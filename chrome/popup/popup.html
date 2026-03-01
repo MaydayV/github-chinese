@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GitHub 中文汉化插件</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="panel">
+    <h1>GitHub 中文汉化插件</h1>
+    <p id="featureDescription" class="feature-description">将 GitHub 页面界面自动翻译为中文</p>
+
+    <div class="power-wrap">
+      <input id="enable_extension" class="power-input" type="checkbox" aria-label="翻译总开关">
+      <label for="enable_extension" class="power-button">
+        <span class="power-ring"></span>
+        <span class="power-line"></span>
+      </label>
+    </div>
+
+    <p id="status" class="status" aria-live="polite"></p>
+    <p class="usage-note">切换后若当前标签页是 GitHub 页面，会自动刷新并立即生效。</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
