@@ -183,6 +183,101 @@ function getProviderConfig(values) {
   }
 }
 
+function getApiOriginPattern(url) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return { ok: false, message: 'API 地址格式无效，请填写完整 URL。' };
+  }
+
+  const protocol = String(parsedUrl.protocol || '').toLowerCase();
+  const hostname = String(parsedUrl.hostname || '').toLowerCase();
+  const isLocalHttp = protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
+
+  if (protocol !== 'https:' && !isLocalHttp) {
+    return { ok: false, message: '为降低权限风险，API 地址仅支持 HTTPS（localhost/127.0.0.1 可用 HTTP）。' };
+  }
+
+  return {
+    ok: true,
+    originPattern: `${parsedUrl.protocol}//${parsedUrl.host}/*`,
+    hostLabel: parsedUrl.host,
+  };
+}
+
+function permissionsContains(origins) {
+  return new Promise((resolve, reject) => {
+    chrome.permissions.contains({ origins }, (granted) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(Boolean(granted));
+    });
+  });
+}
+
+function permissionsRequest(origins) {
+  return new Promise((resolve, reject) => {
+    chrome.permissions.request({ origins }, (granted) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(Boolean(granted));
+    });
+  });
+}
+
+async function ensureProviderHostPermission(values, options = {}) {
+  const { request = false } = options;
+  const config = getProviderConfig(values);
+  if (!config.ok) {
+    return { ok: false, message: config.message };
+  }
+
+  const origin = getApiOriginPattern(config.url);
+  if (!origin.ok) {
+    return { ok: false, message: origin.message };
+  }
+
+  const origins = [origin.originPattern];
+  const alreadyGranted = await permissionsContains(origins);
+  if (alreadyGranted) {
+    return {
+      ok: true,
+      config,
+      hostLabel: origin.hostLabel,
+      originPattern: origin.originPattern,
+      grantedByRequest: false,
+    };
+  }
+
+  if (!request) {
+    return {
+      ok: false,
+      message: `尚未授权访问 ${origin.hostLabel}。请在“API 设置”点击“保存设置”或“测试连通性”完成授权。`,
+    };
+  }
+
+  const granted = await permissionsRequest(origins);
+  if (!granted) {
+    return {
+      ok: false,
+      message: `你未授予 ${origin.hostLabel} 的访问权限，无法调用该翻译接口。`,
+    };
+  }
+
+  return {
+    ok: true,
+    config,
+    hostLabel: origin.hostLabel,
+    originPattern: origin.originPattern,
+    grantedByRequest: true,
+  };
+}
+
 function enforceFeatureSwitchRules(values, options = {}) {
   const { requireApiConfig = true, resetAdvancedWhenEnable = false } = options;
   const nextValues = { ...values };
@@ -228,13 +323,23 @@ function hasSettingDifference(a, b) {
 async function saveValues(values) {
   await chrome.storage.sync.set(values);
   LAST_SAVED_VALUES = { ...values };
-  setStatus('设置已保存。你现在可以点击“测试连通性”验证接口。', 'success');
 }
 
 async function loadValues() {
   const rawValues = await chrome.storage.sync.get(DEFAULTS);
   const ruled = enforceFeatureSwitchRules(rawValues, { requireApiConfig: false });
-  const normalized = ruled.values;
+  let normalized = ruled.values;
+
+  if (normalized.enable_readme_translation) {
+    const permission = await ensureProviderHostPermission(normalized, { request: false });
+    if (!permission.ok) {
+      normalized = enforceFeatureSwitchRules(
+        { ...normalized, enable_readme_translation: false },
+        { requireApiConfig: false },
+      ).values;
+    }
+  }
+
   LAST_SAVED_VALUES = { ...normalized };
 
   applyValues(normalized);
@@ -605,7 +710,7 @@ function bindEvents() {
   });
 
   const mainSwitch = byId('enable_readme_translation');
-  mainSwitch?.addEventListener('change', () => {
+  mainSwitch?.addEventListener('change', async () => {
     const values = collectValues();
 
     if (values.enable_readme_translation) {
@@ -626,6 +731,22 @@ function bindEvents() {
         mainSwitch.checked = false;
         updateAdvancedSwitchUi(false);
         setStatus('请先在“API 设置”中保存可用配置，再开启 README 翻译。', 'error');
+        return;
+      }
+
+      try {
+        const permission = await ensureProviderHostPermission(LAST_SAVED_VALUES, { request: false });
+        if (!permission.ok) {
+          mainSwitch.checked = false;
+          updateAdvancedSwitchUi(false);
+          setStatus(permission.message, 'error');
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        mainSwitch.checked = false;
+        updateAdvancedSwitchUi(false);
+        setStatus('读取接口权限失败，请重新点击“保存设置”或“测试连通性”。', 'error');
         return;
       }
 
@@ -659,8 +780,15 @@ function bindEvents() {
         return;
       }
 
+      const permission = await ensureProviderHostPermission(ruled.values, { request: true });
+      if (!permission.ok) {
+        setStatus(permission.message, 'error');
+        return;
+      }
+
       applyValues(ruled.values);
       await saveValues(ruled.values);
+      setStatus('设置已保存。接口域名权限已就绪，可点击“测试连通性”进一步验证。', 'success');
     } catch (error) {
       console.error(error);
       setStatus('保存失败，请检查输入内容或稍后重试。', 'error');
@@ -671,6 +799,11 @@ function bindEvents() {
     try {
       setStatus('正在测试连通性，请稍候...');
       const values = collectValues();
+      const permission = await ensureProviderHostPermission(values, { request: true });
+      if (!permission.ok) {
+        setStatus(permission.message, 'error');
+        return;
+      }
       const message = await testProviderConnection(values);
       setStatus(`测试成功：${message}`, 'success');
     } catch (error) {

@@ -154,7 +154,7 @@
           <div class="field">
             <label for="readme_openai_api_url">API 地址</label>
             <input id="readme_openai_api_url" type="url" placeholder="https://api.openai.com/v1/chat/completions">
-            <p class="hint">可填完整 `/chat/completions` 地址，也可填 base URL（插件会自动补全）。</p>
+            <p class="hint">可填完整 `/chat/completions` 地址，也可填 base URL（插件会自动补全）。为通过商店审核并降低权限风险，默认仅支持 HTTPS（本地 localhost 可用 HTTP）。</p>
           </div>
           <div class="field">
             <label for="readme_openai_api_key">API Key</label>
@@ -171,7 +171,7 @@
 
         <section class="card assist">
           <h2>连接测试说明</h2>
-          <p>点击“测试连通性”会用当前表单配置发送一次最小测试请求，不会修改页面内容。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
+          <p>点击“测试连通性”会用当前表单配置发送一次最小测试请求，不会修改页面内容。首次测试某个 API 域名时，浏览器会弹出域名访问授权提示。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
         </section>
       </section>
 

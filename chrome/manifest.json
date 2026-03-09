@@ -11,16 +11,20 @@
     "128": "assets/icons/icon128.png"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "permissions"
   ],
   "host_permissions": [
     "https://github.com/*",
     "https://skills.github.com/*",
     "https://gist.github.com/*",
     "https://education.github.com/*",
-    "https://www.githubstatus.com/*",
+    "https://www.githubstatus.com/*"
+  ],
+  "optional_host_permissions": [
     "https://*/*",
-    "http://*/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "background.js"
