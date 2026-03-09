@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>README 翻译设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">GitHub 中文化插件 · README Translator</p>
+      <h1>README 翻译设置</h1>
+      <p>将 README 翻译能力拆分为“功能开关 / API 设置 / 翻译记录”三个区域。建议先完成 API 配置并保存，再启用 README 翻译。</p>
+    </header>
+
+    <form id="settingsForm" class="form">
+      <section class="card tabs-card">
+        <div class="tabs" role="tablist" aria-label="README 翻译设置标签">
+          <button type="button" class="tab-btn is-active" data-tab-target="features" role="tab" aria-selected="true">功能开关</button>
+          <button type="button" class="tab-btn" data-tab-target="api" role="tab" aria-selected="false">API 设置</button>
+          <button type="button" class="tab-btn" data-tab-target="records" role="tab" aria-selected="false">翻译记录</button>
+        </div>
+      </section>
+
+      <section class="tab-panel is-active" data-tab-panel="features">
+        <section class="card">
+          <h2>README 翻译开关</h2>
+          <label for="enable_readme_translation" class="switch-row">
+            <span class="switch-copy">
+              <strong>启用 README 翻译</strong>
+              <small>仅翻译仓库 README 内容区域，不影响代码块、链接、图片路径与 Markdown 结构。</small>
+            </span>
+            <span class="ios-switch-wrap">
+              <input id="enable_readme_translation" type="checkbox" class="ios-switch-input">
+              <span class="ios-switch" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="hint">注意：未配置有效 API 并保存前，不能开启此开关。</p>
+        </section>
+
+        <section class="card">
+          <h2>高级功能</h2>
+          <div class="switch-stack">
+            <label for="readme_enable_token_record" class="switch-row">
+              <span class="switch-copy">
+                <strong>记录翻译消耗</strong>
+                <small>记录每次翻译状态、tokens、时间和仓库名，用于评估调用成本。</small>
+              </span>
+              <span class="ios-switch-wrap">
+                <input id="readme_enable_token_record" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
+
+            <label for="readme_enable_repo_cache" class="switch-row">
+              <span class="switch-copy">
+                <strong>仓库翻译缓存</strong>
+                <small>仓库 README 未变化时，直接使用上次翻译结果，减少重复 API 请求。</small>
+              </span>
+              <span class="ios-switch-wrap">
+                <input id="readme_enable_repo_cache" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
+
+            <label for="readme_enable_progressive" class="switch-row">
+              <span class="switch-copy">
+                <strong>分段渐进翻译</strong>
+                <small>长 README 按段落分批翻译并逐步显示，降低长时间等待体感。</small>
+              </span>
+              <span class="ios-switch-wrap">
+                <input id="readme_enable_progressive" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card assist">
+          <h2>使用说明</h2>
+          <ul class="guide-list">
+            <li>步骤 1：切到“API 设置”填写服务地址、Key、模型并保存。</li>
+            <li>步骤 2：点击“测试连通性”确认接口可用。</li>
+            <li>步骤 3：回到“功能开关”开启 README 翻译，再按需开启高级功能。</li>
+            <li>步骤 4：在“翻译记录”查看 tokens 消耗、缓存命中与翻译状态。</li>
+          </ul>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="api">
+        <section class="card">
+          <div class="field">
+            <label for="readme_provider">翻译服务</label>
+            <select id="readme_provider">
+              <option value="deepl">DeepL</option>
+              <option value="google">Google Cloud Translation</option>
+              <option value="azure">Microsoft Translator (Azure)</option>
+              <option value="openai">OpenAI 兼容接口（DeepSeek/Kimi/中转站等）</option>
+            </select>
+            <p class="hint">选择当前使用的翻译平台。翻译目标语言固定为简体中文（zh-CN）。若使用国产大模型或中转站，请选择 OpenAI 兼容接口。</p>
+          </div>
+        </section>
+
+        <section class="card provider" data-provider="deepl">
+          <h2>DeepL 配置</h2>
+          <div class="field">
+            <label for="readme_deepl_api_url">API 地址</label>
+            <input id="readme_deepl_api_url" type="url" placeholder="https://api-free.deepl.com/v2/translate">
+            <p class="hint">DeepL Free 默认地址：`api-free.deepl.com`，Pro 账号可改为 `api.deepl.com`。</p>
+          </div>
+          <div class="field">
+            <label for="readme_deepl_api_key">API Key</label>
+            <input id="readme_deepl_api_key" type="password" placeholder="DeepL API Key">
+            <p class="hint">在 DeepL 控制台生成，通常以 `:fx` 结尾（Free 套餐）。</p>
+          </div>
+        </section>
+
+        <section class="card provider" data-provider="google">
+          <h2>Google Cloud Translation 配置</h2>
+          <div class="field">
+            <label for="readme_google_api_url">API 地址</label>
+            <input id="readme_google_api_url" type="url" placeholder="https://translation.googleapis.com/language/translate/v2">
+            <p class="hint">推荐使用 v2 端点。若走代理网关，可替换为你的网关地址。</p>
+          </div>
+          <div class="field">
+            <label for="readme_google_api_key">API Key</label>
+            <input id="readme_google_api_key" type="password" placeholder="Google API Key">
+            <p class="hint">请确保该 Key 已启用 Cloud Translation API 权限。</p>
+          </div>
+        </section>
+
+        <section class="card provider" data-provider="azure">
+          <h2>Microsoft Translator 配置</h2>
+          <div class="field">
+            <label for="readme_azure_api_url">API 地址</label>
+            <input id="readme_azure_api_url" type="url" placeholder="https://api.cognitive.microsofttranslator.com/translate">
+            <p class="hint">默认是全球端点；若使用私有区域端点，请填你的专属地址。</p>
+          </div>
+          <div class="field">
+            <label for="readme_azure_api_key">API Key</label>
+            <input id="readme_azure_api_key" type="password" placeholder="Azure Translator Key">
+            <p class="hint">来自 Azure AI Translator 资源密钥。</p>
+          </div>
+          <div class="field">
+            <label for="readme_azure_region">Region</label>
+            <input id="readme_azure_region" type="text" placeholder="例如：eastasia">
+            <p class="hint">必填，如 `eastasia`、`koreacentral` 等。</p>
+          </div>
+        </section>
+
+        <section class="card provider" data-provider="openai">
+          <h2>OpenAI 兼容接口配置</h2>
+          <div class="field">
+            <label for="readme_openai_api_url">API 地址</label>
+            <input id="readme_openai_api_url" type="url" placeholder="https://api.openai.com/v1/chat/completions">
+            <p class="hint">可填完整 `/chat/completions` 地址，也可填 base URL（插件会自动补全）。</p>
+          </div>
+          <div class="field">
+            <label for="readme_openai_api_key">API Key</label>
+            <input id="readme_openai_api_key" type="password" placeholder="Bearer Key">
+            <p class="hint">支持 OpenAI、DeepSeek、Kimi 及兼容 OpenAI 协议的平台。</p>
+          </div>
+          <div class="field">
+            <label for="readme_openai_model">模型</label>
+            <input id="readme_openai_model" type="text" placeholder="gpt-4o-mini / deepseek-chat / kimi-k2">
+            <p class="hint">填接口实际可用的模型名，大小写请与平台要求一致。</p>
+          </div>
+          <p class="hint">README 翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>
+        </section>
+
+        <section class="card assist">
+          <h2>连接测试说明</h2>
+          <p>点击“测试连通性”会用当前表单配置发送一次最小测试请求，不会修改页面内容。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="records">
+        <section class="card history">
+          <div class="history-head">
+            <h2>翻译记录</h2>
+            <div class="history-tools">
+              <button id="refreshRecords" type="button" class="btn btn-ghost btn-mini">刷新</button>
+              <button id="clearRecords" type="button" class="btn btn-ghost btn-mini">清空记录</button>
+              <button id="clearRepoCache" type="button" class="btn btn-ghost btn-mini">清空缓存</button>
+            </div>
+          </div>
+          <p id="recordsSummary" class="hint">暂无翻译记录。</p>
+          <ul id="recordsList" class="history-list"></ul>
+          <div id="recordsPager" class="history-pager" hidden>
+            <button id="recordsPrev" type="button" class="btn btn-ghost btn-mini">上一页</button>
+            <span id="recordsPageInfo" class="history-page-info"></span>
+            <button id="recordsNext" type="button" class="btn btn-ghost btn-mini">下一页</button>
+          </div>
+        </section>
+      </section>
+
+      <footer class="actions">
+        <button type="submit" class="btn btn-primary">保存设置</button>
+        <button id="testConnection" type="button" class="btn btn-test">测试连通性</button>
+        <button id="resetReadmeDefaults" type="button" class="btn btn-ghost">恢复 README 默认值</button>
+        <p id="status" class="status" aria-live="polite"></p>
+      </footer>
+
+      <section class="footer-meta">
+        <p><strong>Chrome 插件作者仓库：</strong><a href="https://github.com/MaydayV/github-chinese/tree/chrome" target="_blank" rel="noopener noreferrer">https://github.com/MaydayV/github-chinese/tree/chrome</a></p>
+        <p><strong>词条原仓库（致谢）：</strong><a href="https://github.com/maboloshi/github-chinese" target="_blank" rel="noopener noreferrer">https://github.com/maboloshi/github-chinese</a></p>
+      </section>
+    </form>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

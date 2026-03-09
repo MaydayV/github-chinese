@@ -1,0 +1,1517 @@
+(function (window, document, undefined) {
+    'use strict';
+
+    const OPENAI_README_SYSTEM_PROMPT = `你是一个 GitHub README 翻译引擎。
+请把输入数组中的英文文本翻译为目标中文语言，并严格遵守：
+1. 保留 Markdown 语义，不要改动链接、URL、占位符、变量名、文件路径。
+2. 代码片段、命令、配置键名和版本号保持不变。
+3. 不要新增解释，不要总结，不要添加前后缀。
+4. 返回 JSON 数组，长度与输入一致，顺序一致。`;
+
+    /****************** 全局配置区（开发者可修改部分） ******************/
+    const STORAGE_DEFAULTS = {
+        enable_extension: true,
+        enable_readme_translation: false,
+        readme_enable_token_record: false,
+        readme_enable_repo_cache: false,
+        readme_enable_progressive: false,
+        readme_provider: 'deepl',
+        readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
+        readme_deepl_api_key: '',
+        readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',
+        readme_google_api_key: '',
+        readme_azure_api_url: 'https://api.cognitive.microsofttranslator.com/translate',
+        readme_azure_api_key: '',
+        readme_azure_region: '',
+        readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
+        readme_openai_api_key: '',
+        readme_openai_model: 'gpt-4o-mini',
+    };
+
+    const FeatureSet = { ...STORAGE_DEFAULTS };
+
+    const CONFIG = {
+        LANG: 'zh-CN',
+        // 站点域名 -> 类型映射
+        PAGE_MAP: {
+            'gist.github.com': 'gist',
+            'www.githubstatus.com': 'status',
+            'skills.github.com': 'skills',
+            'education.github.com': 'education'
+        },
+        // 需要特殊处理的站点类型
+        SPECIAL_SITES: ['gist', 'status', 'skills', 'education'],
+        OBSERVER_CONFIG: {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributeFilter: ['value', 'placeholder', 'aria-label', 'data-confirm']
+        }
+    };
+
+    const README_CONFIG = {
+        ROOT_SELECTORS: [
+            '#readme article.markdown-body',
+            '[data-testid="readme"] article.markdown-body',
+            'article.markdown-body.entry-content.container-lg'
+        ],
+        SKIP_PARENT_SELECTOR: [
+            'pre',
+            'code',
+            'kbd',
+            'samp',
+            'svg',
+            'math',
+            'script',
+            'style',
+            'textarea',
+            '.notranslate',
+            '[translate="no"]',
+            '[aria-hidden="true"]'
+        ].join(', '),
+        MAX_BATCH_ITEMS: 24,
+        MAX_BATCH_CHARS: 6500,
+        PROGRESSIVE_GROUP_SIZE: 12,
+        DEBOUNCE_MS: 700,
+        RECORD_MAX_ENTRIES: 200,
+        REPO_CACHE_MAX_ENTRIES: 24,
+        MAX_CACHE_HTML_CHARS: 260000,
+    };
+
+    const README_LOCAL_STORAGE_KEYS = {
+        TRANSLATION_RECORDS: 'ghcn_readme_translation_records',
+        REPO_CACHE: 'ghcn_readme_repo_cache',
+    };
+
+    const readmeRuntime = {
+        timerId: 0,
+        inFlight: false,
+        rerunRequested: false,
+        stateByElement: new WeakMap(),
+        translationCache: new Map(),
+        repoCacheMap: new Map(),
+        repoCacheLoaded: false,
+        lastWarnKey: '',
+    };
+
+    const FIXED_TARGET_LANG = 'zh-CN';
+
+    let pageConfig = {};
+
+    // 初始化
+    init().catch(err => {
+        console.error('初始化失败:', err);
+    });
+
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message?.type === 'refresh-page') {
+            window.location.reload();
+        }
+    });
+
+    async function loadFeatureSet() {
+        const result = await chrome.storage.sync.get(STORAGE_DEFAULTS);
+        Object.assign(FeatureSet, result);
+    }
+
+    function refreshCurrentPageTranslations() {
+        if (!pageConfig.currentPageType || !document.body) return;
+        traverseNode(document.body);
+        transTitle();
+        transBySelector();
+        scheduleReadmeTranslation('refreshCurrentPageTranslations');
+    }
+
+    function isReadmeSettingKey(key) {
+        return key === 'enable_readme_translation' || key.startsWith('readme_');
+    }
+
+    function handleFeatureToggle(key, newFeatureState) {
+        switch (key) {
+            case 'enable_extension':
+                if (newFeatureState) {
+                    document.documentElement.lang = CONFIG.LANG;
+                    refreshCurrentPageTranslations();
+                } else {
+                    restoreReadmeTranslation();
+                }
+                break;
+            default:
+                if (isReadmeSettingKey(key)) {
+                    readmeRuntime.translationCache.clear();
+                    if (key === 'readme_enable_repo_cache' && !newFeatureState) {
+                        readmeRuntime.repoCacheMap.clear();
+                        readmeRuntime.repoCacheLoaded = false;
+                    }
+                    if (FeatureSet.enable_extension && FeatureSet.enable_readme_translation) {
+                        scheduleReadmeTranslation(`setting:${key}`);
+                    } else {
+                        restoreReadmeTranslation();
+                    }
+                }
+                break;
+        }
+    }
+
+    function watchFeatureChanges() {
+        chrome.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName !== 'sync') return;
+
+            Object.entries(changes).forEach(([key, change]) => {
+                if (!(key in FeatureSet)) return;
+                FeatureSet[key] = change.newValue;
+                handleFeatureToggle(key, change.newValue);
+            });
+        });
+    }
+
+    // 更新页面设置
+    function updatePageConfig(currentPageChangeTrigger) {
+        const newType = detectPageType();
+        if (newType && newType !== pageConfig.currentPageType) {
+            pageConfig = buildPageConfig(newType);
+            scheduleReadmeTranslation(`${currentPageChangeTrigger}:pageTypeChanged`);
+        }
+        console.log(`【Debug】${currentPageChangeTrigger}触发, 页面类型为 ${pageConfig.currentPageType}`);
+    }
+
+    // 构建页面设置 pageConfig 对象
+    function buildPageConfig(pageType = pageConfig.currentPageType) {
+        return {
+            // 当前页面类型
+            currentPageType: pageType,
+            // 页面标题静态词库
+            titleStaticDict: {
+                ...I18N[CONFIG.LANG].public.title.static,
+                ...(I18N[CONFIG.LANG][pageType]?.title?.static || {})
+            },
+            // 页面标题正则词库
+            titleRegexpRules: [
+                ...I18N[CONFIG.LANG].public.title.regexp,
+                ...(I18N[CONFIG.LANG][pageType]?.title?.regexp || [])
+            ],
+            // 静态词库
+            staticDict: {
+                ...I18N[CONFIG.LANG].public.static,
+                ...(I18N[CONFIG.LANG][pageType]?.static || {})
+            },
+            // 正则词库
+            regexpRules: [
+                ...(I18N[CONFIG.LANG][pageType]?.regexp || []),
+                ...I18N[CONFIG.LANG].public.regexp
+            ],
+            // 忽略突变元素选择器（字符串）
+            ignoreMutationSelectors: [
+                ...I18N.conf.ignoreMutationSelectorPage['*'],
+                ...(I18N.conf.ignoreMutationSelectorPage[pageType] || [])
+            ].join(', '),
+            // 忽略元素选择器规则（字符串）
+            ignoreSelectors: [
+                ...I18N.conf.ignoreSelectorPage['*'],
+                ...(I18N.conf.ignoreSelectorPage[pageType] || [])
+            ].join(', '),
+            // 字符数据监视开启规则（布尔值）
+            characterData: I18N.conf.characterDataPage.includes(pageType),
+            // CSS 选择器规则
+            tranSelectors: [
+                ...(I18N[CONFIG.LANG].public.selector || []),
+                ...(I18N[CONFIG.LANG][pageType]?.selector || [])
+            ],
+        };
+    }
+
+    /**
+     * watchUpdate 函数：监视页面变化，根据变化的节点进行翻译
+     */
+    function watchUpdate() {
+        // 缓存当前页面的 URL
+        let previousURL = window.location.href;
+
+        const handleUrlChange = () => {
+            const currentURL = window.location.href;
+            // 如果页面的 URL 发生变化
+            if (currentURL !== previousURL) {
+                previousURL = currentURL;
+                updatePageConfig('DOM变化');
+            }
+        }
+
+        const processMutations = mutations => {
+            // 平铺突变记录并过滤需要处理的节点（链式操作）
+            // 使用 mutations.flatMap 进行筛选突变:
+            //   1. 针对`节点增加`突变，后期迭代翻译的对象调整为`addedNodes`中记录的新增节点，而不是`target`，此举大幅减少重复迭代翻译
+            //   2. 对于其它`属性`和特定页面`文本节点`突变，仍旧直接处理`target`
+            //   3. 使用`.filter()`筛选丢弃特定页面`特定忽略元素`内突变的节点
+            mutations.flatMap(({ target, addedNodes, type }) => {
+                // 处理子节点添加的情况
+                if (type === 'childList' && addedNodes.length > 0) {
+                    return [...addedNodes]; // 将新增节点转换为数组
+                }
+                // 处理属性和文本内容变更的情况
+                return (type === 'attributes' || (type === 'characterData' && pageConfig.characterData))
+                    ? [target] // 否则，仅处理目标节点
+                    : [];
+            })
+            // 过滤需要忽略的突变节点
+            .filter(node =>
+                // 剔除节点元素所在 DOM 树中匹配忽略选择器
+                !(node.closest
+                  ? node.closest(pageConfig.ignoreMutationSelectors)
+                  : node.parentElement?.closest(pageConfig.ignoreMutationSelectors)
+                )
+            )
+            // 处理每个变化
+            .forEach(node =>
+                // 递归遍历节点树进行处理
+                traverseNode(node)
+            );
+        }
+
+        // 监听 document.body 下 DOM 变化，用于处理节点变化
+        new MutationObserver(mutations => {
+            if (!FeatureSet.enable_extension) return;
+            handleUrlChange();
+            if (pageConfig.currentPageType) processMutations(mutations);
+            if (FeatureSet.enable_readme_translation) {
+                scheduleReadmeTranslation('mutation');
+            }
+        }).observe(document.body, CONFIG.OBSERVER_CONFIG);
+    }
+
+    /**
+     * traverseNode 函数：遍历指定的节点，并对节点进行翻译。
+     * @param {Node} node - 需要遍历的节点。
+     */
+    function traverseNode(rootNode) {
+        if (!FeatureSet.enable_extension) return;
+        const start = performance.now();
+
+        const handleTextNode = node => {
+            if (node.length > 500) return;
+            transElement(node, 'data');
+        }
+
+        // 如果 rootNode 是文本节点，直接处理
+        if (rootNode.nodeType === Node.TEXT_NODE) {
+            handleTextNode(rootNode);
+            return; // 文本节点没有子节点，直接返回
+        }
+
+        const treeWalker = document.createTreeWalker(
+            rootNode,
+            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+            node =>
+                // 跳过忽略的节点
+                node.matches?.(pageConfig.ignoreSelectors)
+                ? NodeFilter.FILTER_REJECT
+                : NodeFilter.FILTER_ACCEPT,
+        );
+
+        const handleElement = node => {
+            // 处理不同标签的元素属性翻译
+            switch (node.tagName) {
+                case 'RELATIVE-TIME': // 翻译时间元素
+                    transTimeElement(node.shadowRoot);
+                    return;
+
+                case 'INPUT':
+                case 'TEXTAREA': // 输入框 按钮 文本域
+                    if (['button', 'submit', 'reset'].includes(node.type)) {
+                        transElement(node.dataset, 'confirm'); // 翻译 浏览器 提示对话框
+                        transElement(node, 'value');
+                    } else {
+                        transElement(node, 'placeholder');
+                    }
+                    break;
+
+                case 'OPTGROUP':
+                    transElement(node, 'label'); // 翻译 <optgroup> 的 label 属性
+                    break;
+
+                case 'BUTTON':
+                    transElement(node, 'title'); // 翻译 浏览器 提示对话框
+                    transElement(node.dataset, 'confirm'); // 翻译 浏览器 提示对话框 ok
+                    transElement(node.dataset, 'confirmText'); // 翻译 浏览器 提示对话框 ok
+                    transElement(node.dataset, 'confirmCancelText'); // 取消按钮 提醒
+                    transElement(node, 'cancelConfirmText'); // 取消按钮 提醒
+                    transElement(node.dataset, 'disableWith'); // 按钮等待提示
+
+                case 'A':
+                case 'SPAN':
+                    transElement(node, 'title'); // title 属性
+                    transElement(node.dataset, 'visibleText'); // 翻译 浏览器 提示对话框 ok
+
+                default:
+                    // 仅当 元素存在'tooltipped'样式 aria-label 才起效果
+                    if (/tooltipped/.test(node.className)) transElement(node, 'ariaLabel'); // 带提示的元素，类似 tooltip 效果的
+            }
+        }
+
+        // 预绑定处理函数提升性能
+        const handlers = {
+            [Node.ELEMENT_NODE]: handleElement,
+            [Node.TEXT_NODE]: handleTextNode
+        };
+
+        let currentNode;
+        while ((currentNode = treeWalker.nextNode())) {
+            handlers[currentNode.nodeType]?.(currentNode);
+        }
+
+        const duration = performance.now() - start;
+        if (duration > 10) {
+            // console.warn(`【Debug】节点遍历耗时: ${duration.toFixed(2)}ms`, rootNode);
+            console.log(`节点遍历耗时: ${duration.toFixed(2)}ms`);
+        }
+    }
+
+    /**
+     * detectPageType 函数：检测当前页面类型，基于URL、元素类名和meta信息。
+     * @returns {string|boolean} 页面的类型，如'repository'、'dashboard'等，如果无法确定类型，那么返回 false。
+     */
+    function detectPageType() {
+        const url = new URL(window.location.href);
+        const { PAGE_MAP, SPECIAL_SITES } = CONFIG;
+        const { hostname, pathname } = url;
+
+        // 基础配置 ===============================================
+        const site = PAGE_MAP[hostname] || 'github'; // 通过站点映射获取基础类型
+        const isLogin = document.body.classList.contains('logged-in');
+        const metaLocation = document.head.querySelector('meta[name="analytics-location"]')?.content || '';
+
+        // 页面特征检测 ============================================
+        const isSession = document.body.classList.contains('session-authentication');
+        const isHomepage = pathname === '/' && site === 'github';
+        const isProfile = document.body.classList.contains('page-profile') || metaLocation === '/<user-name>';
+        const isRepository = /\/<user-name>\/<repo-name>/.test(metaLocation);
+        const isOrganization = /\/<org-login>/.test(metaLocation) || /^\/(?:orgs|organizations)/.test(pathname);
+
+        // 正则配置 ================================================
+        const { rePagePathRepo, rePagePathOrg, rePagePath } = I18N.conf;
+
+        // 核心判断逻辑 ============================================
+        let pageType;
+        switch (true) { // 使用 switch(true) 模式处理多条件分支
+            // 1. 登录相关页面
+            case isSession:
+                pageType = 'session-authentication';
+                break;
+
+            // 2. 特殊站点类型（gist/status/skills/education）
+            case SPECIAL_SITES.includes(site):
+                pageType = site;
+                break;
+
+            // 3. 个人资料页
+            case isProfile:
+                const tabParam = new URLSearchParams(url.search).get('tab');
+                pageType = pathname.includes('/stars') ? 'page-profile/stars'
+                         : tabParam ? `page-profile/${tabParam}`
+                         : 'page-profile';
+                break;
+
+            // 4. 首页/仪表盘
+            case isHomepage:
+                pageType = isLogin ? 'dashboard' : 'homepage';
+                break;
+
+            // 5. 代码仓库页
+            case isRepository:
+                const repoMatch = pathname.match(rePagePathRepo);
+                pageType = repoMatch ? `repository/${repoMatch[1]}` : 'repository';
+                break;
+
+            // 6. 组织页面
+            case isOrganization:
+                const orgMatch = pathname.match(rePagePathOrg);
+                pageType = orgMatch ? `orgs/${orgMatch[1] || orgMatch.slice(-1)[0]}` : 'orgs';
+                break;
+
+            // 7. 默认处理逻辑
+            default:
+                const pathMatch = pathname.match(rePagePath);
+                pageType = pathMatch ? (pathMatch[1] || pathMatch.slice(-1)[0]) : false;
+        }
+
+        console.log(`【Debug】pathname = ${pathname}, site = ${site}, isLogin = ${isLogin}, analyticsLocation = ${metaLocation}, isOrganization = ${isOrganization}, isRepository = ${isRepository}, isProfile = ${isProfile}, isSession = ${isSession}`)
+
+        // 词库校验 ================================================
+        if (pageType === false || !I18N[CONFIG.LANG]?.[pageType]) {
+            console.warn(`[i18n] 页面类型未匹配或词库缺失: ${pageType}`);
+            return false; // 明确返回 false 表示异常
+        }
+
+        return pageType;
+    }
+
+    /**
+     * transTitle 函数：翻译页面标题
+     */
+    function transTitle() {
+        if (!FeatureSet.enable_extension) return;
+        const text = document.title; // 获取标题文本内容
+        let translatedText = pageConfig.titleStaticDict[text] || '';
+        if (!translatedText) {
+            for (const [pattern, replacement] of pageConfig.titleRegexpRules) {
+                translatedText = text.replace(pattern, replacement);
+                if (translatedText !== text) break;
+            }
+        }
+        if (translatedText) {
+            document.title = translatedText;
+        }
+    }
+
+    /**
+     * transTimeElement 函数：翻译时间元素文本内容。
+     * @param {Element} el - 需要翻译的元素。
+     */
+    function transTimeElement(el) {
+        if (!FeatureSet.enable_extension || !el) return;
+        const text = el.childNodes.length > 0 ? el.lastChild.textContent : el.textContent;
+        const translatedText = text.replace(/^on/, '');
+        if (translatedText !== text) {
+            el.textContent = translatedText;
+        }
+    }
+
+    /**
+     * transElement 函数：翻译指定元素的文本内容或属性。
+     * @param {Element|DOMStringMap} el - 需要翻译的元素或元素的数据集 (node.dataset)。
+     * @param {string} field - 需要翻译的属性名称或文本内容字段。
+     */
+    function transElement(el, field) {
+        if (!FeatureSet.enable_extension) return false;
+        const text = el[field]; // 获取需要翻译的文本
+        if (!text) return false; // 当 text 为空时，退出函数
+
+        const translatedText = transText(text); // 翻译后的文本
+        if (translatedText) {
+            el[field] = translatedText; // 替换翻译后的内容
+        }
+    }
+
+    /**
+     * transText 函数：翻译文本内容。
+     * @param {string} text - 需要翻译的文本内容。
+     * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
+     */
+    function transText(text) {
+        // 判断是否需要跳过翻译
+        //  1. 检查内容是否为空或者仅包含空白字符或数字。
+        //  2. 检查内容是否仅包含中文字符。
+        //  3. 检查内容是否不包含英文字母和符号。
+        const shouldSkip = text => /^[\s0-9]*$/.test(text) || /^[\u4e00-\u9fa5]+$/.test(text) || !/[a-zA-Z,.]/.test(text);
+        if (shouldSkip(text)) return false;
+
+        // 清理文本内容
+        const trimmedText = text.trim(); // 去除首尾空格
+        const cleanedText = trimmedText.replace(/\xa0|[\s]+/g, ' '); // 去除多余空白字符（包括 &nbsp; 空格 换行符）
+
+        // 尝试获取翻译结果
+        const translatedText = fetchTranslatedText(cleanedText);
+
+        // 如果找到翻译并且不与清理后的文本相同，则返回替换后的结果
+        if (translatedText && translatedText !== cleanedText) {
+            return text.replace(trimmedText, translatedText); // 替换原字符，保留首尾空白部分
+        }
+
+        return false;
+    }
+
+    /**
+     * fetchTranslatedText 函数：从特定页面的词库中获得翻译文本内容。
+     * @param {string} text - 需要翻译的文本内容。
+     * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
+     */
+    function fetchTranslatedText(text) {
+
+        // 静态翻译
+        let translatedText = pageConfig.staticDict[text]; // 默认翻译 公共部分
+
+        if (typeof translatedText === 'string') return translatedText;
+
+        // 正则翻译
+        for (const [pattern, replacement] of pageConfig.regexpRules) {
+            translatedText = text.replace(pattern, replacement);
+            if (translatedText !== text) return translatedText;
+        }
+
+        return false; // 没有翻译条目
+    }
+
+    /**
+     * transBySelector 函数：通过 CSS 选择器找到页面上的元素，并将其文本内容替换为预定义的翻译。
+     */
+    function transBySelector() {
+        if (!FeatureSet.enable_extension) return;
+        // 遍历每个翻译规则
+        pageConfig.tranSelectors?.forEach(([selector, translatedText]) => {
+            // 使用 CSS 选择器找到对应的元素
+            const element = document.querySelector(selector);
+            // 如果找到了元素，那么将其文本内容替换为翻译后的文本
+            if (element) {
+                element.textContent = translatedText;
+            }
+        })
+    }
+
+    function isRepositoryPage() {
+        return typeof pageConfig.currentPageType === 'string' && pageConfig.currentPageType.startsWith('repository');
+    }
+
+    function isReadmeTranslationEnabled() {
+        return FeatureSet.enable_extension && FeatureSet.enable_readme_translation && isRepositoryPage();
+    }
+
+    function getReadmeRootElement() {
+        for (const selector of README_CONFIG.ROOT_SELECTORS) {
+            const element = document.querySelector(selector);
+            if (!element) continue;
+
+            return element;
+        }
+
+        return null;
+    }
+
+    function getReadmeElementState(readmeEl) {
+        if (!readmeRuntime.stateByElement.has(readmeEl)) {
+            readmeRuntime.stateByElement.set(readmeEl, {
+                originalHtml: '',
+                translatedHash: '',
+                translatedSignature: '',
+            });
+        }
+
+        return readmeRuntime.stateByElement.get(readmeEl);
+    }
+
+    function buildRepoIdentifierFromPath(pathname) {
+        if (!pathname) return '';
+        const match = String(pathname).match(/^\/([^/]+)\/([^/]+)/);
+        if (!match) return '';
+
+        const decodePathPart = (segment) => {
+            try {
+                return decodeURIComponent(segment);
+            } catch {
+                return segment;
+            }
+        };
+
+        const owner = decodePathPart(match[1]).toLowerCase();
+        const repo = decodePathPart(match[2]).toLowerCase();
+        return owner && repo ? `${owner}/${repo}` : '';
+    }
+
+    function getCurrentRepoInfo() {
+        const fullName = buildRepoIdentifierFromPath(window.location.pathname);
+        if (!fullName) return null;
+
+        const [owner, repo] = fullName.split('/');
+        if (!owner || !repo) return null;
+        return { owner, repo, fullName };
+    }
+
+    function buildRepoCacheKey(repoInfo, sourceHash, signature) {
+        if (!repoInfo?.owner || !repoInfo?.repo || !sourceHash || !signature) return '';
+        return `${String(repoInfo.owner).toLowerCase()}/${String(repoInfo.repo).toLowerCase()}|${sourceHash}|${signature}`;
+    }
+
+    function buildProgressiveGroups(items, groupSize) {
+        const values = Array.isArray(items) ? items : [];
+        if (!values.length) return [];
+
+        const size = Math.max(1, Number(groupSize) || 1);
+        const groups = [];
+
+        for (let index = 0; index < values.length; index += size) {
+            groups.push(values.slice(index, index + size));
+        }
+
+        return groups;
+    }
+
+    function trimTranslationRecords(records, maxEntries) {
+        const list = Array.isArray(records) ? records : [];
+        const limit = Math.max(1, Number(maxEntries) || 1);
+
+        return [...list]
+            .sort((a, b) => Number(b?.createdAt || 0) - Number(a?.createdAt || 0))
+            .slice(0, limit);
+    }
+
+    function getReadmeUsageTokens(payload) {
+        const usage = payload?.usage;
+        if (!usage || typeof usage !== 'object') return 0;
+
+        const totalTokens = Number(usage.total_tokens);
+        if (Number.isFinite(totalTokens) && totalTokens >= 0) {
+            return totalTokens;
+        }
+
+        const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
+        const completionTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+        const fallback = promptTokens + completionTokens;
+        return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+    }
+
+    function generateRecordId() {
+        return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function normalizeRepoCacheEntries(entries) {
+        const list = Array.isArray(entries) ? entries : [];
+
+        return list
+            .filter((item) => item && typeof item.key === 'string' && typeof item.translatedHtml === 'string')
+            .map((item) => ({
+                key: item.key,
+                repo: item.repo || '',
+                sourceHash: item.sourceHash || '',
+                translatedHtml: item.translatedHtml,
+                updatedAt: Number(item.updatedAt || 0),
+            }))
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, README_CONFIG.REPO_CACHE_MAX_ENTRIES);
+    }
+
+    async function getLocalValue(key, fallbackValue) {
+        const result = await chrome.storage.local.get({ [key]: fallbackValue });
+        return result[key];
+    }
+
+    async function setLocalValue(key, value) {
+        await chrome.storage.local.set({ [key]: value });
+    }
+
+    async function ensureRepoCacheLoaded() {
+        if (readmeRuntime.repoCacheLoaded) return;
+
+        const storedEntries = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
+        const normalizedEntries = normalizeRepoCacheEntries(storedEntries);
+
+        readmeRuntime.repoCacheMap.clear();
+        normalizedEntries.forEach((entry) => {
+            readmeRuntime.repoCacheMap.set(entry.key, entry);
+        });
+        readmeRuntime.repoCacheLoaded = true;
+    }
+
+    async function getRepoCachedTranslation(cacheKey) {
+        if (!FeatureSet.readme_enable_repo_cache || !cacheKey) return null;
+        await ensureRepoCacheLoaded();
+
+        const entry = readmeRuntime.repoCacheMap.get(cacheKey);
+        if (!entry || !entry.translatedHtml) return null;
+        return entry;
+    }
+
+    async function upsertRepoCachedTranslation(cacheKey, value) {
+        if (!FeatureSet.readme_enable_repo_cache || !cacheKey) return;
+        if (!value?.translatedHtml || value.translatedHtml.length > README_CONFIG.MAX_CACHE_HTML_CHARS) return;
+
+        await ensureRepoCacheLoaded();
+
+        readmeRuntime.repoCacheMap.set(cacheKey, {
+            key: cacheKey,
+            repo: value.repo || '',
+            sourceHash: value.sourceHash || '',
+            translatedHtml: value.translatedHtml,
+            updatedAt: Date.now(),
+        });
+
+        const entries = normalizeRepoCacheEntries([...readmeRuntime.repoCacheMap.values()]);
+        readmeRuntime.repoCacheMap.clear();
+        entries.forEach((entry) => {
+            readmeRuntime.repoCacheMap.set(entry.key, entry);
+        });
+
+        await setLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, entries);
+    }
+
+    async function appendReadmeTranslationRecord(record) {
+        if (!FeatureSet.readme_enable_token_record) return;
+
+        const repoInfo = getCurrentRepoInfo();
+        const nextRecord = {
+            id: generateRecordId(),
+            repo: record?.repo || repoInfo?.fullName || 'unknown/unknown',
+            status: record?.status || 'success',
+            tokens: Math.max(0, Number(record?.tokens) || 0),
+            provider: (FeatureSet.readme_provider || '').trim().toLowerCase(),
+            createdAt: Date.now(),
+            durationMs: Math.max(0, Number(record?.durationMs) || 0),
+            sourceHash: record?.sourceHash || '',
+            detail: record?.detail ? truncateText(String(record.detail), 160) : '',
+        };
+
+        const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, []);
+        const records = Array.isArray(existing) ? existing : [];
+        records.push(nextRecord);
+
+        const trimmed = trimTranslationRecords(records, README_CONFIG.RECORD_MAX_ENTRIES);
+        await setLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, trimmed);
+    }
+
+    function applyTextGroupTranslations(tasksByText, texts, translatedMap) {
+        let translatedCount = 0;
+
+        texts.forEach((text) => {
+            const translated = translatedMap.get(text);
+            if (!translated || translated === text) return;
+
+            const tasks = tasksByText.get(text) || [];
+            tasks.forEach((task) => {
+                task.node.data = task.rawText.replace(task.trimmedText, translated);
+                translatedCount += 1;
+            });
+        });
+
+        return translatedCount;
+    }
+
+    async function waitForNextPaint() {
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(() => resolve());
+        });
+    }
+
+    function restoreReadmeTranslation() {
+        const readmeEl = getReadmeRootElement();
+        if (!readmeEl) return;
+
+        const state = getReadmeElementState(readmeEl);
+        if (state.originalHtml && readmeEl.innerHTML !== state.originalHtml) {
+            readmeEl.innerHTML = state.originalHtml;
+        }
+
+        state.translatedHash = '';
+        state.translatedSignature = '';
+    }
+
+    function scheduleReadmeTranslation(reason) {
+        if (!FeatureSet.enable_extension) return;
+
+        if (readmeRuntime.timerId) {
+            window.clearTimeout(readmeRuntime.timerId);
+        }
+
+        readmeRuntime.timerId = window.setTimeout(() => {
+            readmeRuntime.timerId = 0;
+            runReadmeTranslation(reason).catch(err => {
+                console.error('[README翻译] 执行失败:', err);
+            });
+        }, README_CONFIG.DEBOUNCE_MS);
+    }
+
+    async function runReadmeTranslation(reason) {
+        if (!isReadmeTranslationEnabled()) {
+            restoreReadmeTranslation();
+            return;
+        }
+
+        if (readmeRuntime.inFlight) {
+            readmeRuntime.rerunRequested = true;
+            return;
+        }
+
+        const readmeEl = getReadmeRootElement();
+        if (!readmeEl) return;
+
+        readmeRuntime.inFlight = true;
+        const startAt = performance.now();
+
+        try {
+            await translateReadmeElement(readmeEl, reason);
+        } catch (error) {
+            const sourceHash = createHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '');
+            await appendReadmeTranslationRecord({
+                status: 'failed',
+                tokens: 0,
+                durationMs: performance.now() - startAt,
+                sourceHash,
+                detail: error instanceof Error ? error.message : String(error),
+            }).catch((recordError) => {
+                console.warn('[README翻译] 记录失败日志时出错:', recordError);
+            });
+            throw error;
+        } finally {
+            readmeRuntime.inFlight = false;
+            if (readmeRuntime.rerunRequested) {
+                readmeRuntime.rerunRequested = false;
+                scheduleReadmeTranslation('rerun');
+            }
+        }
+    }
+
+    async function translateReadmeElement(readmeEl, reason) {
+        const startAt = performance.now();
+        const state = getReadmeElementState(readmeEl);
+        const currentHash = createHash(readmeEl.innerHTML);
+
+        if (state.translatedHash && currentHash !== state.translatedHash) {
+            // README 被重新渲染后，重置翻译状态，以最新英文内容作为基线。
+            state.originalHtml = readmeEl.innerHTML;
+            state.translatedHash = '';
+            state.translatedSignature = '';
+        } else if (!state.originalHtml) {
+            state.originalHtml = readmeEl.innerHTML;
+        }
+
+        const providerConfig = getProviderConfig();
+        if (!providerConfig.ok) {
+            warnReadmeConfig(providerConfig.message);
+            restoreReadmeTranslation();
+            return;
+        }
+
+        const repoInfo = getCurrentRepoInfo();
+        const sourceHash = createHash(state.originalHtml);
+        const signature = createHash(`${providerConfig.signature}\n${state.originalHtml}`);
+        if (state.translatedSignature === signature && currentHash === state.translatedHash) {
+            return;
+        }
+
+        const sourceText = normalizeText(readmeEl.textContent || '');
+        if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
+            if (readmeEl.innerHTML !== state.originalHtml) {
+                readmeEl.innerHTML = state.originalHtml;
+            }
+
+            state.translatedSignature = signature;
+            state.translatedHash = createHash(readmeEl.innerHTML);
+            return;
+        }
+
+        const repoCacheKey = buildRepoCacheKey(repoInfo, sourceHash, providerConfig.signature);
+        const cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
+            console.warn('[README翻译] 读取仓库缓存失败:', error);
+            return null;
+        });
+
+        if (cacheHit?.translatedHtml) {
+            readmeEl.innerHTML = cacheHit.translatedHtml;
+            state.translatedSignature = signature;
+            state.translatedHash = createHash(readmeEl.innerHTML);
+
+            await appendReadmeTranslationRecord({
+                status: 'cache_hit',
+                tokens: 0,
+                durationMs: performance.now() - startAt,
+                sourceHash,
+                detail: `cache_reason=${reason || 'unknown'}`,
+            }).catch((error) => {
+                console.warn('[README翻译] 写入缓存命中记录失败:', error);
+            });
+            return;
+        }
+
+        if (readmeEl.innerHTML !== state.originalHtml) {
+            readmeEl.innerHTML = state.originalHtml;
+        }
+
+        const tasks = collectReadmeTextTasks(readmeEl);
+        if (!tasks.length) {
+            state.translatedSignature = signature;
+            state.translatedHash = createHash(readmeEl.innerHTML);
+            return;
+        }
+
+        const uniqueTexts = [...new Set(tasks.map(task => task.normalizedText))];
+        const tasksByText = new Map();
+        tasks.forEach((task) => {
+            if (!tasksByText.has(task.normalizedText)) {
+                tasksByText.set(task.normalizedText, []);
+            }
+            tasksByText.get(task.normalizedText).push(task);
+        });
+
+        let translatedCount = 0;
+        let totalTokens = 0;
+
+        if (FeatureSet.readme_enable_progressive) {
+            const groups = buildProgressiveGroups(uniqueTexts, README_CONFIG.PROGRESSIVE_GROUP_SIZE);
+
+            for (let index = 0; index < groups.length; index += 1) {
+                const group = groups[index];
+                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(group, providerConfig);
+                totalTokens += groupTokens;
+                translatedCount += applyTextGroupTranslations(tasksByText, group, translatedMap);
+
+                if (index < groups.length - 1) {
+                    await waitForNextPaint();
+                }
+            }
+        } else {
+            const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+            totalTokens += tokens;
+            translatedCount += applyTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
+        }
+
+        console.log(`[README翻译] 完成，共翻译 ${translatedCount} 个文本节点`);
+
+        state.translatedSignature = signature;
+        state.translatedHash = createHash(readmeEl.innerHTML);
+
+        await upsertRepoCachedTranslation(repoCacheKey, {
+            repo: repoInfo?.fullName || '',
+            sourceHash,
+            translatedHtml: readmeEl.innerHTML,
+        }).catch((error) => {
+            console.warn('[README翻译] 写入仓库缓存失败:', error);
+        });
+
+        await appendReadmeTranslationRecord({
+            status: 'success',
+            tokens: totalTokens,
+            durationMs: performance.now() - startAt,
+            sourceHash,
+            detail: `translated_nodes=${translatedCount}`,
+        }).catch((error) => {
+            console.warn('[README翻译] 写入翻译记录失败:', error);
+        });
+    }
+
+    function warnReadmeConfig(message) {
+        const warnKey = `${FeatureSet.readme_provider}:${message}`;
+        if (readmeRuntime.lastWarnKey === warnKey) return;
+
+        readmeRuntime.lastWarnKey = warnKey;
+        console.warn(`[README翻译] ${message}`);
+    }
+
+    function collectReadmeTextTasks(readmeEl) {
+        const tasks = [];
+        const walker = document.createTreeWalker(readmeEl, NodeFilter.SHOW_TEXT);
+
+        let node;
+        while ((node = walker.nextNode())) {
+            const parent = node.parentElement;
+            if (!parent) continue;
+            if (parent.closest(README_CONFIG.SKIP_PARENT_SELECTOR)) continue;
+
+            const rawText = node.data;
+            const trimmedText = rawText.trim();
+            const normalizedText = normalizeText(trimmedText);
+
+            if (shouldSkipReadmeText(normalizedText)) continue;
+
+            tasks.push({ node, rawText, trimmedText, normalizedText });
+        }
+
+        return tasks;
+    }
+
+    function shouldSkipReadmeText(text) {
+        if (!text) return true;
+        if (text.length > 2000) return true;
+        if (isMostlyCjkText(text)) return true;
+        if (/^[0-9\s.,:;()\[\]{}+\-/*#@_`~!$%^&|<>="'\\]+$/.test(text)) return true;
+        if (!/[A-Za-z]/.test(text)) return true;
+        if (/[\u3400-\u9FFF]/.test(text) && !/[A-Za-z]{2,}/.test(text)) return true;
+        return false;
+    }
+
+    function isMostlyCjkText(text) {
+        const input = String(text || '');
+        const cjkCount = (input.match(/[\u3400-\u9FFF]/g) || []).length;
+        if (!cjkCount) return false;
+
+        const latinCount = (input.match(/[A-Za-z]/g) || []).length;
+        if (!latinCount) return true;
+
+        return cjkCount >= 8 && cjkCount >= latinCount * 1.25;
+    }
+
+    function shouldSkipReadmeByLanguage(text, targetLang) {
+        if (!/^zh(?:-|$)/i.test(String(targetLang || ''))) return false;
+
+        const input = String(text || '').trim();
+        if (input.length < 40) return false;
+
+        const cjkCount = (input.match(/[\u3400-\u9FFF]/g) || []).length;
+        if (cjkCount < 12) return false;
+
+        const latinCount = (input.match(/[A-Za-z]/g) || []).length;
+        if (!latinCount) return true;
+
+        return cjkCount >= latinCount * 1.5;
+    }
+
+    function normalizeText(text) {
+        return text.replace(/\xa0|[\s]+/g, ' ').trim();
+    }
+
+    function getProviderConfig() {
+        const provider = (FeatureSet.readme_provider || '').trim().toLowerCase();
+        const targetLang = FIXED_TARGET_LANG;
+
+        if (!provider) {
+            return { ok: false, message: '请先选择 README 翻译服务。' };
+        }
+
+        switch (provider) {
+            case 'deepl': {
+                const url = normalizeUrl(FeatureSet.readme_deepl_api_url);
+                const key = (FeatureSet.readme_deepl_api_key || '').trim();
+                if (!url || !key) {
+                    return { ok: false, message: 'DeepL 需要 API 地址与 API Key。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    signature: `${provider}|${targetLang}|${url}|${createHash(key)}`,
+                };
+            }
+
+            case 'google': {
+                const url = normalizeUrl(FeatureSet.readme_google_api_url);
+                const key = (FeatureSet.readme_google_api_key || '').trim();
+                if (!url || !key) {
+                    return { ok: false, message: 'Google Cloud Translation 需要 API 地址与 API Key。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    signature: `${provider}|${targetLang}|${url}|${createHash(key)}`,
+                };
+            }
+
+            case 'azure': {
+                const url = normalizeUrl(FeatureSet.readme_azure_api_url);
+                const key = (FeatureSet.readme_azure_api_key || '').trim();
+                const region = (FeatureSet.readme_azure_region || '').trim();
+                if (!url || !key || !region) {
+                    return { ok: false, message: 'Azure Translator 需要 API 地址、API Key 与 Region。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    region,
+                    signature: `${provider}|${targetLang}|${url}|${region}|${createHash(key)}`,
+                };
+            }
+
+            case 'openai': {
+                const rawUrl = normalizeUrl(FeatureSet.readme_openai_api_url);
+                const url = normalizeOpenAiEndpoint(rawUrl);
+                const key = (FeatureSet.readme_openai_api_key || '').trim();
+                const model = (FeatureSet.readme_openai_model || '').trim();
+                if (!url || !key || !model) {
+                    return { ok: false, message: 'OpenAI 兼容接口需要 API 地址、API Key 与模型名。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    model,
+                    signature: `${provider}|${targetLang}|${url}|${model}|${createHash(key)}`,
+                };
+            }
+
+            default:
+                return { ok: false, message: `不支持的翻译服务类型: ${provider}` };
+        }
+    }
+
+    async function translateTextsWithProvider(texts, providerConfig) {
+        const translatedMap = new Map();
+        const uncached = [];
+        let totalTokens = 0;
+
+        texts.forEach(text => {
+            const cacheKey = `${providerConfig.signature}|${text}`;
+            const cached = readmeRuntime.translationCache.get(cacheKey);
+
+            if (cached) {
+                translatedMap.set(text, cached);
+            } else {
+                uncached.push(text);
+            }
+        });
+
+        const batches = buildBatches(uncached, README_CONFIG.MAX_BATCH_ITEMS, README_CONFIG.MAX_BATCH_CHARS);
+        for (const batch of batches) {
+            const batchResult = await translateBatchWithFallback(batch, providerConfig);
+            const batchResults = batchResult.translations;
+            totalTokens += batchResult.tokens;
+
+            batch.forEach((text, index) => {
+                const translated = (batchResults[index] || '').trim();
+                const fallback = translated || text;
+                const cacheKey = `${providerConfig.signature}|${text}`;
+                readmeRuntime.translationCache.set(cacheKey, fallback);
+                translatedMap.set(text, fallback);
+            });
+        }
+
+        return {
+            translatedMap,
+            totalTokens,
+        };
+    }
+
+    async function translateBatchWithFallback(batch, providerConfig) {
+        try {
+            const result = await translateBatch(batch, providerConfig);
+            const translations = result?.translations;
+            const tokens = Math.max(0, Number(result?.tokens) || 0);
+
+            if (!Array.isArray(translations) || translations.length !== batch.length) {
+                throw new Error('翻译结果数量与请求数量不一致，请检查接口配置。');
+            }
+            return {
+                translations,
+                tokens,
+            };
+        } catch (error) {
+            // OpenAI 兼容接口在部分平台上会因 JSON 输出不稳定导致整批失败，此时退化为更小批次重试。
+            if (providerConfig.provider !== 'openai' || batch.length <= 1) {
+                throw error;
+            }
+
+            const midpoint = Math.ceil(batch.length / 2);
+            const left = await translateBatchWithFallback(batch.slice(0, midpoint), providerConfig);
+            const right = await translateBatchWithFallback(batch.slice(midpoint), providerConfig);
+            return {
+                translations: [...left.translations, ...right.translations],
+                tokens: left.tokens + right.tokens,
+            };
+        }
+    }
+
+    function buildBatches(texts, maxItems, maxChars) {
+        if (!texts.length) return [];
+
+        const batches = [];
+        let currentBatch = [];
+        let currentLength = 0;
+
+        texts.forEach(text => {
+            const length = text.length;
+            const exceedsItems = currentBatch.length >= maxItems;
+            const exceedsChars = currentLength + length > maxChars;
+
+            if (currentBatch.length > 0 && (exceedsItems || exceedsChars)) {
+                batches.push(currentBatch);
+                currentBatch = [];
+                currentLength = 0;
+            }
+
+            currentBatch.push(text);
+            currentLength += length;
+        });
+
+        if (currentBatch.length > 0) {
+            batches.push(currentBatch);
+        }
+
+        return batches;
+    }
+
+    async function translateBatch(texts, providerConfig) {
+        switch (providerConfig.provider) {
+            case 'deepl':
+                return translateWithDeepL(texts, providerConfig);
+            case 'google':
+                return translateWithGoogle(texts, providerConfig);
+            case 'azure':
+                return translateWithAzure(texts, providerConfig);
+            case 'openai':
+                return translateWithOpenAiCompatible(texts, providerConfig);
+            default:
+                throw new Error(`未知翻译服务: ${providerConfig.provider}`);
+        }
+    }
+
+    async function translateWithDeepL(texts, providerConfig) {
+        const body = new URLSearchParams();
+        body.append('auth_key', providerConfig.key);
+        body.append('target_lang', mapTargetLangForDeepL());
+        texts.forEach(text => body.append('text', text));
+
+        const data = await proxyFetchJson({
+            url: providerConfig.url,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+        });
+
+        return {
+            translations: (data?.translations || []).map(item => (item?.text || '').trim()),
+            tokens: 0,
+        };
+    }
+
+    async function translateWithGoogle(texts, providerConfig) {
+        const url = new URL(providerConfig.url);
+        url.searchParams.set('key', providerConfig.key);
+
+        const body = new URLSearchParams();
+        body.append('target', providerConfig.targetLang);
+        body.append('format', 'text');
+        texts.forEach(text => body.append('q', text));
+
+        const data = await proxyFetchJson({
+            url: url.toString(),
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+        });
+
+        return {
+            translations: (data?.data?.translations || []).map(item => decodeHtmlEntities(item?.translatedText || '')),
+            tokens: 0,
+        };
+    }
+
+    async function translateWithAzure(texts, providerConfig) {
+        const url = new URL(providerConfig.url);
+        url.searchParams.set('api-version', '3.0');
+        url.searchParams.set('to', mapTargetLangForAzure());
+
+        const data = await proxyFetchJson({
+            url: url.toString(),
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Ocp-Apim-Subscription-Key': providerConfig.key,
+                'Ocp-Apim-Subscription-Region': providerConfig.region,
+                'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
+            },
+            body: JSON.stringify(texts.map(text => ({ text }))),
+        });
+
+        return {
+            translations: (data || []).map(item => (item?.translations?.[0]?.text || '').trim()),
+            tokens: 0,
+        };
+    }
+
+    async function translateWithOpenAiCompatible(texts, providerConfig) {
+        const targetLanguage = '简体中文';
+
+        const payload = {
+            model: providerConfig.model,
+            temperature: 0,
+            messages: [
+                {
+                    role: 'system',
+                    content: OPENAI_README_SYSTEM_PROMPT,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify({
+                        target_language: targetLanguage,
+                        texts,
+                    }),
+                },
+            ],
+        };
+
+        const data = await proxyFetchJson({
+            url: providerConfig.url,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${providerConfig.key}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const firstChoice = data?.choices?.[0] || {};
+        const content = firstChoice?.message?.content ?? firstChoice?.text;
+        const raw = Array.isArray(content)
+            ? content.map(part => part?.text || '').join('')
+            : String(content || '').trim();
+
+        return {
+            translations: parseOpenAiArray(raw, texts.length),
+            tokens: getReadmeUsageTokens(data),
+        };
+    }
+
+    function parseOpenAiArray(rawText, expectedLength) {
+        let text = (rawText || '').trim();
+        text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        const start = text.indexOf('[');
+        const end = text.lastIndexOf(']');
+        if (start !== -1 && end !== -1 && end > start) {
+            text = text.slice(start, end + 1);
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            throw new Error('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+        }
+
+        if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.translations)) parsed = parsed.translations;
+            else if (Array.isArray(parsed.data)) parsed = parsed.data;
+            else if (Array.isArray(parsed.results)) parsed = parsed.results;
+        }
+
+        if (!Array.isArray(parsed)) {
+            throw new Error('OpenAI 兼容接口返回内容不是数组（或未包含 translations/data/results 数组字段）。');
+        }
+
+        if (parsed.length !== expectedLength) {
+            throw new Error(`OpenAI 兼容接口返回数量不匹配，期望 ${expectedLength}，实际 ${parsed.length}`);
+        }
+
+        return parsed.map(item => String(item ?? '').trim());
+    }
+
+    async function proxyFetchJson(request) {
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'ghcn-proxy-fetch',
+                payload: request,
+            }, (message) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+
+                resolve(message);
+            });
+        });
+
+        if (!response) {
+            throw new Error('翻译请求失败：后台未返回响应。');
+        }
+
+        const { ok, status, statusText, body, error } = response;
+        if (!ok) {
+            const details = body ? truncateText(body, 200) : (error || 'unknown error');
+            throw new Error(`翻译请求失败 (${status} ${statusText}): ${details}`);
+        }
+
+        if (!body) return null;
+
+        try {
+            return JSON.parse(body);
+        } catch {
+            throw new Error(`接口返回非 JSON 数据: ${truncateText(body, 180)}`);
+        }
+    }
+
+    function mapTargetLangForDeepL() {
+        return 'ZH';
+    }
+
+    function mapTargetLangForAzure() {
+        return 'zh-Hans';
+    }
+
+    function normalizeOpenAiEndpoint(url) {
+        if (!url) return '';
+
+        if (/\/chat\/completions\/?$/i.test(url)) {
+            return url;
+        }
+
+        if (/\/v1\/?$/i.test(url)) {
+            return `${url.replace(/\/+$/, '')}/chat/completions`;
+        }
+
+        return `${url.replace(/\/+$/, '')}/v1/chat/completions`;
+    }
+
+    function normalizeUrl(url) {
+        return (url || '').trim().replace(/\s+/g, '');
+    }
+
+    function decodeHtmlEntities(text) {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
+    }
+
+    function truncateText(text, maxLength) {
+        if (!text || text.length <= maxLength) return text || '';
+        return `${text.slice(0, maxLength)}...`;
+    }
+
+    function createHash(input) {
+        let hash = 0;
+        for (let i = 0; i < input.length; i += 1) {
+            hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+        }
+        return (hash >>> 0).toString(16);
+    }
+
+    /**
+     * init 函数：初始化翻译功能。
+     */
+    async function init() {
+        if (typeof I18N === 'undefined') {
+            throw new Error('词库文件 locals.js 未加载，脚本无法运行');
+        } else {
+            console.log('词库文件 locals.js 已加载');
+        }
+
+        await loadFeatureSet();
+        watchFeatureChanges();
+
+        // 设置中文环境
+        if (FeatureSet.enable_extension) {
+            document.documentElement.lang = CONFIG.LANG;
+        }
+
+        // 监测 HTML Lang 值, 设置中文环境
+        new MutationObserver(() => {
+            if (FeatureSet.enable_extension && document.documentElement.lang === 'en') {
+                document.documentElement.lang = CONFIG.LANG;
+            }
+        }).observe(document.documentElement, { attributeFilter: ['lang'] });
+
+        // 监听 Turbo 完成事件（延迟翻译）
+        document.addEventListener('turbo:load', () => {
+            updatePageConfig('turbo:load');
+            if (!FeatureSet.enable_extension || !pageConfig.currentPageType) return;
+
+            transTitle(); // 翻译页面标题
+            transBySelector();
+            scheduleReadmeTranslation('turbo:load');
+        });
+
+        // 首次页面翻译
+        window.addEventListener('DOMContentLoaded', () => {
+            // 获取当前页面的翻译规则
+            updatePageConfig('首次载入');
+            if (FeatureSet.enable_extension && pageConfig.currentPageType) {
+                traverseNode(document.body);
+            }
+
+            // 监视页面变化
+            watchUpdate();
+            scheduleReadmeTranslation('DOMContentLoaded');
+        });
+    }
+
+})(window, document);
