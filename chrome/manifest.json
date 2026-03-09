@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub 中文汉化插件",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "将 GitHub 界面文本元素翻译为中文。",
   "homepage_url": "https://github.com/MaydayV/github-chinese",
   "icons": {
