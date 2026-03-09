@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub 中文汉化插件",
+  "version": "2.0.0",
+  "description": "将 GitHub 界面文本元素翻译为中文。",
+  "homepage_url": "https://github.com/MaydayV/github-chinese",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://skills.github.com/*",
+    "https://gist.github.com/*",
+    "https://education.github.com/*",
+    "https://www.githubstatus.com/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "GitHub 中文汉化插件",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*",
+        "https://skills.github.com/*",
+        "https://gist.github.com/*",
+        "https://education.github.com/*",
+        "https://www.githubstatus.com/*"
+      ],
+      "js": [
+        "locals.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "options_page": "options/options.html"
+}
