@@ -11,8 +11,7 @@
     "128": "assets/icons/icon128.png"
   },
   "permissions": [
-    "storage",
-    "permissions"
+    "storage"
   ],
   "host_permissions": [
     "https://github.com/*",
