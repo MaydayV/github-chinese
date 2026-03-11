@@ -23,6 +23,14 @@
   - 仓库级翻译缓存（README 未变化时复用结果）
   - 分段渐进翻译（长文档分批显示）
 
+## 安装方式（Chrome 应用商店，推荐）
+
+1. 安装地址（原链接）：https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb
+2. 点击安装页（超链接）：[https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb)
+3. 在 Chrome 商店页面点击“添加至 Chrome”，并确认安装。
+4. 打开 `chrome://extensions/`，确认扩展已启用。
+5. 打开任意 GitHub 页面即可生效；如未立即生效，请刷新页面或重启浏览器。
+
 ## 安装方式（开发者模式）
 
 1. 拉取本仓库并切换到 `chrome` 分支。
@@ -47,6 +55,17 @@
 
 - `chrome/`：插件主体代码（manifest、content script、options、popup 等）。
 - `script/`：辅助脚本与简单测试脚本。
+
+## 开源说明
+
+词条仓库原作者已将相关内容开源发布，因此本插件也继续采用开源方式维护。
+
+如果你希望继续修改和完善，欢迎通过以下方式参与：
+
+1. 向本仓库提交 PR，我们会基于变更内容进行 review 与合并。
+2. Fork 本仓库后继续开发，并将你的修改版本以开源仓库形式发布。
+
+二次发布时请遵循本仓库许可证（GPL-3.0），并保留来源说明，方便社区持续协作与追溯。
 
 ## 致谢
 
