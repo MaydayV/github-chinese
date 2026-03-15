@@ -12,16 +12,8 @@
 
 - GitHub 页面词条中文化（基于内置词典与规则）。
 - README 动态翻译（仅针对 README 内容区域）。
-- 支持多类翻译服务：
-  - DeepL
-  - Google Cloud Translation
-  - Microsoft Translator (Azure)
-  - OpenAI 兼容接口（如 DeepSeek、Kimi 等兼容平台）
-- 接口连通性测试（在设置页直接测试）。
-- 高级能力（可开关）：
-  - 翻译消耗记录（含 tokens）
-  - 仓库级翻译缓存（README 未变化时复用结果）
-  - 分段渐进翻译（长文档分批显示）
+- README 描述区远程翻译（当前默认接入讯飞听见，可切换 DeepL）。
+- DeepL 已按官方新规范改为 header-based authentication。
 
 ## 安装方式（Chrome 应用商店，推荐）
 
@@ -40,11 +32,19 @@
 
 ## 使用说明
 
-1. 点击扩展图标，进入“README 翻译设置”。
-2. 在“API 设置”中填写接口地址、Key（及模型名）并保存。
-3. 点击“测试连通性”确认配置可用。
-4. 在“功能开关”中启用 README 翻译，并按需启用高级能力。
-5. 在“翻译记录”中查看状态、tokens 与缓存命中情况。
+### Chrome 扩展
+
+1. 点击扩展图标，可开启或关闭中文化功能。
+2. 当前 Chrome 扩展本体不依赖在线翻译服务，刷新 GitHub 页面即可生效。
+
+### 油猴脚本 README 描述翻译
+
+1. 打开 `main.user.js`。
+2. 默认使用 `iflyrec`；如果想切到 DeepL：
+   - 将 `CONFIG.transEngine` 改为 `deepl`
+   - 填入 `CONFIG.DEEPL_AUTH_KEY`
+3. DeepL 现已使用请求头认证：`Authorization: DeepL-Auth-Key <your-key>`。
+4. 如使用 DeepL Free，保持 `url_api` 为 `https://api-free.deepl.com/v2/translate`；Pro 版可改为 `https://api.deepl.com/v2/translate`。
 
 ## 分支说明
 

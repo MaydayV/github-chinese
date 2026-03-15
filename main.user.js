@@ -21,6 +21,8 @@
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_notification
 // @connect      fanyi.iflyrec.com
+// @connect      api-free.deepl.com
+// @connect      api.deepl.com
 // @supportURL   https://github.com/maboloshi/github-chinese/issues
 // ==/UserScript==
 
@@ -34,6 +36,8 @@
     };
     const CONFIG = {
         LANG: 'zh-CN',
+        // 若切换为 DeepL，请填入你的 API Key，并将 transEngine 改为 'deepl'
+        DEEPL_AUTH_KEY: '',
         // 站点域名 -> 类型映射
         PAGE_MAP: {
             'gist.github.com': 'gist',
@@ -76,6 +80,22 @@
                 }),
                 // 响应标识
                 responseIdentifier: 'biz[0]?.sectionResult[0]?.dst',
+            },
+            deepl: {
+                name: 'DeepL',
+                url: 'https://www.deepl.com/docs-api',
+                url_api: 'https://api-free.deepl.com/v2/translate',
+                method: 'POST',
+                getHeaders: () => ({
+                    'Content-Type': 'application/json',
+                    'Authorization': `DeepL-Auth-Key ${CONFIG.DEEPL_AUTH_KEY}`,
+                }),
+                getRequestData: (text) => ({
+                    text: [text],
+                    source_lang: 'EN',
+                    target_lang: 'ZH-HANS',
+                }),
+                responseIdentifier: 'translations[0].text',
             },
         }
     };
@@ -528,9 +548,16 @@
      */
     async function requestRemoteTranslation(text) {
         return new Promise((resolve) => {
-            const { url_api, method, headers, getRequestData, responseIdentifier } = CONFIG.TRANS_ENGINES[CONFIG.transEngine];
+            const engine = CONFIG.TRANS_ENGINES[CONFIG.transEngine];
+            const { url_api, method, getRequestData, responseIdentifier } = engine;
+            const headers = typeof engine.getHeaders === 'function' ? engine.getHeaders() : engine.headers;
             // 构建请求数据
             const requestData = getRequestData(text);
+
+            if (CONFIG.transEngine === 'deepl' && !CONFIG.DEEPL_AUTH_KEY.trim()) {
+                resolve('翻译失败（未配置 DeepL API Key）');
+                return;
+            }
 
             // 使用 GM_xmlhttpRequest 函数发送 HTTP 请求
             GM_xmlhttpRequest({
@@ -543,11 +570,17 @@
                     try {
                         const result = JSON.parse(res.responseText);
                         console.log(result);
-                        const translatedText = getNestedProperty(result, responseIdentifier) || '翻译失败';
-                        resolve(translatedText);
+                        const translatedText = getNestedProperty(result, responseIdentifier);
+                        if (translatedText) {
+                            resolve(translatedText);
+                            return;
+                        }
+
+                        const errorMessage = result?.message || result?.detail || res.responseText || `HTTP ${res.status}`;
+                        resolve(`翻译失败（HTTP ${res.status} - ${errorMessage}）`);
                     } catch (err) {
                         console.error('翻译失败:', err);
-                        resolve(`翻译失败（${err.type}）`);
+                        resolve(`翻译失败（${err.type || '响应解析错误'}）`);
                     }
                 },
                 onerror: (err) => {
