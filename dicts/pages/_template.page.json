@@ -1,0 +1,22 @@
+{
+  "scope": {
+    "page": "account-generic",
+    "pathPrefix": "/account/"
+  },
+  "static": {
+    "Create": "创建"
+  },
+  "selectorRules": [
+    {
+      "selector": "button",
+      "source": "Create",
+      "target": "创建"
+    }
+  ],
+  "regexp": [
+    {
+      "pattern": "^(\\d+) Items$",
+      "replacement": "$1 个项目"
+    }
+  ]
+}

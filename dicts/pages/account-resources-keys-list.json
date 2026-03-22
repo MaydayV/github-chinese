@@ -1,0 +1,64 @@
+{
+  "scope": {
+    "page": "account-resources-keys",
+    "pathPrefix": "/account/resources"
+  },
+  "static": {
+    "Keys": "密钥",
+    "All Keys": "所有密钥",
+    "Register a New Key": "注册新密钥",
+    "Getting Started with Keys": "密钥使用入门",
+    "Create a key": "创建密钥",
+    "Creating a key allows you to configure, authenticate, and use one or more Apple services for that key. Unlike certificates, keys do not expire and can be modified to access more services after their creation. For more information on creating and using keys, refer to Developer Account Help.": "创建密钥后，你可以为该密钥配置、认证并使用一个或多个 Apple 服务。与证书不同，密钥不会过期，并且在创建后可修改以访问更多服务。有关创建和使用密钥的更多信息，请参阅 Developer Account Help。",
+    "Key Name": "密钥名称",
+    "You cannot use special characters such as @, &, *, ', \", -, .": "不能使用 @、&、*、'、\"、-、. 等特殊字符。",
+    "Key Usage Description (optional)": "密钥用途说明（可选）",
+    "Apple Push Notifications service (APNs)": "Apple 推送通知服务（APNs）",
+    "Establish connectivity between your notification server and the Apple Push Notification service. One key is used for all of your apps. 了解更多": "在你的通知服务器与 Apple 推送通知服务之间建立连接。一个密钥可用于你的所有应用。了解更多",
+    "Establish connectivity between your notification server and the Apple Push Notification service. One key is used for all of your apps.": "在你的通知服务器与 Apple 推送通知服务之间建立连接。一个密钥可用于你的所有应用。",
+    "DeviceCheck": "DeviceCheck",
+    "Access the DeviceCheck and AppAttest APIs to get data that your associated server can use in its business logic to protect your business while maintaining user privacy. 了解更多": "访问 DeviceCheck 和 AppAttest API，获取可供关联服务器在业务逻辑中使用的数据，在保护用户隐私的同时保护你的业务。了解更多",
+    "Access the DeviceCheck and AppAttest APIs to get data that your associated server can use in its business logic to protect your business while maintaining user privacy.": "访问 DeviceCheck 和 AppAttest API，获取可供关联服务器在业务逻辑中使用的数据，在保护用户隐私的同时保护你的业务。",
+    "Media Services (MusicKit, ShazamKit, Apple Music Feed)": "媒体服务（MusicKit、ShazamKit、Apple Music Feed）",
+    "Access the Apple Music catalog and make personalized requests for authorized users, check audio signatures against the Shazam music catalog, and access Apple Music Feed. There are no identifiers available that can be associated with the key": "访问 Apple Music 目录并为已授权用户发起个性化请求，将音频指纹与 Shazam 音乐目录匹配，并访问 Apple Music Feed。没有可与此密钥关联的标识符",
+    "Access the Apple Music catalog and make personalized requests for authorized users, check audio signatures against the Shazam music catalog, and access Apple Music Feed. 没有可与此密钥关联的标识符": "访问 Apple Music 目录并为已授权用户发起个性化请求，将音频指纹与 Shazam 音乐目录匹配，并访问 Apple Music Feed。没有可与此密钥关联的标识符",
+    "Access the Apple Music catalog and make personalized requests for authorized users, check audio signatures against the Shazam music catalog, and access Apple Music Feed.": "访问 Apple Music 目录并为已授权用户发起个性化请求，将音频指纹与 Shazam 音乐目录匹配，并访问 Apple Music Feed。",
+    "Sign in with Apple": "使用 Apple 登录",
+    "Enable your apps to allow users to authenticate in your application with their Apple ID. Configuration is required to enable this feature.": "使你的应用支持用户使用 Apple ID 在应用内完成身份验证。启用此功能需要进行配置。",
+    "Create a key for each of your primary App IDs in order to implement Sign in with Apple. This key will also be used for any App IDs grouped with the primary. The user will see your primary app's icon at sign in and in their Apple ID account settings.": "为每个主 App ID 创建一个密钥以实现“使用 Apple 登录”。该密钥也将用于与主 App ID 分组的其他 App ID。用户在登录时和 Apple ID 账户设置中会看到你的主应用图标。",
+    "iWork Document Exporting": "iWork 文档导出",
+    "通过请求文档的只读 PDF 版本，使用户能够显示 iWork 文档。 没有可与此密钥关联的标识符": "通过请求文档的只读 PDF 版本，使用户能够显示 iWork 文档。没有可与此密钥关联的标识符",
+    "Enable your users to display iWork documents by requesting a read-only PDF version of the document.": "通过请求文档的只读 PDF 版本，使用户能够显示 iWork 文档。",
+    "Enable your users to display iWork documents by requesting a read-only PDF version of the document. There are no identifiers available that can be associated with the key": "通过请求文档的只读 PDF 版本，使用户能够显示 iWork 文档。没有可与此密钥关联的标识符",
+    "Account & Organizational Data Sharing": "账户与组织数据共享",
+    "Configure your apps and websites with Account & Organizational Data Sharing to securely request access to your users’ Apple ID account information.": "通过“账户与组织数据共享”配置你的应用和网站，以安全地请求访问用户的 Apple ID 账户信息。",
+    "ClassKit Catalog": "ClassKit 目录",
+    "将所有 ClassKit 应用活动发布给在 Apple Schoolwork 中创建讲义的教师。 了解更多": "将所有 ClassKit 应用活动发布给在 Apple Schoolwork 中创建讲义的教师。了解更多",
+    "Publish all of your ClassKit app activities to teachers creating Handouts in Apple Schoolwork.": "将所有 ClassKit 应用活动发布给在 Apple Schoolwork 中创建讲义的教师。",
+    "Access the Apple Weather service.": "访问 Apple 天气服务。",
+    "There are no identifiers available that can be associated with the key": "没有可与此密钥关联的标识符"
+  },
+  "selectorRules": [],
+  "regexp": [
+    {
+      "pattern": "^(.*)\\s+了解更多$",
+      "replacement": "$1 了解更多"
+    },
+    {
+      "pattern": "^(.*)\\s+没有可与此密钥关联的标识符$",
+      "replacement": "$1 没有可与此密钥关联的标识符"
+    },
+    {
+      "pattern": "^(.*)\\s+There are no identifiers available that can be associated with the key$",
+      "replacement": "$1 没有可与此密钥关联的标识符"
+    },
+    {
+      "pattern": "^There are no identifiers available that can be associated with the key$",
+      "replacement": "没有可与此密钥关联的标识符"
+    },
+    {
+      "pattern": "^(.*)\\s+Learn more$",
+      "replacement": "$1 了解更多"
+    }
+  ]
+}

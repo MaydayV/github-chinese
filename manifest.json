@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Apple Developer 中文汉化插件",
+  "version": "1.1.0",
+  "description": "Apple Developer 中文汉化插件用于将 Apple Developer 后台页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文开发者的使用效率。",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://developer.apple.com/*",
+    "https://*.developer.apple.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://developer.apple.com/*",
+        "https://*.developer.apple.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dicts/common/*.json",
+        "dicts/pages/*.json"
+      ],
+      "matches": [
+        "https://developer.apple.com/*",
+        "https://*.developer.apple.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "Apple Developer 中文汉化插件",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  }
+}

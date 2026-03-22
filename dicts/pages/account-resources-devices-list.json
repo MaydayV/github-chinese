@@ -1,0 +1,35 @@
+{
+  "scope": {
+    "page": "account-resources-devices",
+    "pathPrefix": "/account/resources/devices"
+  },
+  "static": {
+    "Devices": "设备",
+    "All Devices": "所有设备",
+    "Register a New Device": "注册新设备",
+    "Register Devices": "注册设备",
+    "Register a Device": "注册设备",
+    "Name your device and enter its Unique Device Identifier (UDID).": "为设备命名并输入其唯一设备标识符（UDID）。",
+    "Device Name": "设备名称",
+    "Device ID (UDID)": "设备 ID（UDID）",
+    "Register Multiple Devices": "批量注册设备",
+    "Download sample files": "下载示例文件",
+    "Device List": "设备列表",
+    "Choose File": "选择文件",
+    "To create a provisioning profile for app testing and ad hoc distribution, you'll need to specify registered devices. If you use automatic signing, Xcode registers connected devices for you. Xcode Server can also be configured to register connected devices.": "若要为应用测试和 Ad Hoc 分发创建描述文件，你需要指定已注册设备。如果你使用自动签名，Xcode 会为你注册已连接设备。Xcode Server 也可以配置为注册已连接设备。",
+    "Note: If you remove a registered device from your account, it will continue to count against your device limit. At the start of your new membership year, Account Holders and Admins will be presented with the option to remove listed devices and restore the available device count.": "注意：如果你从账号中移除已注册设备，该设备仍会计入设备上限。在新的会员年度开始时，Account Holder 和 Admin 会看到移除已列设备并恢复可用设备数量的选项。",
+    "Register a Device Name your device and enter its Unique Device Identifier (UDID). 平台 iOS, iPadOS, tvOS, watchOS, visionOS macOS Device Name Device ID (UDID)": "注册设备 为设备命名并输入其唯一设备标识符（UDID）。平台 iOS、iPadOS、tvOS、watchOS、visionOS、macOS 设备名称 设备 ID（UDID）",
+    "Register Multiple Devices Upload a file containing the devices you wish to register. Please note that a maximum of 100 devices can be included in your file and it may take a few minutes to process. Download sample files Device List 选择文件": "批量注册设备 上传包含你要注册设备的文件。请注意，文件中最多可包含 100 台设备，处理可能需要几分钟。下载示例文件 设备列表 选择文件",
+    "Upload a file containing the devices you wish to register. Please note that a maximum of 100 devices can be included in your file and it may take a few minutes to process.": "上传包含你要注册设备的文件。请注意，文件中最多可包含 100 台设备，处理可能需要几分钟。",
+    "iOS, iPadOS, tvOS, watchOS, visionOS": "iOS、iPadOS、tvOS、watchOS、visionOS",
+    "iPhone": "iPhone",
+    "iPad": "iPad",
+    "Mac": "Mac",
+    "Apple TV": "Apple TV",
+    "Apple Watch": "Apple Watch",
+    "Apple Vision Pro": "Apple Vision Pro",
+    "iPod Touch": "iPod touch"
+  },
+  "selectorRules": [],
+  "regexp": []
+}

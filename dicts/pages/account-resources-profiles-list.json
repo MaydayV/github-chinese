@@ -1,0 +1,65 @@
+{
+  "scope": {
+    "page": "account-resources-profiles",
+    "pathPrefix": "/account/resources/profiles"
+  },
+  "static": {
+    "Profiles": "描述文件",
+    "All Profiles": "所有描述文件",
+    "Register a New Provisioning Profile": "注册新的描述文件",
+    "Generate a Provisioning Profile": "生成描述文件",
+    "Select Type": "选择类型",
+    "Generate": "生成",
+    "Select an App ID": "选择一个 App ID",
+    "App ID:": "App ID：",
+    "App ID": "App ID",
+    "Provisioning Profile Configuration": "描述文件配置",
+    "Offline support (7 day validity)": "离线支持（7 天有效期）",
+    "Ad hoc": "Ad Hoc",
+    "iOS App Development": "iOS 应用开发",
+    "iOS App Development Create a provisioning profile to install development apps on iOS, iPadOS, watchOS, and visionOS test devices.": "iOS 应用开发 创建描述文件，以便在 iOS、iPadOS、watchOS 和 visionOS 测试设备上安装开发版应用。",
+    "Create a provisioning profile to install development apps on iOS, iPadOS, watchOS, and visionOS test devices.": "创建描述文件，以便在 iOS、iPadOS、watchOS 和 visionOS 测试设备上安装开发版应用。",
+    "tvOS App Development": "tvOS 应用开发",
+    "tvOS App Development Create a provisioning profile to install development apps on tvOS test devices.": "tvOS 应用开发 创建描述文件，以便在 tvOS 测试设备上安装开发版应用。",
+    "Create a provisioning profile to install development apps on tvOS test devices.": "创建描述文件，以便在 tvOS 测试设备上安装开发版应用。",
+    "macOS App Development": "macOS 应用开发",
+    "macOS App Development Create a provisioning profile to install development apps on test devices.": "macOS 应用开发 创建描述文件，以便在测试设备上安装开发版应用。",
+    "Create a provisioning profile to install development apps on test devices.": "创建描述文件，以便在测试设备上安装开发版应用。",
+    "DriverKit App Development": "DriverKit 应用开发",
+    "DriverKit App Development Create a provisioning profile to install development driverkit extensions on iOS, iPadOS, and macOS test devices.": "DriverKit 应用开发 创建描述文件，以便在 iOS、iPadOS 和 macOS 测试设备上安装开发版 DriverKit 扩展。",
+    "Create a provisioning profile to install development driverkit extensions on iOS, iPadOS, and macOS test devices.": "创建描述文件，以便在 iOS、iPadOS 和 macOS 测试设备上安装开发版 DriverKit 扩展。",
+    "Ad Hoc Create a distribution provisioning profile to install your app on a limited number of registered devices.": "Ad Hoc 创建分发描述文件，以便在有限数量的已注册设备上安装你的应用。",
+    "Create a distribution provisioning profile to install your app on a limited number of registered devices.": "创建分发描述文件，以便在有限数量的已注册设备上安装你的应用。",
+    "tvOS Ad Hoc": "tvOS Ad Hoc",
+    "tvOS Ad Hoc Create a distribution provisioning profile to install your app on a limited number of registered tvOS devices.": "tvOS Ad Hoc 创建分发描述文件，以便在有限数量的已注册 tvOS 设备上安装你的应用。",
+    "Create a distribution provisioning profile to install your app on a limited number of registered tvOS devices.": "创建分发描述文件，以便在有限数量的已注册 tvOS 设备上安装你的应用。",
+    "App Store Connect": "App Store Connect",
+    "App Store Connect Create a distribution provisioning profile to submit your app to App Store Connect.": "App Store Connect 创建分发描述文件，以便将应用提交到 App Store Connect。",
+    "Create a distribution provisioning profile to submit your app to App Store Connect.": "创建分发描述文件，以便将应用提交到 App Store Connect。",
+    "tvOS App Store Connect": "tvOS App Store Connect",
+    "tvOS App Store Connect Create a distribution provisioning profile to submit your tvOS app to App Store Connect.": "tvOS App Store Connect 创建分发描述文件，以便将 tvOS 应用提交到 App Store Connect。",
+    "Create a distribution provisioning profile to submit your tvOS app to App Store Connect.": "创建分发描述文件，以便将 tvOS 应用提交到 App Store Connect。",
+    "Mac App Store Connect": "Mac App Store Connect",
+    "Mac App Store Connect Create a distribution provisioning profile to submit your app to Mac App Store Connect.": "Mac App Store Connect 创建分发描述文件，以便将应用提交到 Mac App Store Connect。",
+    "Create a distribution provisioning profile to submit your app to Mac App Store Connect.": "创建分发描述文件，以便将应用提交到 Mac App Store Connect。",
+    "Developer ID": "Developer ID",
+    "Developer ID Create a Developer ID provisioning profile to use Apple services with your Developer ID signed applications.": "Developer ID 创建 Developer ID 描述文件，以便在使用 Developer ID 签名的应用中使用 Apple 服务。",
+    "Create a Developer ID provisioning profile to use Apple services with your Developer ID signed applications.": "创建 Developer ID 描述文件，以便在使用 Developer ID 签名的应用中使用 Apple 服务。",
+    "If you plan to use services such as Game Center, In-App Purchase, and Push Notifications, or want a Bundle ID unique to a single app, use an explicit App ID. If you want to create one provisioning profile for multiple apps or don't need a specific Bundle ID, select a wildcard App ID. Wildcard App IDs use an asterisk (*) as the last digit in the Bundle ID field.": "如果你计划使用 Game Center、In-App Purchase、Push Notifications 等服务，或希望某个应用使用唯一的 Bundle ID，请使用显式 App ID。如果你想为多个应用创建同一个描述文件，或不需要特定 Bundle ID，请选择通配符 App ID。通配符 App ID 会在 Bundle ID 字段的末位使用星号（*）。",
+    "Apps signed with development and adhoc provisioning profiles must connect to ppq.apple.com during app installation or first launch. Create an offline profile if you need to build and run without an active internet connection.": "使用开发和 Ad Hoc 描述文件签名的应用，必须在安装或首次启动时连接到 ppq.apple.com。如果你需要在无网络连接下构建和运行，请创建离线描述文件。",
+    "Select the certificates you wish to include in this provisioning profile. To use this profile to install an app, the certificate the app was signed with must be included.": "选择你希望包含在此描述文件中的证书。要使用此描述文件安装应用，必须包含用于给该应用签名的证书。",
+    "Click \"Create Devices.\" to create a Device. You need a Device to configure a Provisioning Profile.": "点击“Create Devices.”来创建设备。配置描述文件需要设备。",
+    "macOS": "macOS"
+  },
+  "selectorRules": [],
+  "regexp": [
+    {
+      "pattern": "For use in Xcode 11 or later$",
+      "replacement": "用于 Xcode 11 或更高版本"
+    },
+    {
+      "pattern": "\\)For use in Xcode 11 or later$",
+      "replacement": "）（用于 Xcode 11 或更高版本）"
+    }
+  ]
+}

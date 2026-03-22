@@ -1,0 +1,110 @@
+{
+  "scope": {
+    "page": "account-resources-certificates",
+    "pathPrefix": "/account/resources/certificates"
+  },
+  "static": {
+    "Certificates, Identifiers & Profiles": "证书、标识符和描述文件",
+    "All Certificates": "所有证书",
+    "Create a New Certificate": "创建新证书",
+    "All": "全部",
+    "Development": "开发",
+    "Distribution": "分发",
+    "Certificate Name": "证书名称",
+    "Certificate Type": "证书类型",
+    "Expiration Date": "到期日期",
+    "Add Certificate": "添加证书",
+    "Revoke": "吊销",
+    "Software": "软件",
+    "Apple Development": "Apple 开发",
+    "Apple Development Sign development versions of your iOS, iPadOS, macOS, tvOS, watchOS, and visionOS apps.": "Apple 开发 为 iOS、iPadOS、macOS、tvOS、watchOS 和 visionOS 应用的开发版本签名。",
+    "Sign development versions of your iOS, iPadOS, macOS, tvOS, watchOS, and visionOS apps.": "为 iOS、iPadOS、macOS、tvOS、watchOS 和 visionOS 应用的开发版本签名。",
+    "Apple Distribution": "Apple 分发",
+    "Apple Distribution Sign your iOS, iPadOS, macOS, tvOS, watchOS, and visionOS apps for release testing using Ad Hoc distribution or for submission to App Store Connect.": "Apple 分发 为 iOS、iPadOS、macOS、tvOS、watchOS 和 visionOS 应用签名，用于通过 Ad Hoc 进行发布测试或提交到 App Store Connect。",
+    "Sign your iOS, iPadOS, macOS, tvOS, watchOS, and visionOS apps for release testing using Ad Hoc distribution or for submission to App Store Connect.": "为 iOS、iPadOS、macOS、tvOS、watchOS 和 visionOS 应用签名，用于通过 Ad Hoc 进行发布测试或提交到 App Store Connect。",
+    "iOS App Development": "iOS 应用开发",
+    "iOS App Development Sign development versions of your iOS app.": "iOS 应用开发 为 iOS 应用的开发版本签名。",
+    "Sign development versions of your iOS app.": "为 iOS 应用的开发版本签名。",
+    "iOS Distribution (App Store Connect and Ad Hoc)": "iOS 分发（App Store Connect 与 Ad Hoc）",
+    "iOS Distribution (App Store Connect and Ad Hoc) Sign your iOS, iPadOS, watchOS, and visionOS apps for submission to App Store Connect or for Ad Hoc distribution.": "iOS 分发（App Store Connect 与 Ad Hoc）为 iOS、iPadOS、watchOS、visionOS 应用签名，用于提交到 App Store Connect 或进行 Ad Hoc 分发。",
+    "Sign your iOS, iPadOS, watchOS, and visionOS apps for submission to App Store Connect or for Ad Hoc distribution.": "为 iOS、iPadOS、watchOS、visionOS 应用签名，用于提交到 App Store Connect 或 Ad Hoc 分发。",
+    "Mac Development": "Mac 开发",
+    "Mac Development Sign development versions of your Mac app.": "Mac 开发 为 Mac 应用的开发版本签名。",
+    "Sign development versions of your Mac app.": "为 Mac 应用的开发版本签名。",
+    "Mac App Distribution": "Mac 应用分发",
+    "Mac App Distribution This certificate is used to code sign your app and configure a Distribution Provisioning Profile for submission to the Mac App Store Connect.": "Mac 应用分发 此证书用于对应用进行代码签名，并配置用于提交到 Mac App Store Connect 的分发描述文件。",
+    "This certificate is used to code sign your app and configure a Distribution Provisioning Profile for submission to the Mac App Store Connect.": "此证书用于对应用进行代码签名，并配置用于提交到 Mac App Store Connect 的分发描述文件。",
+    "Mac Installer Distribution": "Mac 安装包分发",
+    "Mac Installer Distribution This certificate is used to sign your app's Installer Package for submission to the Mac App Store Connect.": "Mac 安装包分发 此证书用于为应用安装包签名，以提交到 Mac App Store Connect。",
+    "This certificate is used to sign your app's Installer Package for submission to the Mac App Store Connect.": "此证书用于为应用安装包签名，以提交到 Mac App Store Connect。",
+    "Developer ID Installer": "Developer ID 安装器",
+    "Developer ID Installer This certificate is used to sign your app's Installer Package for distribution outside of the Mac App Store Connect.": "Developer ID 安装器 此证书用于为应用安装包签名，以便在 Mac App Store Connect 之外分发。",
+    "This certificate is used to sign your app's Installer Package for distribution outside of the Mac App Store Connect.": "此证书用于为应用安装包签名，以便在 Mac App Store Connect 之外分发。",
+    "Developer ID Application": "Developer ID 应用",
+    "Developer ID Application This certificate is used to code sign your app for distribution outside of the Mac App Store Connect.": "Developer ID 应用 此证书用于对应用进行代码签名，以便在 Mac App Store Connect 之外分发。",
+    "This certificate is used to code sign your app for distribution outside of the Mac App Store Connect.": "此证书用于对应用进行代码签名，以便在 Mac App Store Connect 之外分发。",
+    "Apple Push Notification service SSL (Sandbox)": "Apple 推送通知服务 SSL（Sandbox）",
+    "Apple Push Notification service SSL (Sandbox) Establish connectivity between your notification server and the Apple Push Notification service sandbox environment to deliver remote notifications to your app. A separate certificate is required for each app you develop.": "Apple 推送通知服务 SSL（Sandbox）在你的通知服务器与 Apple 推送通知服务沙盒环境之间建立连接，以向应用发送远程通知。你开发的每个应用都需要单独证书。",
+    "Establish connectivity between your notification server and the Apple Push Notification service sandbox environment to deliver remote notifications to your app. A separate certificate is required for each app you develop.": "在你的通知服务器与 Apple 推送通知服务沙盒环境之间建立连接，以向应用发送远程通知。你开发的每个应用都需要单独证书。",
+    "Apple Push Notification service SSL (Sandbox & Production)": "Apple 推送通知服务 SSL（Sandbox 与 Production）",
+    "Apple Push Notification service SSL (Sandbox & Production) Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environments to deliver remote notifications to your app. When utilizing HTTP/2, the same certificate can be used to deliver app notifications, update ClockKit complication data, and alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "Apple 推送通知服务 SSL（Sandbox 与 Production）在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以向应用发送远程通知。使用 HTTP/2 时，同一证书可用于发送应用通知、更新 ClockKit complication 数据，并通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environments to deliver remote notifications to your app. When utilizing HTTP/2, the same certificate can be used to deliver app notifications, update ClockKit complication data, and alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以向应用发送远程通知。使用 HTTP/2 时，同一证书可用于发送应用通知、更新 ClockKit complication 数据，并通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "Pass Type ID Certificate": "Pass Type ID 证书",
+    "Pass Type ID Certificate Sign and send updates to passes in Wallet.": "Pass Type ID 证书 为 Wallet 中的通行证签名并发送更新。",
+    "Sign and send updates to passes in Wallet.": "为 Wallet 中的通行证签名并发送更新。",
+    "Order Type ID Certificate": "Order Type ID 证书",
+    "Order Type ID Certificate Sign and send updates to order information payloads displayed in Apple Wallet.": "Order Type ID 证书 为 Apple Wallet 中显示的订单信息载荷签名并发送更新。",
+    "Sign and send updates to order information payloads displayed in Apple Wallet.": "为 Apple Wallet 中显示的订单信息载荷签名并发送更新。",
+    "Website Push ID Certificate": "Website Push ID 证书",
+    "Sign and send updates for Websites.": "为网站签名并发送更新。",
+    "Swift Package Collection Certificate": "Swift 包集合证书",
+    "Swift Package Collection Certificate Sign Swift Package Collections for distribution.": "Swift 包集合证书 为 Swift 包集合签名以进行分发。",
+    "Sign Swift Package Collections for distribution.": "为 Swift 包集合签名以进行分发。",
+    "Swift Package Certificate": "Swift 包证书",
+    "Swift Package Certificate Sign Swift packages and package collections for distribution. For use with Swift Package Manager v5.9 or later.": "Swift 包证书 为 Swift 包和包集合签名以进行分发。适用于 Swift Package Manager v5.9 及以上版本。",
+    "Sign Swift packages and package collections for distribution. For use with Swift Package Manager v5.9 or later.": "为 Swift 包和包集合签名以进行分发。适用于 Swift Package Manager v5.9 及以上版本。",
+    "WatchKit Services Certificate": "WatchKit 服务证书",
+    "WatchKit Services Certificate Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environment to update ClockKit complication data. When utilizing HTTP/2, the same certificate can be used to deliver app notifications, update ClockKit complication data, and alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "WatchKit 服务证书 在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以更新 ClockKit complication 数据。使用 HTTP/2 时，同一证书可用于发送应用通知、更新 ClockKit complication 数据，并通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environment to update ClockKit complication data. When utilizing HTTP/2, the same certificate can be used to deliver app notifications, update ClockKit complication data, and alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以更新 ClockKit complication 数据。使用 HTTP/2 时，同一证书可用于发送应用通知、更新 ClockKit complication 数据，并通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "VoIP Services Certificate": "VoIP 服务证书",
+    "VoIP Services Certificate Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environment to alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "VoIP 服务证书 在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "Establish connectivity between your notification server, the Apple Push Notification service sandbox, and production environment to alert background VoIP apps of incoming activity. A separate certificate is required for each app you distribute.": "在你的通知服务器、Apple 推送通知服务沙盒与生产环境之间建立连接，以通知后台 VoIP 应用有来电活动。你分发的每个应用都需要单独证书。",
+    "Apple Pay Payment Processing Certificate": "Apple Pay 支付处理证书",
+    "Apple Pay Payment Processing Certificate Decrypt app transaction data sent by Apple to a merchant/developer.": "Apple Pay 支付处理证书 解密 Apple 发送给商户/开发者的应用交易数据。",
+    "Decrypt app transaction data sent by Apple to a merchant/developer.": "解密 Apple 发送给商户/开发者的应用交易数据。",
+    "Apple Pay Merchant Identity Certificate": "Apple Pay 商户身份证书",
+    "Apple Pay Merchant Identity Certificate A client TLS certificate that is used to authenticate you to Apple Pay Payment Processing Servers You need to accept the agreement 'Apple Pay Platform Web Merchant Terms and Conditions'.Review Agreement": "Apple Pay 商户身份证书 用于向 Apple Pay 支付处理服务器认证身份的客户端 TLS 证书。你需要接受协议“Apple Pay Platform Web Merchant Terms and Conditions”。查看协议",
+    "A client TLS certificate that is used to authenticate you to Apple Pay Payment Processing Servers": "用于向 Apple Pay 支付处理服务器认证身份的客户端 TLS 证书。",
+    "You need to accept the agreement 'Apple Pay Platform Web Merchant Terms and Conditions'.": "你需要接受协议“Apple Pay Platform Web Merchant Terms and Conditions”。",
+    "Review Agreement": "查看协议",
+    "Intermediate Certificates": "中间证书",
+    "Upload a Certificate Signing Request": "上传证书签名请求",
+    "To manually generate a Certificate, you need a Certificate Signing Request (CSR) file from your Mac.": "要手动生成证书，你需要从 Mac 获取证书签名请求（CSR）文件。",
+    "To use your certificates, you must have the intermediate signing certificate in your system keychain. This is automatically installed by Xcode. However, if you need to reinstall the intermediate signing certificate click the link below:": "要使用你的证书，系统钥匙串中必须有中间签名证书。该证书会由 Xcode 自动安装；如果你需要重新安装中间签名证书，请点击下方链接："
+  },
+  "selectorRules": [
+    {
+      "selector": "button[aria-label='Create a certificate']",
+      "source": "Create",
+      "target": "创建证书"
+    }
+  ],
+  "regexp": [
+    {
+      "pattern": "^(\\d+)\\s+Certificates$",
+      "replacement": "$1 个证书"
+    },
+    {
+      "pattern": "^(Worldwide Developer Relations Certificate Authority) \\(Expiring ([0-9/]+)\\)$",
+      "replacement": "全球开发者关系证书颁发机构（到期：$2）"
+    },
+    {
+      "pattern": "^(Worldwide Developer Relations - G4) \\(Expiring ([0-9/]+)\\)$",
+      "replacement": "全球开发者关系 - G4（到期：$2）"
+    },
+    {
+      "pattern": "^(Developer ID - G2) \\(Expiring ([0-9/]+)\\)$",
+      "replacement": "Developer ID - G2（到期：$2）"
+    }
+  ]
+}

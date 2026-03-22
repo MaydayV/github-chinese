@@ -1,0 +1,150 @@
+{
+  "scope": {
+    "page": "account-resources-identifiers",
+    "pathPrefix": "/account/resources/identifiers"
+  },
+  "static": {
+    "Identifiers": "标识符",
+    "All Identifiers": "所有标识符",
+    "Register a new identifier": "注册新标识符",
+    "Register an iCloud Container": "注册 iCloud 容器",
+    "Configure your App Clip Bundle Identifier": "配置你的 App Clip Bundle 标识符",
+    "Register an App ID": "注册 App ID",
+    "Select a type": "选择类型",
+    "App": "应用",
+    "App Clip": "App Clip",
+    "You cannot use special characters such as @, &, *, \"": "不能使用 @、&、*、\" 等特殊字符",
+    "You cannot use special characters such as @, &, *, ', \", -, .": "不能使用 @、&、*、'、\"、-、. 等特殊字符",
+    "We recommend using a reverse-domain name style string (i.e., com.domainname.appname).": "建议使用反向域名格式字符串（例如：com.domainname.appname）。",
+    "We recommend using a reverse-domain name style string (i.e., com.domainname.appname). It cannot contain an asterisk (*).": "建议使用反向域名格式（如 com.domainname.appname），且不能包含星号（*）。",
+    "Access the Apple Music catalog and make personalized requests for authorized users.": "访问 Apple Music 目录，并为已授权用户发起个性化请求。",
+    "Match audio signatures against Shazam’s music catalog.": "将音频指纹与 Shazam 音乐目录进行匹配。",
+    "Access the Apple Weather service.": "访问 Apple 天气服务。",
+    "Include CloudKit support (requires Xcode 6)": "包含 CloudKit 支持（需要 Xcode 6）",
+    "Compatible with Xcode 5": "兼容 Xcode 5",
+    "Complete Protection": "完整保护",
+    "Protected Unless Open": "除非打开否则受保护",
+    "Protected Until First User Authentication": "首次用户认证前受保护",
+    "Manage Thread Network Credentials": "管理 Thread 网络凭据",
+    "Manage Thread Network Credentials (development)": "管理 Thread 网络凭据（开发）",
+    "Network Extensions": "网络扩展",
+    "Sign In with Apple": "使用 Apple 登录",
+    "Siri": "Siri",
+    "Wallet": "钱包",
+    "Register an App ID to enable your app, app extensions, or App Clip to access available services and identify your app in a provisioning profile. You can enable app services when you create an App ID or modify these settings later.": "注册一个 App ID，使你的 App、App 扩展或 App Clip 能够访问可用服务，并在描述文件中标识你的 App。你可以在创建 App ID 时启用应用服务，也可以稍后修改这些设置。",
+    "App ID Register an App ID to enable your app, app extensions, or App Clip to access available services and identify your app in a provisioning profile. You can enable app services when you create an App ID or modify these settings later.": "App ID 注册一个 App ID，使你的 App、App 扩展或 App Clip 能够访问可用服务，并在描述文件中标识你的 App。你可以在创建 App ID 时启用应用服务，也可以稍后修改这些设置。",
+    "For each website that uses Sign in with Apple, register a services identifier (Services ID), configure your domain and return URL, and create an associated private key.": "对于每个使用“使用 Apple 登录”的网站，请注册一个服务标识符（Services ID），配置你的域名和回调 URL，并创建关联的私钥。",
+    "服务 ID For each website that uses Sign in with Apple, register a services identifier (Services ID), configure your domain and return URL, and create an associated private key.": "服务 ID 对于每个使用“使用 Apple 登录”的网站，请注册一个服务标识符（Services ID），配置你的域名和回调 URL，并创建关联的私钥。",
+    "Register a pass type identifier (Pass Type ID) for each kind of pass you create (i.e. gift cards). Registering your Pass Type IDs lets you generate Apple-issued certificates which are used to digitally sign and send updates to your passes, and allow your passes to be recognized by Wallet.": "为你创建的每类卡片（例如礼品卡）注册一个 pass 类型标识符（Pass Type ID）。注册 Pass Type ID 后，你可以生成 Apple 签发的证书，用于对卡片进行数字签名并发送更新，同时让 Wallet 能识别这些卡片。",
+    "Pass Type ID Register a pass type identifier (Pass Type ID) for each kind of pass you create (i.e. gift cards). Registering your Pass Type IDs lets you generate Apple-issued certificates which are used to digitally sign and send updates to your passes, and allow your passes to be recognized by Wallet.": "Pass Type ID 为你创建的每类卡片（例如礼品卡）注册一个 pass 类型标识符（Pass Type ID）。注册 Pass Type ID 后，你可以生成 Apple 签发的证书，用于对卡片进行数字签名并发送更新，同时让 Wallet 能识别这些卡片。",
+    "Register an order type identifier (Order Type ID) to support signing and distributing order bundles with Wallet and Apple Pay. Registering your order type ID lets you generate certificates to digitally sign and send updates to your orders in Wallet.": "注册一个订单类型标识符（Order Type ID），以支持在 Wallet 和 Apple Pay 中对订单包进行签名和分发。注册订单类型 ID 后，你可以生成证书，对 Wallet 中的订单进行数字签名并发送更新。",
+    "Order Type ID Register an order type identifier (Order Type ID) to support signing and distributing order bundles with Wallet and Apple Pay. Registering your order type ID lets you generate certificates to digitally sign and send updates to your orders in Wallet.": "Order Type ID 注册一个订单类型标识符（Order Type ID），以支持在 Wallet 和 Apple Pay 中对订单包进行签名和分发。注册订单类型 ID 后，你可以生成证书，对 Wallet 中的订单进行数字签名并发送更新。",
+    "Register a Website Push Identifier (Website Push ID). Registering your Website Push IDs lets you generate Apple-issued certificates which are used to digitally sign and send push notifications from your website to macOS.": "注册一个网站推送标识符（Website Push ID）。注册 Website Push ID 后，你可以生成 Apple 签发的证书，用于从你的网站向 macOS 发送并签名推送通知。",
+    "网站推送 ID Register a Website Push Identifier (Website Push ID). Registering your Website Push IDs lets you generate Apple-issued certificates which are used to digitally sign and send push notifications from your website to macOS.": "网站推送 ID 注册一个网站推送标识符（Website Push ID）。注册 Website Push ID 后，你可以生成 Apple 签发的证书，用于从你的网站向 macOS 发送并签名推送通知。",
+    "Registering your iCloud Container lets you use the iCloud Storage APIs to enable your apps to store data and documents in iCloud, keeping your apps up to date automatically.": "注册 iCloud 容器后，你可以使用 iCloud Storage API，让应用将数据和文档存储在 iCloud 中，并自动保持最新。",
+    "Registering an App Clip bundle identifier requires you to specify the App ID of the parent app. Select the App ID from the list below and provide the product name for the App Clip.": "注册 App Clip Bundle 标识符时，需要指定父应用的 App ID。请从下方列表中选择 App ID，并为 App Clip 提供产品名称。",
+    "Parent App ID:": "父应用 App ID：",
+    "Product Name": "产品名称",
+    "Product names cannot contain periods (.). Periods will be automatically converted to hyphens (-).": "产品名称不能包含句点（.）。句点会被自动转换为连字符（-）。",
+    "App Clip Bundle ID": "App Clip Bundle ID",
+    "iCloud 容器 Registering your iCloud Container lets you use the iCloud Storage APIs to enable your apps to store data and documents in iCloud, keeping your apps up to date automatically.": "iCloud 容器 注册 iCloud 容器后，你可以使用 iCloud Storage API，让应用将数据和文档存储在 iCloud 中，并自动保持最新。",
+    "Registering your App Group allows access to group containers that are shared among multiple related apps, and allows certain additional interprocess communication between the apps.": "注册 App 群组后，可以访问多个关联应用共享的群组容器，并允许应用之间进行某些额外的进程间通信。",
+    "App 群组 Registering your App Group allows access to group containers that are shared among multiple related apps, and allows certain additional interprocess communication between the apps.": "App 群组 注册 App 群组后，可以访问多个关联应用共享的群组容器，并允许应用之间进行某些额外的进程间通信。",
+    "Register your Merchant Identifiers (Merchant IDs) to enable your apps and websites to process transactions for physical goods and services. Generate an Apple Pay Payment Processing certificate for each registered Merchant ID to validate transactions initiated within your app and/or website.": "注册商户标识符（Merchant ID），以便你的应用和网站处理实物商品与服务交易。请为每个已注册的 Merchant ID 生成 Apple Pay 支付处理证书，用于验证在应用和/或网站内发起的交易。",
+    "商户 ID Register your Merchant Identifiers (Merchant IDs) to enable your apps and websites to process transactions for physical goods and services. Generate an Apple Pay Payment Processing certificate for each registered Merchant ID to validate transactions initiated within your app and/or website.": "商户 ID 注册商户标识符（Merchant ID），以便你的应用和网站处理实物商品与服务交易。请为每个已注册的 Merchant ID 生成 Apple Pay 支付处理证书，用于验证在应用和/或网站内发起的交易。",
+    "Register a media identifier (Media ID) for each app that uses the Apple Music API, ShazamKit or Apple Music Feed. Then create an associated private key.": "为每个使用 Apple Music API、ShazamKit 或 Apple Music Feed 的应用注册一个媒体标识符（Media ID），然后创建关联私钥。",
+    "媒体 ID Register a media identifier (Media ID) for each app that uses the Apple Music API, ShazamKit or Apple Music Feed. Then create an associated private key.": "媒体 ID 为每个使用 Apple Music API、ShazamKit 或 Apple Music Feed 的应用注册一个媒体标识符（Media ID），然后创建关联私钥。",
+    "App IDs": "App ID",
+    "Services IDs": "服务 ID",
+    "Pass Type IDs": "Pass Type ID",
+    "Order Type IDs": "订单类型 ID",
+    "Website Push IDs": "网站推送 ID",
+    "iCloud Containers": "iCloud 容器",
+    "App Groups": "App 群组",
+    "Merchant IDs": "商户 ID",
+    "Media IDs": "媒体 ID"
+  },
+  "selectorRules": [],
+  "regexp": [
+    {
+      "pattern": "^Development, Ad hoc, App Store Connect$",
+      "replacement": "开发、Ad Hoc、App Store Connect"
+    },
+    {
+      "pattern": "^Development, Ad hoc, App Store Connect, Developer ID$",
+      "replacement": "开发、Ad Hoc、App Store Connect、Developer ID"
+    },
+    {
+      "pattern": "^Development, App Store Connect, Ad hoc$",
+      "replacement": "开发、App Store Connect、Ad Hoc"
+    },
+    {
+      "pattern": "^App Store Connect, Ad hoc, Development$",
+      "replacement": "App Store Connect、Ad Hoc、开发"
+    },
+    {
+      "pattern": "^Developer ID, Development, Ad hoc, App Store Connect$",
+      "replacement": "Developer ID、开发、Ad Hoc、App Store Connect"
+    },
+    {
+      "pattern": "^Development, Ad hoc, Developer ID, App Store Connect$",
+      "replacement": "开发、Ad Hoc、Developer ID、App Store Connect"
+    },
+    {
+      "pattern": "^Development, App Store Connect, Developer ID$",
+      "replacement": "开发、App Store Connect、Developer ID"
+    },
+    {
+      "pattern": "^Development, App Store Connect, Developer ID, Ad hoc$",
+      "replacement": "开发、App Store Connect、Developer ID、Ad Hoc"
+    },
+    {
+      "pattern": "^Ad hoc, Development, App Store Connect, Developer ID$",
+      "replacement": "Ad Hoc、开发、App Store Connect、Developer ID"
+    },
+    {
+      "pattern": "^Ad hoc, App Store Connect, Development$",
+      "replacement": "Ad Hoc、App Store Connect、开发"
+    },
+    {
+      "pattern": "^iOS, iPadOS$",
+      "replacement": "iOS、iPadOS"
+    },
+    {
+      "pattern": "^iOS, visionOS$",
+      "replacement": "iOS、visionOS"
+    },
+    {
+      "pattern": "^iOS, watchOS$",
+      "replacement": "iOS、watchOS"
+    },
+    {
+      "pattern": "^iOS, macOS$",
+      "replacement": "iOS、macOS"
+    },
+    {
+      "pattern": "^iOS, macOS, tvOS$",
+      "replacement": "iOS、macOS、tvOS"
+    },
+    {
+      "pattern": "^iOS, tvOS$",
+      "replacement": "iOS、tvOS"
+    },
+    {
+      "pattern": "^macOS, iOS$",
+      "replacement": "macOS、iOS"
+    },
+    {
+      "pattern": "^visionOS, iOS$",
+      "replacement": "visionOS、iOS"
+    },
+    {
+      "pattern": "^iOS, tvOS, watchOS, macOS$",
+      "replacement": "iOS、tvOS、watchOS、macOS"
+    },
+    {
+      "pattern": "^iOS, macOS, watchOS$",
+      "replacement": "iOS、macOS、watchOS"
+    }
+  ]
+}
