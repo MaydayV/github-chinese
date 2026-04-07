@@ -25,7 +25,6 @@
 - [🔧 本地调试](#-本地调试)
 - [🔄 更新日志](#-更新日志)
 - [📖 开源说明](#-开源说明)
-- [🖼️ 效果预览](#-效果预览)
 </details>
 
 ## 🌟 功能特性
@@ -47,8 +46,10 @@
 
 ### Chrome 应用商店安装（推荐）
 
-1. 打开安装地址：https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb
-1. 在 Chrome 商店页面点击 `添加至 Chrome`，并确认安装
+[**前往 Chrome 应用商店安装**](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb)
+
+1. 点击上方链接进入 Chrome 应用商店
+1. 点击 `添加至 Chrome`，并确认安装
 1. 安装后可在 `chrome://extensions/` 中确认扩展已启用（建议固定到工具栏）
 1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
 
@@ -102,7 +103,7 @@
 
 本扩展为社区项目，非 GitHub 官方产品。
 
-词条仓库的原作者已将相关内容开源发布，因此本插件也继续以开源方式维护。
+词条基于 [maboloshi/github-chinese](https://github.com/maboloshi/github-chinese) 项目，该项目由 [52cik](https://github.com/52cik) 创建，[maboloshi](https://github.com/maboloshi) 等社区成员持续维护，以 GPL-3.0 许可证开源。
 
 如果你希望继续修改或完善，欢迎通过以下方式参与：
 
@@ -110,19 +111,6 @@
 1. Fork 本仓库后继续开发，并将你的修改版本以开源仓库形式发布
 
 请在二次发布时遵循本仓库许可证（GPL-3.0），并保留来源说明，方便社区持续协作与追溯。
-
-## 🖼️ 效果预览
-
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img1.png"/>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img3.png"/>
-    <img src="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img1.png" width="75%" />
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img2.png"/>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img4.png"/>
-    <img src="https://raw.githubusercontent.com/MaydayV/github-chinese/preview/img2.png" width="75%" />
-  </picture>
 
 <div align="right">
 
