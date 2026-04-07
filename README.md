@@ -27,7 +27,11 @@
 - [📖 开源说明](#-开源说明)
 </details>
 
+<div align="center">
+
 ### [👉 前往 Chrome 应用商店安装 👈](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb)
+
+</div>
 
 ## 🌟 功能特性
 
