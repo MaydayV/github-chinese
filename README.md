@@ -4,6 +4,8 @@
 
 > 将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。
 
+### [👉 前往 Chrome 应用商店安装 👈](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb)
+
 **简体中文** · [反馈问题][github-issues-link]
 
 <!-- SHIELD GROUP -->
