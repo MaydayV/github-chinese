@@ -16,8 +16,8 @@ assert.strictEqual(
 
 assert.strictEqual(
   manifest.version,
-  '2.0.0',
-  'manifest 版本号应更新为 2.0.0',
+  '2.2.1',
+  'manifest 版本号应更新为 2.2.1',
 );
 
 console.log('PASS');

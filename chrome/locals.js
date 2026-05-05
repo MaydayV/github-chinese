@@ -54,7 +54,7 @@ I18N.conf = {
     rePagePathOrg: /^\/[^\/]+\/[^\/]+\/(repositories\/new|repositories|sponsoring|discussions|projects|packages|teams|new-team|people|outside-collaborators|pending_collaborators|dashboard|billing_managers\/new|invitations?|settings\/(profile|billing|roles|member_privileges|teams|import-export|blocked_users|interaction_limits|code_review_limits|moderators|repository-defaults|rules|codespaces|copilot|actions|hooks|discussions|packages|pages|projects|security_analysis|security|dependabot_rules|domains|secrets|variables|oauth_application_policy|installations|personal-access-token|reminders|sponsors-log|audit-log|deleted_repositories|applications\/new|applications|apps\/new|apps|publisher|policies\/repositories)|topics|domain\/new|audit-log\/event_settings|billing\/(history|plans)|policies\/applications)|^\/[^\/]+\/(enterprise_plan|sponsoring)/,
 
     // 特定页面，启用`字符数据`监测
-    characterDataPage: ['repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules'],
+    characterDataPage: ['repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules', 'pulls'],
 
     // 特定页面，忽略突变元素规则
     ignoreMutationSelectorPage: {
@@ -717,7 +717,9 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Home": "主页",
             "Feed": "动态",
             "Issues": "议题",
+            "All issues": "所有议题",
             "Pull requests": "拉取请求",
+            "All pull requests": "所有拉取请求",
             "Projects": "项目",
             "Discussions": "讨论",
             "Codespaces": "代码空间",
@@ -817,6 +819,12 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
 
                 "Recent tasks": "近期任务",
 
+            "Ask Copilot…": "询问 Copilot…",
+                "About this page": "关于此页面",
+                "In immersive chat": "在沉浸式聊天中",
+                "In a space": "在空间",
+                "Download for…": "下载插件…",
+
         // 右上角个人图标下拉菜单
             "Open user navigation menu": "打开用户导航菜单",
             "Account switcher": "账户切换",
@@ -824,6 +832,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                 "Switch account": "切换账户",
                 "Sign out...": "登出…",
             "Set status": "状态设置",
+            "Create new repository": "新建仓库", // 小屏模式
             "Profile": "个人资料",
             "Gists": "代码片段",
 
@@ -1046,6 +1055,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "dragging & dropping,": "拖放，",
             "selecting or pasting them.": "选择或粘贴来附加文件。",
             "Markdown is supported": "支持 Markdown 语法",
+                "is supported": "语法支持",
             "Styling with Markdown is supported.": "支持 Markdown 语法。",
             "Paste, drop, or click to add files": "粘贴、拖放或点击添加文件",
             "Write with Copilot": "使用 Copilot 撰写",
@@ -2008,7 +2018,7 @@ I18N["zh-CN"]["orgs-public"] = { // 组织公共部分
 I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组织）
     "static": { // 静态翻译
         // 顶部 GPT 聊天窗口
-        "Ask anything": "询问任何事",
+        "Ask anything or type @ to add context": "询问任何问题或输入 @ 来添加上下文",
         "Ask": "询问",
         "Send": "发送",
         "Feedback": "反馈",
@@ -2051,6 +2061,8 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
         "Agent sessions to include": "智能体任务包含",
         "View all": "查看全部",
         "Number of results": "结果数量",
+        "Maximum age of results": "结果最大年龄",
+        "No maximum": "无限制",
         "Pull request options": "拉取请求选项",
         "Pull requests to include": "拉取请求包含",
             "Authored": "由您创建",
@@ -2061,7 +2073,7 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
         "Issues to include": "议题包含",
             "Assigned to me": "分配给我",
             "Involves me": "涉及我",
-        "Open in Copilot chat": "在 Copilot Chat 中打开",
+        "Open in Copilot Chat": "在 Copilot Chat 中打开",
         "Assign to Copilot": "分配给 Copilot",
         "uses AI. Check for mistakes.": "使用 AI。请检查错误。",
 
@@ -2207,6 +2219,7 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
         // 提要筛选
         "Filter": "筛选器",
             "Feed filters": "提要筛选器",
+            "Organization feed filters": "组织提要筛选器",
             "Events": "事件",
                 "Activity you want to see on your feed": "您想在提要上看到的活动",
             "Announcements": "公告",
@@ -2221,6 +2234,7 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
                 "Repositories that are created or forked by people": "由人们创建或复刻的仓库",
             "Repository activity": "仓库活动",
                 "Issues and pull requests from repositories": "来自仓库的议题和拉取请求",
+                "Issues, pull requests, and contributions from repositories": "来自仓库的议题、拉取请求和贡献",
             "Follows": "关注",
                 "Who people are following": "人们在关注谁",
             "Recommendations": "推荐",
@@ -2516,7 +2530,7 @@ I18N["zh-CN"]["page-profile-public"] = { // 个人首页（含组织）
                     "inaccessible": "已删库",
                     "Merged without a review": "未经审查就合并",
                 // Pull Shark
-                    "Pull Shark": "鲨鱼拉",
+                    "Pull Shark": "合纵连横",
                     "Bronze unlocked": "青铜已解锁",
                     "Bronze and Silver unlocked": "青铜和白银已解锁",
                     "· First unlocked": "· 首次解锁于",
@@ -2531,16 +2545,16 @@ I18N["zh-CN"]["page-profile-public"] = { // 个人首页（含组织）
                     "⭐️ 512 stars": "⭐️ 512 个星标",
                     "⭐️ 4096 stars": "⭐️ 4096 个星标",
                 // Pair Extraordinaire
-                    "Pair Extraordinaire": "非凡搭档",
+                    "Pair Extraordinaire": "珠璧联辉",
                     "Unlocked": "解锁于",
                     "Coauthored with": "与下列用户共同合作",
                     "Coauthored with an unknown user": "与未知用户共同合作",
                 // Quickdraw
-                    "Quickdraw": "快速关闭",
+                    "Quickdraw": "电光石火",
                     "Gitty up!": "赶快开始！",
                     "Closed within 5 minutes of opening": "在打开的 5 分钟内关闭",
                 // Galaxy Brain
-                    "Galaxy Brain": "银河大脑",
+                    "Galaxy Brain": "天工慧心",
                     "2nd accepted answer": "2 个答案被接受",
                     "8th accepted answer": "8 个答案被接受",
                     "16th accepted answer": "16 个答案被接受",
@@ -4285,6 +4299,7 @@ I18N["zh-CN"]["settings/billing"] = { // 设置 - 账单和计划
             "Next payment due": "下一次应付款",
 
             "Subscriptions": "订阅",
+                "Copilot Student": "Copilot 学生",
                 "Manage subscriptions": "管理订阅",
                 "per": "/",
                 "month": "月",
@@ -4477,6 +4492,7 @@ I18N["zh-CN"]["settings/billing"] = { // 设置 - 账单和计划
 
             // 获取使用情况报告
                 "Premium requests usage report": "高级请求使用报告",
+                "Get premium request usage report": "获取高级请求使用报告",
                     "Detailed per-user breakdown of premium requests consumed.": "详细列出每位用户消耗的高级请求数量。",
                 "Legacy usage report": "旧版使用报告",
 
@@ -4895,6 +4911,7 @@ I18N["zh-CN"]["settings/billing"] = { // 设置 - 账单和计划
             const translatedDate = dateRegExp.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), p1);
             return `过去 45 天内每用户高级请求明细。${translatedDate} 日落`;
         }],
+        [/of (\d+) included/, "/$1"], // 高级请求总数
 
         // billing 概况页面
         [/(?:Gross metered usage|Included usage discounts) for (.+) - (.+).$/, (match, p1, p2) => { // 概况下方小字，过于啰嗦直接省略
@@ -4905,6 +4922,9 @@ I18N["zh-CN"]["settings/billing"] = { // 设置 - 账单和计划
             const translatedP2 = dateRegExp.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), p2);
             return `${translatedP1}-${translatedP2}`;
         }],
+        // 订阅相关
+        [/^(\$\d+(\.\d+)?) off$/, "$1 减免"],
+        [/· (\d+) years? remaining/, " · 剩余 $1 年"],
         //[/Included usage discounts for (.+) - (.+)./, (match, p1, p2) => {
         //    const translatedP1 = I18N["zh-CN"]["public"]["time-regexp"][p1] || p1;
         //    const translatedP2 = I18N["zh-CN"]["public"]["time-regexp"][p2] || p2;
@@ -4913,6 +4933,7 @@ I18N["zh-CN"]["settings/billing"] = { // 设置 - 账单和计划
         [/([\d,]+) min used \/ ([\d,]+) min included/, "$1 / $2 分钟"],
         //(\d+) min used \/ ([\d,+]) min included
         [/(\d+) GB used \/ (\d+) GB included/, "$1/$2 GB"],
+        [/Based on (\d+) additional premium requests? beyond your included usage./, "超额高级请求：$1"],
         // 当前包含用量 - 详情 对话框
             [/Current usage for (.+) - (.+). Monthly quota resets in (\d+) day\(s\)./, (match, p1, p2, p3) => {
                 const dateRegExp = I18N["zh-CN"]["public"]["time-regexp"];
@@ -6154,6 +6175,7 @@ I18N["zh-CN"]["settings/copilot"] = { // 设置 - GitHub Copilot
                 "Copilot Chat in GitHub.com": "在 GitHub.com 中使用 Copilot Chat",
                     "You can use Copilot Chat in GitHub.com. Copilot code review and preview features are only available for paid licenses.": "您可以在 GitHub.com 中使用 Copilot Chat。Copilot 代码审查和预览功能仅适用于付费版。",
                     "You can use Copilot Chat in GitHub.com. Preview features are only available for paid licenses.": "您可以在 GitHub.com 中使用 Copilot Chat。预览功能仅适用于付费版。",
+                    "You can use Copilot Chat in GitHub.com and Copilot for pull requests. Preview features are only available for paid licenses.": "您可以在 GitHub.com 中使用 Copilot Chat 和 Copilot 拉取请求。预览功能仅适用于付费版。",
                     "Learn more about Copilot in GitHub.com": "了解更多关于在 GitHub.com 中使用 Copilot 的信息",
                 "Editor preview features": "编辑器预览功能",
                     "You can use preview features in your editor.": "您可以在编辑器中使用预览功能。",
@@ -6171,6 +6193,7 @@ I18N["zh-CN"]["settings/copilot"] = { // 设置 - GitHub Copilot
                     "About GitHub Copilot privacy.": "关于 GitHub Copilot 隐私的信息。",
                 "Allow GitHub to use my data for AI model training": "允许 GitHub 将数据用于训练 AI 模型",
                     "Allow GitHub, its affiliates and third parties to use my data, including Prompts, Suggestions, and Code Snippets, for AI model training. More information in the": "允许GitHub、其关联公司和第三方使用我的数据，包括提示、建议和代码片段，以训练 AI 模型。更多信息请查看",
+                    "Allow GitHub to collect and use my Inputs, Outputs, and associated context to train and improve AI models. Read more in the": "允许 GitHub 收集并使用我的输入、输出、交互上下文以训练并提升 AI 模型。更多信息在",
                 "Copilot can search the web": "网络搜索",
                     "Copilot can answer questions about new trends and give improved answers, via Bing. See": "Copilot 可以回答有关新趋势的问题并给出改进的答案，通过必应。请参阅",
                     "Microsoft Privacy Statement": "微软隐私声明",
@@ -6247,6 +6270,10 @@ I18N["zh-CN"]["settings/copilot"] = { // 设置 - GitHub Copilot
                 "Copilot coding agent": "Copilot 编程智能体",
                     "With Copilot coding agent, you can delegate tasks to Copilot, freeing you to focus on the creative, complex, and high-impact work that matters most. Simply assign an issue to Copilot, wait for the agent to request your review, then leave feedback on the pull request to iterate.": "使用 Copilot 编程智能体，您可以将任务委托给 Copilot，从而让您专注于最具创造性的、复杂且影响深远的工作。只需将问题分配给 Copilot，等待智能体请求您审查，然后在拉取请求中留下反馈以进行迭代。",
                     "Delegate tasks to Copilot coding agent in repositories where it is enabled": "将任务委托给已启用 Copilot 编程智能体的仓库",
+                "Copilot Memory": "Copilot 记忆",
+                    "to remember repository context across Copilot agent interactions.": "在 Copilot 智能体交互过程中记住代码仓库上下文。",
+                    "This preview is governed by": "此预览受此约束：",
+                    "GitHub's pre-release terms": "GitHub 预发行条款",
                 "MCP servers in Copilot": "Copilot 中的 MCP 服务器",
                     "Connect MCP servers to Copilot in all Copilot editors and Coding Agent.": "在所有 Copilot 编辑器和编程智能体中连接 MCP 服务器。",
                 // Grok
@@ -8186,6 +8213,7 @@ I18N["zh-CN"]["repository-public"] = { // 仓库 - 公共部分
                     //[/This user has been invited to collaborate on the ([^ ]+) repository./, "该用户已被邀请在 $1 仓库上进行协作。"],
                 "Pick your reaction": "选择您的表情",
                 "Copy link": "复制链接",
+                "Copy Markdown": "复制为 Markdown",
                 "Quote reply": "引用回复",
                 "Reference in new issue": "引用到新议题",
                     // 引用到新议题 对话框
@@ -8195,6 +8223,7 @@ I18N["zh-CN"]["repository-public"] = { // 仓库 - 公共部分
                     "Select repository": "选择仓库",
                     "Repository:": "仓库：",
                     "No matching repositories.": "没有匹配的仓库。",
+                "Pin": "置顶",
                 "Report content": "举报内容",
                 "Report": "举报",
                 // 评论删除提醒
@@ -10095,8 +10124,8 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
                     "Has review state": "包含评审状态",
                     "Exclude review": "排除评审状态",
                     "No reviews": "无评审",
-                "Code language": "代码语言",
-                    "Has code language": "包含代码语言",
+                "Language": "代码语言",
+                    "Has language": "包含代码语言",
                     "Exclude language": "排除代码语言",
                 "Commit SHA": "提交 SHA",
                     "Has commit sha": "包含提交 SHA",
@@ -10679,6 +10708,12 @@ I18N["zh-CN"]["repository/pulls"] = { // 仓库 - 拉取请求页面
 
                 "Suggested change": "建议更改",
 
+        // 疑似临时信息
+            "Some pull requests may be missing due to an": "某些拉取请求可能丢失因",
+                "ongoing search incident": "持续搜索事故",
+                ", but no data is lost. Use the": "，但没有数据丢失。使用",
+                ") for complete pull request results.": ") 获取完整结果。",
+
     },
     "regexp": [
         ...I18N["zh-CN"]["repository-public"]["regexp"],
@@ -10738,6 +10773,7 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                 "Change base": "更改基础分支",
 
             "View status": "查看状态",
+            "Not ready": "未准备好",
             "Able to merge": "可以合并",
             "Unable to merge": "无法合并",
             "Ready to merge": "准备合并",
@@ -10745,6 +10781,8 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                 "What's new": "新内容",
                 "Close merge status": "关闭",
             "Merge conflicts": "合并冲突",
+            "Not planning to merge?": "不打算合并吗？",
+            "Awaiting approval": "等待批准",
 
             // 代码 下拉菜单
                 "Code 55% faster with AI pair programming.": "与 AI 一起编程，写代码速度提高55%。",
@@ -11427,7 +11465,7 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
             "Review in codespace": "在代码空间中审查",
             // "Review changes": "审查更改", // 使用 Selector 规则翻译
                 // 下拉
-                "Finish your review": "完成审查",
+                "Finish your": "完成您的",
                     "Submit general feedback without explicit approval.": "未批准，并提出一般性反馈意见。",
                 "Approve": "批准",
                     "Submit feedback approving these changes.": "批准，并提出反馈意见。",
@@ -11444,6 +11482,12 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                     // 顶部提醒
                         "You need to leave a comment indicating the requested changes.": "您需要留下评论，说明所要求的更改。",
                 "Cancel review": "取消审核",
+                "Commit suggestions": "提交建议",
+                "Discard batch": "放弃批处理",
+                    "Discard batch?": "放弃批处理？",
+                    "Are you sure you want to discard this batch? This will remove all": "您确定要放弃此批处理吗？",
+                    "from the batch.": "将从批处理中移除。",
+                    "Discard": "放弃",
                 "pending": "条待处理",
                 "comment": "评论",
                 "comments": "评论",
@@ -11480,6 +11524,9 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
             // 大型拉取请求提示
             "This page has been optimized for large pull requests. Some browser features (like Find on Page or Select All) may not work as expected.": "此页面已针对大型拉取请求进行了优化。某些浏览器功能（如页面查找或全选）可能无法正常工作。",
                 "Switch to single file mode": "切换至单文件模式",
+            "Due to the size of this pull request, only one file can be shown at a time.": "由于此拉取请求的大小，一次只能显示一个文件。",
+                "To view all files in a single page,": "要在单个页面上查看所有文件，",
+                "try a new experimental mode": "请尝试一种新的实验模式",
 
             "These merge commits were added into this branch cleanly.": "这些合并提交已被干净利落地添加到该分支中。",
                 "There are no new changes to show.": "没有任何新的变化。",
@@ -11525,6 +11572,10 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                 "Sign off and commit changes": "签署并提交更改",
                     "Applying commit...": "正在应用提交…",
 
+                "Apply suggestions": "应用建议",
+                    "Suggestions to apply": "待应用的建议",
+                    "There was an error trying to commit changes.": "尝试提交更改时出错。",
+                
                 "This diff has recently been updated.": "该差异最近已更新。",
                 "Refresh and try again.": "刷新并重试。",
 
@@ -11537,9 +11588,12 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                 "Collapse file tree": "折叠文件树",
                 "Expand file tree": "展开文件树",
 
+                "Select commits to view": "选择要查看的提交",
                 "All changes": "所有更改",
                 "All commits": "所有提交",
                 "Changes since your last review": "自您上次审核以来的更改",
+                "No previous review found": "未找到之前的审核",
+                "Select a range of commits": "选择一个提交范围",
                 "Specific commit…": "特定提交…",
                     "Pick one or more commits": "选择多个提交",
                     "Clear selection": "清除选择",
@@ -11599,6 +11653,12 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
                 "Filter comments": "筛选评论",
                     "Show resolved comments": "显示已解决评论",
                     "Show outdated comments": "显示陈旧的评论",
+                    "Filter by": "筛选条件",
+                    "Hide resolved comments": "隐藏已解决评论",
+                    "Hide outdated comments": "隐藏陈旧的评论",
+                    "Jump to the comment in the diff": "跳转到差异中的评论",
+                    "Showing": "显示",
+                    "of": "条中的",
 
                 "No comments on changes yet": "还没有评论",
                     "Comments will show up here as soon as there are some.": "评论将在此显示。",
@@ -11719,6 +11779,7 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
     "regexp": [ // 正则翻译
         [/The (\d+) commits? from this branch will be rebased and added to the base branch./, "该分支的 $1 次提交将变基并添加到基本分支。"],
         [/([^ ]+):([^ ]+)% was force-pushed and no longer has any new commits./, "$1:$2 分支被强制推送，现在没有新的提交。"], // 放这里是因为跟现有词条冲突
+        [/(\d+) pending reviews?/, "$1 名待审者"],
         // 建议更改（词条打架移动至此）
         [/on this commit as ([^@]+@[^\n]+)/, "该提交以 $1 身份"],
         // Dependabot 打开的拉取请求
@@ -11844,6 +11905,8 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
 
         // 建议更改
         //[/on this commit as ([^@]+@[^\n]+)/, "提交，身份为 $1"],
+        [/Remove suggestion from (.+)/,"从 $1 中移除建议"],
+        [/suggestions?/, "个建议"],
 
         // Copilot
         [/Copilot has encountered an internal error. If the problem persists, please contact GitHub Support, including the request ID `([^ ]+)`. To retry, leave a comment on this pull request asking Copilot to try again./, "Copilot 遇到了内部错误。如果问题仍然存在，请联系 GitHub 支持，并附上请求 ID `$1`。要重试，请在此拉取请求中发表评论，要求 Copilot 再试一次。"],
@@ -11952,7 +12015,7 @@ I18N["zh-CN"]["repository/compare"] = { // 仓库 - 比较并创建拉取请求
             "Load diff": "载入差异",
             "This file was deleted.": "该文件已被删除",
             "Large diffs are not rendered by default.": "默认情况下，大的差异不会被呈现。",
-            "File renamed without changes": "文件仅重命名，内容没有更改",
+            "File renamed without changes.": "文件仅重命名，内容没有更改。",
             "Binary file not shown.": "不显示二进制文件。",
             "Some generated files are not rendered by default. Learn more about": "某些生成的文件默认不会呈现。详细了解",
                 "how customized files appear on GitHub": "自定义文件在 GitHub 上的显示方式",
@@ -17127,10 +17190,15 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
                 "A repository with LFS content cannot be used as a template.": "带有 LFS 内容的仓库不能作为模板使用。",
                 "Learn more about template repositories": "了解更多关于模板库的信息",
 
+            "Commits": "提交",
                 "Require contributors to sign off on web-based commits": "要求贡献者在基于 Web 的提交上签署",
-                "Enabling this setting will require contributors to sign off on commits made through GitHub’s web interface. Signing off is a way for contributors to affirm that their commit complies with the repository's terms, commonly the": "启用此设置将要求贡献者签署通过 GitHub 的 Web 界面所做的提交。签署是贡献者确认他们的提交符合仓库条款的一种方式，通常是",
-                "Developer Certificate of Origin (DCO)": "开发者来源证书（DCO）",
-                "Learn more about signing off on commits": "了解更多关于签署提交的信息",
+                    "Enabling this setting will require contributors to sign off on commits made through GitHub’s web interface. Signing off is a way for contributors to affirm that their commit complies with the repository's terms, commonly the": "启用此设置将要求贡献者签署通过 GitHub 的 Web 界面所做的提交。签署是贡献者确认他们的提交符合仓库条款的一种方式，通常是",
+                    "Developer Certificate of Origin (DCO)": "开发者来源证书（DCO）",
+                    "Learn more about signing off on commits": "了解更多关于签署提交的信息",
+                "Allow comments on individual commits": "允许对单个提交发表评论",
+                    "Enabling this setting will allow anyone who can view this repository to add": "启用此设置后，任何能查看该仓库的人都可以添加",
+                    "commit comments": "提交评论",
+                    ". Existing commit comments are not affected by this setting and will remain viewable, editable, and deletable.": "。现有的提交评论不受此设置影响，依然可以查看、编辑和删除",
 
             "This setting is enabled on the upstream repository. Disabling this setting may block commits from being merged upstream.": "此设置在上游仓库中启用。禁用此设置可能会阻止提交向上游合并。",
 
@@ -17346,8 +17414,10 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
                 "If you decide to make this repository public in the future, it will not be possible to restore these stars and watchers and this will affect its repository rankings.": "即使您决定将来公开此仓库，也无法恢复这些星标者和关注者，这将影响其仓库排名。",
                 "Dependency graph and Dependabot alerts will remain enabled with permission to perform read-only analysis on this repository.": "依赖项关系图和 Dependabot 警报将保持启用，并有权限对该仓库进行只读分析。",
                 "Dependency graph and Dependabot alerts will remain enabled with permission to perform read-only analysis on this repository. Any custom Dependabot alert rules will be disabled unless GitHub Advanced Security is enabled for this repository.": "依赖项关系图和 Dependabot 警报将继续启用，并允许对该仓库执行只读分析。除非为该仓库启用了 GitHub 高级安全功能，否则任何自定义的 Dependabot 警报规则都将被禁用。",
+                "Any custom Dependabot alert rules will be disabled unless GitHub Advanced Security is enabled for this repository.": "除非为该仓库启用了 GitHub 高级安全，否则任何自定义的 Dependabot 警报规则都将被禁用。",
                 "Code scanning will become unavailable.": "代码扫描将变得不可用。",
                 "Current forks will remain public and will be detached from this repository.": "当前的复刻将保持公开，并将从该仓库中分离出来。",
+                "Advanced Security will be disabled.": "高级安全将被禁用。",
                 "Make this repository private": "将此仓库设为私有",
                 "I have read and understand these effects": "我已阅读并理解这些影响",
 
@@ -20821,6 +20891,9 @@ I18N["zh-CN"]["notifications"] = { // 通知页面
             "filter by notification reason": "按通知原因筛选",
             "filter by notification author": "按通知作者筛选",
             "filter by organization": "按组织筛选",
+        "Sort by:": "排序：",
+            "Newest to oldest": "从新到旧",
+            "Oldest to newest": "从旧到新",
         "Group by:": "分组：",
         "Group by: Date": "分组：日期",
         "Group by: Repository": "分组：仓库",
@@ -21510,7 +21583,111 @@ I18N["zh-CN"]["issues"] = { // 议题页面
         },
     },
 };
-I18N["zh-CN"].pulls = I18N["zh-CN"].issues;
+
+I18N["zh-CN"]["pulls"] = { // 拉取请求页面
+    "static": {
+        ...I18N["zh-CN"]["issues"]["static"],
+
+        // 上边栏
+            "What's new": "新功能",
+            "Switch to the classic experience": "切换到经典视图",
+            "Default view options": "默认视图选项",
+            "Set as default view": "设为默认视图",
+            "Default to this view when visiting /pulls": "访问 /pulls 时默认使用此视图",
+
+        "Inbox": "收件箱",
+            "Needs your review": "需要您的审查",
+                "Expand Needs your review": "展开“需要您的审查”选项卡",
+                "Collapse Needs your review": "折叠“需要您的审查”选项卡",
+                "Pull requests that need your review will appear here.": "需要您审查的拉取请求将出现在这里。",
+            "Needs action": "需要操作",
+                "Expand Needs action": "展开“需要操作”选项卡",
+                "Collapse Needs action": "折叠“需要操作”选项卡",
+                "Pull requests with failing checks, merge conflicts, or required changes will appear here.": "检查失败、存在合并冲突或需要更改的拉取请求将出现在这里。",
+            "Ready to merge": "准备合并",
+                "Expand Ready to merge": "展开“准备合并”选项卡",
+                "Collapse Ready to merge": "折叠“准备合并”选项卡",
+                "Pull requests that are ready to merge will appear here.": "准备合并的拉取请求将出现在这里。",
+            "Needs your teams' review": "需要您团队的审查",
+                "Expand Needs your teams' review": "展开“需要您团队的审查”选项卡",
+                "Collapse Needs your teams' review": "折叠“需要您团队的审查”选项卡",
+                "Pull requests that need your teams' review will appear here.": "需要您团队审查的拉取请求将出现在这里。",
+            "All caught up": "全部已处理",
+            "When a pull request needs your review or attention, it'll appear here.": "当一个拉取请求需要您的审查或关注时，它将出现在这里。",
+            "Awaiting approval": "等待批准",
+
+        "Authored by me": "由我创建",
+        "Involves me": "涉及我",
+
+        // 收件箱右上角
+            "Select repositories": "选择仓库",
+                "Select all": "全选",
+                "Select": "选择",
+                "Loading repositories...": "加载仓库中...",
+                "Use the search to find specific items": "使用搜索查找特定项目",
+                "Search or filter": "搜索或筛选",
+                // "Fork": "复刻",
+                    "Exclude fork": "排除复刻",
+                "Mirror": "镜像",
+                    "Exclude mirror": "排除镜像",
+                "License": "许可证",
+                    "Exclude license": "排除许可证",
+                "Visibility": "可见性",
+                    "Exclude visibility": "排除可见性",
+                    "Internal": "内部",
+                "Created": "已创建",
+                "Total forks": "复刻总数",
+                "Total good-first issues": "好的首发议题总数",
+                "Has": "包含文件",
+                "Total help-wanted issues": "求助议题总数",
+                "License": "许可证",
+                "Mirror": "镜像",
+                "Size (Kb)": "大小 (Kb)",
+                "Sponsorable": "可接受赞助",
+                "Text": "文本",
+                "Total topics": "主题总数",
+                "Template": "模板",
+                "Topic": "话题",
+                "Visibility": "可见性",
+                "Admin Access": "管理员访问权限",
+                "Contributions": "贡献",
+
+        // 搜索结果框上边栏
+            "result": "个结果",
+            "results": "个结果",
+            "Comfortable display density": "舒适视图",
+            "Compact display density": "紧凑视图",
+
+        // 搜索结果框
+            "Enter a query to start searching.": "输入查询以开始搜索。",
+            "No pull requests matched your search.": "没有拉取请求匹配您的搜索。",
+            "Try a different search query.": "尝试不同的搜索查询。",
+            "Learn more about searching and filtering pull requests.": "了解更多关于搜索和过滤拉取请求的信息。",
+
+        // 视图
+            "No saved views": "没有保存的视图",
+            "Change icon": "更改图标",
+            "Apply": "应用",
+            "Title can not be empty": "标题不能为空",
+            "Query can not be empty": "查询不能为空",
+            "Discard changes": "放弃更改",
+            "Are you sure you want to discard changes?": "您确定要放弃更改吗？",
+            "Discard": "放弃",
+            "Saved view menu": "已保存视图菜单",
+            "Saved view menu (update available)": "已保存视图菜单（更新可用）",
+            "Update view with current query": "使用当前查询更新视图",
+    },
+    "regexp": [
+        ...I18N["zh-CN"]["issues"]["regexp"],
+        // 收件箱右上角
+        [/(\d+) 个仓库 selected/, "已选择 $1 个仓库"],
+        [/Last month/, "上个月"],
+        [/Last 3 months/, "近 3 个月"],
+        [/Last year/, "去年"],
+        [/Any time/, "任意时间"],
+    ],
+}
+
 
 I18N["zh-CN"]["repos"] = {
     "static": {
