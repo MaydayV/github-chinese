@@ -172,7 +172,6 @@
             pageConfig = buildPageConfig(newType);
             scheduleReadmeTranslation(`${currentPageChangeTrigger}:pageTypeChanged`);
         }
-        console.log(`【Debug】${currentPageChangeTrigger}触发, 页面类型为 ${pageConfig.currentPageType}`);
     }
 
     // 构建页面设置 pageConfig 对象
@@ -180,6 +179,7 @@
         return {
             // 当前页面类型
             currentPageType: pageType,
+            textCache: new Map(),
             // 页面标题静态词库
             titleStaticDict: {
                 ...I18N[CONFIG.LANG].public.title.static,
@@ -284,7 +284,6 @@
      */
     function traverseNode(rootNode) {
         if (!FeatureSet.enable_extension) return;
-        const start = performance.now();
 
         const handleTextNode = node => {
             if (node.length > 500) return;
@@ -357,12 +356,6 @@
         while ((currentNode = treeWalker.nextNode())) {
             handlers[currentNode.nodeType]?.(currentNode);
         }
-
-        const duration = performance.now() - start;
-        if (duration > 10) {
-            // console.warn(`【Debug】节点遍历耗时: ${duration.toFixed(2)}ms`, rootNode);
-            console.log(`节点遍历耗时: ${duration.toFixed(2)}ms`);
-        }
     }
 
     /**
@@ -433,11 +426,8 @@
                 pageType = pathMatch ? (pathMatch[1] || pathMatch.slice(-1)[0]) : false;
         }
 
-        console.log(`【Debug】pathname = ${pathname}, site = ${site}, isLogin = ${isLogin}, analyticsLocation = ${metaLocation}, isOrganization = ${isOrganization}, isRepository = ${isRepository}, isProfile = ${isProfile}, isSession = ${isSession}`)
-
         // 词库校验 ================================================
         if (pageType === false || !I18N[CONFIG.LANG]?.[pageType]) {
-            console.warn(`[i18n] 页面类型未匹配或词库缺失: ${pageType}`);
             return false; // 明确返回 false 表示异常
         }
 
@@ -525,18 +515,27 @@
      * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
      */
     function fetchTranslatedText(text) {
+        const cachedText = pageConfig.textCache.get(text);
+        if (cachedText !== undefined) return cachedText;
 
         // 静态翻译
         let translatedText = pageConfig.staticDict[text]; // 默认翻译 公共部分
 
-        if (typeof translatedText === 'string') return translatedText;
+        if (typeof translatedText === 'string') {
+            pageConfig.textCache.set(text, translatedText);
+            return translatedText;
+        }
 
         // 正则翻译
         for (const [pattern, replacement] of pageConfig.regexpRules) {
             translatedText = text.replace(pattern, replacement);
-            if (translatedText !== text) return translatedText;
+            if (translatedText !== text) {
+                pageConfig.textCache.set(text, translatedText);
+                return translatedText;
+            }
         }
 
+        pageConfig.textCache.set(text, false);
         return false; // 没有翻译条目
     }
 
@@ -554,6 +553,40 @@
                 element.textContent = translatedText;
             }
         })
+
+        // /copilot/agents 页面结构是动态渲染，使用强制替换兜底，避免分段命中失败
+        applyCopilotAgentsOverrides();
+    }
+
+    function applyCopilotAgentsOverrides() {
+        if (window.location.hostname !== 'github.com' || window.location.pathname !== '/copilot/agents') {
+            return;
+        }
+
+        const setText = (selector, text) => {
+            const el = document.querySelector(selector);
+            if (el) el.textContent = text;
+        };
+
+        setText('h2.Blankslate-Heading', 'Copilot 云端智能体处理例行任务，让您专注于核心工作');
+        setText('p.Blankslate-Description', '将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。');
+        setText('.BannerDescription', '仅在付费计划中可用。试用 Copilot Pro，可免费 30 天。');
+
+        // 兼容不同结构：链接文案可能被拆分或已部分翻译
+        document.querySelectorAll('a').forEach((el) => {
+            const text = (el.textContent || '').trim();
+            if (/capabilities/i.test(text)) {
+                el.textContent = '查看 Copilot 云端智能体能力';
+            }
+        });
+
+        // 试用按钮文案兜底
+        document.querySelectorAll('button, a').forEach((el) => {
+            const text = (el.textContent || '').trim();
+            if (/^start\s+free\s+trial$/i.test(text)) {
+                el.textContent = '开始免费试用';
+            }
+        });
     }
 
     function isRepositoryPage() {
@@ -950,7 +983,6 @@
             translatedCount += applyTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
         }
 
-        console.log(`[README翻译] 完成，共翻译 ${translatedCount} 个文本节点`);
 
         state.translatedSignature = signature;
         state.translatedHash = createHash(readmeEl.innerHTML);
@@ -1243,7 +1275,6 @@
 
     async function translateWithDeepL(texts, providerConfig) {
         const body = new URLSearchParams();
-        body.append('auth_key', providerConfig.key);
         body.append('target_lang', mapTargetLangForDeepL());
         texts.forEach(text => body.append('text', text));
 
@@ -1251,6 +1282,7 @@
             url: providerConfig.url,
             method: 'POST',
             headers: {
+                Authorization: `DeepL-Auth-Key ${providerConfig.key}`,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: body.toString(),
@@ -1471,8 +1503,6 @@
     async function init() {
         if (typeof I18N === 'undefined') {
             throw new Error('词库文件 locals.js 未加载，脚本无法运行');
-        } else {
-            console.log('词库文件 locals.js 已加载');
         }
 
         await loadFeatureSet();
