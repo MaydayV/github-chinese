@@ -764,6 +764,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
         // 右上角通知按钮提示
             "You have no unread notifications": "您没有未读通知",
             "You have unread notifications": "您有未读通知",
+            "You have unread notifications.": "您有未读通知。",
 
         // 右上角新建按钮下拉菜单
             "Create new...": "新建…",
@@ -820,6 +821,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
 
             "Ask Copilot…": "询问 Copilot…",
                 "About this page": "关于此页面",
+                "In immersive chat": "在沉浸式聊天中",
                 "In a space": "在空间",
                 "Download for…": "下载插件…",
 
@@ -1637,6 +1639,11 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                 "New agent session": "新智能体任务",
                 "No agents running": "没有智能体任务运行",
                 "You can now ask Copilot to work on a task for you in the background, creating a pull request which you can review.": "您现在可以请求 Copilot 在后台处理任务，创建一个拉取请求供您审查。",
+                "Agent mode": "智能体模式",
+                "Agents now support a broader set of functionality, like helping you create an implementation plan or conducting deep research on a codebase.": "智能体现支持更广泛的能力，例如帮助您制定实现计划或在代码库上执行深度研究。",
+                "Learn more about Copilot cloud agent": "了解更多关于 Copilot 云端智能体",
+                "Copilot cloud agent": "Copilot 云端智能体",
+                "Got it": "知道了",
 
             "Explore the latest Copilot launches from Universe ’25": "探索 Universe ’25 的最新 Copilot 启动",
             "See what’s new": "查看最新内容",
@@ -1655,6 +1662,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Duplicate": "复制",
             "Duplicate Space": "复制空间",
             "Spaces are now available through the GitHub MCP in VSCode.": "空间现在可以通过 VSCode 的 GitHub MCP 使用。",
+            "Spaces are available in VSCode! Get started using Spaces with the GitHub MCP server.": "空间现已支持 VSCode！通过 GitHub MCP 服务器开始使用空间。",
             "Install": "安装",
             "Spaces organize your files, pull requests, issues, and standards so Copilot can give more relevant help for your work.": "空间组织您的文件、拉取请求、议题和标准，以便 Copilot 为您的工作提供更相关的帮助。",
             "Create space": "创建空间",
@@ -9072,6 +9080,28 @@ I18N["zh-CN"]["repository"] = { // 仓库页面 /<user-name>/<repo-name>/
                 // Copilot
                     "Describe a task...": "描述任务…",
                     "Start task": "开始任务",
+                    // Copilot cloud agent 仓库首页
+                    "Copilot cloud agent handles routine tasks so you can focus on core work": "Copilot 云端智能体处理例行任务，让您专注于核心工作",
+                    "handles routine tasks so you can focus on core work": "处理例行任务，让您专注于核心工作",
+                    " handles routine tasks so you can focus on core work": " 处理例行任务，让您专注于核心工作",
+                    "Save time by offloading testing, dependency upgrades, migrations and maintenance to agents.": "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。",
+                    "Create pull requests from Copilot Chat, CLI, IDEs or assign an Issue to Copilot to get started.": "您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+                    "Create pull requests from Copilot Chat, CLI, IDEs or assign an issue to Copilot to get started.": "您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+                    "Create pull requests from Copilot Chat, CLI, IDEs, or assign an issue to Copilot to get started.": "您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+                    "View Copilot cloud agent capabilities": "查看 Copilot 云端智能体能力",
+                    "Copilot cloud agent capabilities": "Copilot 云端智能体能力",
+                    "capabilities": "能力",
+                    " capabilities": " 能力",
+                    "Available on paid plans. Try it with Copilot Pro — free for 30 days.": "仅在付费计划中可用。试用 Copilot Pro，可免费 30 天。",
+                    "Available on paid plans. Try it with Copilot Pro — free for 30 days": "仅在付费计划中可用。试用 Copilot Pro，可免费 30 天",
+                    "Available on paid plans.": "仅在付费计划中可用。",
+                    "Try it with Copilot Pro — free for": "试用 Copilot Pro，可免费",
+                    "Try it with Copilot Pro - free for": "试用 Copilot Pro，可免费",
+                    "free for": "免费",
+                    "free for ": "免费 ",
+                    "days before.": "天。",
+                    "days before": "天",
+                    "Start free trial": "开始免费试用",
 
                     // [/Codespace \"(.+)\" stopped./, "代码空间 “$1” 已停止。"],
                     // [/Codespace \"(.+)\" deleted./, "代码空间 “$1” 已删除。"],
@@ -9400,6 +9430,14 @@ I18N["zh-CN"]["repository"] = { // 仓库页面 /<user-name>/<repo-name>/
         [/(\d+) commits? behind/, "落后 $1 个提交"],
         [/(\d+) commits?/, "$1 个提交"], // 新版仓库概述
         [/Save (.+?) to your computer and use it in GitHub Desktop./, "使用 GitHub Desktop，保存 $1 到您的电脑。"],
+        [/Available on paid plans\. Try it with Copilot Pro\s*[—-]\s*free for (\d+) days?\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
+        [/Available on paid plans\. Try it with Copilot Pro\s*[—-]\s*free for (\d+) days? before\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
+        [/free for (\d+) days? before\.?/, "免费 $1 天。"],
+        [/Save time by offloading testing, dependency upgrades, migrations and maintenance to agents\.\s*Create pull requests from Copilot Chat, CLI, IDEs,? or assign an [Ii]ssue to Copilot to get started\./, "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。"],
+        [/Copilot 云端智能体 handles routine tasks so you can focus on core work/, "Copilot 云端智能体处理例行任务，让您专注于核心工作"],
+        [/查看 Copilot 云端智能体 capabilities/, "查看 Copilot 云端智能体能力"],
+        [/Copilot 云端智能体 capabilities/, "Copilot 云端智能体能力"],
+        [/Available on paid plans\. Try it with Copilot Pro\s*[—-]\s*free for (\d+)\s*天之前\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
         [/Forking ([^ ]+)/, "复刻 $1 中"], // 复刻中...
         [/Fork your own copy of ([^ ]+)/, "复刻成您自己的 $1 副本"], // 复刻按钮提示
         [/will appear on ([^ ]+)'s member profile, visible only to organization members./, "将出现在 $1 的成员资料中，仅对组织成员可见。"],
@@ -11075,6 +11113,7 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
             "milestone": "里程碑",
             "review requested due to automatic review settings": "因设置自动审查",
             "created this pull request from a session": "从任务创建拉取请求",
+            "with Copilot acting as the agent": "，Copilot 作为智能体",
 
             //
             "This branch has not been deployed": "该分支尚未部署",
@@ -21769,8 +21808,10 @@ I18N["zh-CN"]["pulls"] = { // 拉取请求页面
 
         // 搜索结果框
             "Enter a query to start searching.": "输入查询以开始搜索。",
+            "No pull requests matched your search.": "没有拉取请求匹配您的搜索。",
             "No pull requests matched your search": "没有拉取请求匹配您的搜索",
             "Try a different search query.": "尝试不同的搜索查询。",
+            "Learn more about searching and filtering pull requests.": "了解更多关于搜索和过滤拉取请求的信息。",
 
         // 视图
             "No saved views": "没有保存的视图",
@@ -25582,6 +25623,7 @@ I18N["zh-CN"]["orgs/settings/projects"] = { // 组织设置 - 计划 - 项目
                 "If enabled, members with admin permissions on a project can make the project public or private. If disabled, only organization owners can make the project public or private. All projects are private by default.": "如果启用，在项目上有管理权限的成员可以将项目设为公开或私有。如果禁用，则只有组织所有者可以将项目设为公开或私有。默认情况下，所有项目都是私有的。",
 
             "Welcome to projects": "欢迎来到项目！",
+            "Built to be flexible and adaptable, Projects gives you a live canvas to filter, sort, and group issues and pull requests in a table, board, or roadmap. Tailor them to your needs with custom fields, saved views, workflows, and insights.": "项目旨在灵活且适应性强，为您提供一个实时的画布，以表格、看板或路线图的形式筛选、排序和分组议题及拉取请求。通过自定义字段、保存的视图、工作流和洞察，满足您的需求。",
                 "Built like a spreadsheet, project tables give you a live canvas to filter, sort, and group issues and pull requests. Tailor them to your needs with custom fields and saved views.": "项目表格的构造类似电子表格，为您提供了一个实时画布，可用于筛选、排序和分组问题及拉取请求。您可以使用自定义字段和保存的视图，根据自身需求对其进行定制。",
 
             "Recommended templates": "推荐模板",
@@ -29244,11 +29286,33 @@ I18N["zh-CN"]["repository/agents"] = {
     "static": {
         // 介绍页面
         "Copilot Coding Agent handles routine tasks so you can focus on core work": "Copilot 编程智能体处理例行任务，让您专注于核心工作",
+        "Copilot cloud agent handles routine tasks so you can focus on core work": "Copilot 云端智能体处理例行任务，让您专注于核心工作",
+        "handles routine tasks so you can focus on core work": "处理例行任务，让您专注于核心工作",
+        " handles routine tasks so you can focus on core work": " 处理例行任务，让您专注于核心工作",
             "Save time by offloading testing, dependency upgrades, migrations and maintenance to agents. Create pull requests from Copilot Chat, CLI, IDEs or assign an Issue to Copilot to get started.": "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+            "Save time by offloading testing, dependency upgrades, migrations and maintenance to agents.": "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。",
+            "Create pull requests from Copilot Chat, CLI, IDEs or assign an issue to Copilot to get started.": "您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+            "Create pull requests from Copilot Chat, CLI, IDEs, or assign an issue to Copilot to get started.": "您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+            "Save time by offloading testing, dependency upgrades, migrations and maintenance to agents. Create pull requests from Copilot Chat, CLI, IDEs or assign an issue to Copilot to get started.": "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
+            "Save time by offloading testing, dependency upgrades, migrations and maintenance to agents. Create pull requests from Copilot Chat, CLI, IDEs, or assign an issue to Copilot to get started.": "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。",
                 "View Copilot Coding Agent capabilities": "查看 Copilot 编程智能体功能",
+                "View Copilot cloud agent capabilities": "查看 Copilot 云端智能体能力",
+                "Copilot cloud agent capabilities": "Copilot 云端智能体能力",
+                "capabilities": "能力",
+                " capabilities": " 能力",
 
         // 免费试用提示
         "Available on paid plans. Try it with Copilot Pro — free for 30 days.": "仅在付费计划中可用。立即试用 Copilot Pro，享受 30 天免费体验。",
+        "Available on paid plans. Try it with Copilot Pro — free for 30 days": "仅在付费计划中可用。立即试用 Copilot Pro，享受 30 天免费体验",
+        "Available on paid plans.": "仅在付费计划中可用。",
+        "Try it with Copilot Pro —": "试用 Copilot Pro，",
+        "Try it with Copilot Pro -": "试用 Copilot Pro，",
+        "Available on paid plans. Try it with Copilot Pro — free for": "仅在付费计划中可用。试用 Copilot Pro，可免费",
+        "Available on paid plans. Try it with Copilot Pro — free for ": "仅在付费计划中可用。试用 Copilot Pro，可免费 ",
+        "free for": "免费",
+        "free for ": "免费 ",
+        "days before.": "天。",
+        "days before": "天",
             "Start free trial": "开始免费试用",
 
         // 左侧Tab
@@ -29265,4 +29329,18 @@ I18N["zh-CN"]["repository/agents"] = {
         "Customize environment": "自定义环境",
         "Configure": "自定义配置",
     },
+    "regexp": [
+        [/Available on paid plans\. Try it with Copilot Pro — free for (\d+) days?\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
+        [/Available on paid plans\. Try it with Copilot Pro\s*[—-]\s*free for (\d+) days? before\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
+        [/Save time by offloading testing, dependency upgrades, migrations and maintenance to agents\.\s*Create pull requests from Copilot Chat, CLI, IDEs,? or assign an [Ii]ssue to Copilot to get started\./, "将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。"],
+        [/Copilot 云端智能体 handles routine tasks so you can focus on core work/, "Copilot 云端智能体处理例行任务，让您专注于核心工作"],
+        [/查看 Copilot 云端智能体 capabilities/, "查看 Copilot 云端智能体能力"],
+        [/Copilot 云端智能体 capabilities/, "Copilot 云端智能体能力"],
+        [/Available on paid plans\. Try it with Copilot Pro\s*[—-]\s*free for (\d+)\s*天之前\.?/, "仅在付费计划中可用。试用 Copilot Pro，可免费 $1 天。"],
+    ],
+    "selector": [
+        ['h2.Blankslate-Heading', 'Copilot 云端智能体处理例行任务，让您专注于核心工作'],
+        ['p.Blankslate-Description', '将测试、依赖项升级、迁移和维护等工作交给智能体处理，节省您的时间。您可以通过 Copilot Chat、命令行、IDE 创建拉取请求，或直接将议题分配给 Copilot 来开始使用。'],
+        ['.BannerDescription', '仅在付费计划中可用。试用 Copilot Pro，可免费 30 天。'],
+    ],
 };
