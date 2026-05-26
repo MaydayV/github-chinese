@@ -115,6 +115,18 @@ body {
   display: grid;
 }
 
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-head h2 {
+  margin-bottom: 0;
+}
+
 .switch-row {
   display: flex;
   justify-content: space-between;
@@ -268,20 +280,33 @@ select:focus {
   display: block;
 }
 
-.actions {
+.connection-test {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.connection-test .hint {
+  margin-top: 0;
+}
+
+.panel-actions {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  padding: 2px 2px 0;
 }
 
 .btn {
   border: 0;
-  border-radius: 12px;
-  padding: 10px 16px;
+  border-radius: 10px;
+  padding: 8px 13px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .btn-mini {
@@ -299,12 +324,22 @@ select:focus {
 .btn-test {
   color: #fff;
   background: linear-gradient(135deg, var(--test), var(--test-dark));
-  box-shadow: 0 9px 22px rgba(12, 157, 134, 0.26);
+  box-shadow: 0 8px 18px rgba(12, 157, 134, 0.22);
+}
+
+.btn-inline {
+  white-space: nowrap;
 }
 
 .btn-ghost {
   color: #2f405a;
   background: #dbe6f5;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
 }
 
 .history-head {
@@ -409,6 +444,10 @@ select:focus {
   gap: 8px;
 }
 
+.history-pager[hidden] {
+  display: none;
+}
+
 .history-page-info {
   font-size: 12px;
   color: #52647f;
@@ -418,16 +457,40 @@ select:focus {
 
 .history-empty {
   margin: 0;
+  min-height: 112px;
+  display: grid;
+  align-content: center;
+  border: 1px dashed #c8d7ed;
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: #f7fbff;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .status {
   margin: 0;
-  min-height: 24px;
+  min-height: 20px;
   color: var(--muted);
   font-size: 13px;
-  flex: 1 1 100%;
+}
+
+.status:empty {
+  display: none;
+}
+
+.status-page {
+  padding: 0 2px;
+}
+
+.status-context {
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef4ff;
+  border: 1px solid #c9d9f4;
 }
 
 .status.is-success {
@@ -436,6 +499,16 @@ select:focus {
 
 .status.is-error {
   color: var(--danger);
+}
+
+.status-context.is-success {
+  background: #e9faf4;
+  border-color: #9ed8c8;
+}
+
+.status-context.is-error {
+  background: #fff1f3;
+  border-color: #f0bdc3;
 }
 
 .assist p {
@@ -482,6 +555,16 @@ select:focus {
 
   .card {
     padding: 15px;
+  }
+
+  .card-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .panel-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .switch-copy strong {

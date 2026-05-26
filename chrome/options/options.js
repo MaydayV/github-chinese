@@ -68,13 +68,20 @@ function getStatusEl() {
   return byId('status');
 }
 
-function setStatus(message, type = '') {
-  const el = getStatusEl();
+function updateStatusElement(el, message, type = '') {
   if (!el) return;
 
   el.textContent = message || '';
   el.classList.toggle('is-success', type === 'success');
   el.classList.toggle('is-error', type === 'error');
+}
+
+function setStatus(message, type = '') {
+  updateStatusElement(getStatusEl(), message, type);
+}
+
+function setTestStatus(message, type = '') {
+  updateStatusElement(byId('testStatus'), message, type);
 }
 
 function collectValues() {
@@ -805,6 +812,8 @@ function renderRecords() {
   const pageInfoEl = byId('recordsPageInfo');
   const prevEl = byId('recordsPrev');
   const nextEl = byId('recordsNext');
+  const clearRecordsEl = byId('clearRecords');
+  const clearRepoCacheEl = byId('clearRepoCache');
 
   if (!listEl || !summaryEl || !pagerEl || !pageInfoEl || !prevEl || !nextEl) return;
 
@@ -814,10 +823,16 @@ function renderRecords() {
   const currentPage = clampRecordsPage(RECORDS_STATE.page);
   RECORDS_STATE.page = currentPage;
 
+  if (clearRecordsEl) clearRecordsEl.disabled = allRecords.length === 0;
+  if (clearRepoCacheEl) clearRepoCacheEl.disabled = cacheEntries.length === 0;
+
   if (!allRecords.length) {
     listEl.innerHTML = '<li class="history-empty">暂无翻译记录，开启“记录翻译消耗”后会自动累积。</li>';
     summaryEl.textContent = `暂无记录。当前缓存条目：${cacheEntries.length}`;
     pagerEl.hidden = true;
+    pageInfoEl.textContent = '';
+    prevEl.disabled = true;
+    nextEl.disabled = true;
     return;
   }
 
@@ -907,6 +922,7 @@ function bindEvents() {
     const nextValues = applyProviderDefaultsToValues(collectValues());
     applyValues(nextValues);
     setStatus('');
+    setTestStatus('');
   });
 
   const mainSwitch = byId('enable_readme_translation');
@@ -997,31 +1013,34 @@ function bindEvents() {
 
   byId('testConnection')?.addEventListener('click', async () => {
     try {
-      setStatus('正在测试连通性，请稍候...');
+      setStatus('');
+      setTestStatus('正在测试连通性，请稍候...');
       const values = collectValues();
       const permission = await ensureProviderHostPermission(values, { request: true });
       if (!permission.ok) {
-        setStatus(permission.message, 'error');
+        setTestStatus(permission.message, 'error');
         return;
       }
       const message = await testProviderConnection(values);
-      setStatus(`测试成功：${message}`, 'success');
+      setTestStatus(`测试成功：${message}`, 'success');
     } catch (error) {
       console.error(error);
-      setStatus(`测试失败：${error instanceof Error ? error.message : String(error)}`, 'error');
+      setTestStatus(`测试失败：${error instanceof Error ? error.message : String(error)}`, 'error');
     }
   });
 
-  byId('resetReadmeDefaults')?.addEventListener('click', async () => {
-    try {
-      await chrome.storage.sync.set({ ...DEFAULTS });
-      LAST_SAVED_VALUES = { ...DEFAULTS };
-      applyValues({ ...DEFAULTS });
-      setStatus('README 翻译设置已恢复默认值。', 'success');
-    } catch (error) {
-      console.error(error);
-      setStatus('恢复默认值失败，请稍后重试。', 'error');
-    }
+  document.querySelectorAll('[data-reset-readme-defaults]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await chrome.storage.sync.set({ ...DEFAULTS });
+        LAST_SAVED_VALUES = { ...DEFAULTS };
+        applyValues({ ...DEFAULTS });
+        setStatus('README 翻译设置已恢复默认值。', 'success');
+      } catch (error) {
+        console.error(error);
+        setStatus('恢复默认值失败，请稍后重试。', 'error');
+      }
+    });
   });
 
   byId('refreshRecords')?.addEventListener('click', async () => {
