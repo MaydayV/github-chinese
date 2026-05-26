@@ -2,6 +2,7 @@
 
 const DEFAULTS = {
   enable_readme_translation: false,
+  enable_issue_pr_translation: false,
   readme_enable_token_record: false,
   readme_enable_repo_cache: false,
   readme_enable_progressive: false,
@@ -111,6 +112,10 @@ function updateAdvancedSwitchUi(mainEnabled) {
       input.checked = false;
     }
   });
+}
+
+function isAnyAiTranslationEnabled(values) {
+  return Boolean(values.enable_readme_translation || values.enable_issue_pr_translation);
 }
 
 function applyValues(values) {
@@ -455,7 +460,6 @@ function enforceFeatureSwitchRules(values, options = {}) {
     advancedSwitchKeys.forEach((key) => {
       nextValues[key] = false;
     });
-    return { ok: true, values: nextValues, message: '' };
   }
 
   if (resetAdvancedWhenEnable) {
@@ -464,13 +468,13 @@ function enforceFeatureSwitchRules(values, options = {}) {
     });
   }
 
-  if (requireApiConfig) {
+  if (requireApiConfig && isAnyAiTranslationEnabled(nextValues)) {
     const providerResult = getProviderConfig(nextValues);
     if (!providerResult.ok) {
       return {
         ok: false,
         values: nextValues,
-        message: `请先填写并保存有效的 API 设置后再启用 README 翻译。${providerResult.message}`,
+        message: `请先填写并保存有效的 API 设置后再启用 AI 翻译功能。${providerResult.message}`,
       };
     }
   }
@@ -489,16 +493,21 @@ async function saveValues(values) {
   LAST_SAVED_VALUES = { ...values };
 }
 
+async function savePartialValues(values) {
+  await chrome.storage.sync.set(values);
+  LAST_SAVED_VALUES = { ...LAST_SAVED_VALUES, ...values };
+}
+
 async function loadValues() {
   const rawValues = await chrome.storage.sync.get(DEFAULTS);
   const ruled = enforceFeatureSwitchRules(rawValues, { requireApiConfig: false });
   let normalized = ruled.values;
 
-  if (normalized.enable_readme_translation) {
+  if (isAnyAiTranslationEnabled(normalized)) {
     const permission = await ensureProviderHostPermission(normalized, { request: false });
     if (!permission.ok) {
       normalized = enforceFeatureSwitchRules(
-        { ...normalized, enable_readme_translation: false },
+        { ...normalized, enable_readme_translation: false, enable_issue_pr_translation: false },
         { requireApiConfig: false },
       ).values;
     }
@@ -756,13 +765,31 @@ function formatRecordDetail(detail) {
   const text = String(detail || '').trim();
   if (!text) return '';
 
-  let match = text.match(/^(?:nodes|translated_nodes)=(\d+)$/i);
+  let match = text.match(/^(?:nodes|translated_nodes|discussion_translated_nodes)=(\d+)$/i);
   if (match) return `翻译文本节点：${match[1]}`;
+
+  if (text === 'discussion_cache_hit') return '命中讨论内容缓存';
 
   match = text.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
   if (match) return `触发来源：${match[1]}`;
 
   return text;
+}
+
+function normalizeRecordSourceType(sourceType) {
+  const value = String(sourceType || '').trim().toLowerCase();
+  if (value === 'issue' || value === 'pull' || value === 'readme') return value;
+  return 'readme';
+}
+
+function getRecordSourceMeta(sourceType) {
+  const value = normalizeRecordSourceType(sourceType);
+  const map = {
+    readme: { label: 'README', className: 'is-readme' },
+    issue: { label: 'Issue', className: 'is-issue' },
+    pull: { label: 'Pull Request', className: 'is-pull' },
+  };
+  return map[value];
 }
 
 function normalizeRecords(records) {
@@ -773,6 +800,7 @@ function normalizeRecords(records) {
     .map((item) => ({
       id: String(item.id || ''),
       repo: String(item.repo || 'unknown/unknown'),
+      sourceType: normalizeRecordSourceType(item.sourceType),
       status: String(item.status || 'success'),
       tokens: Math.max(0, Number(item.tokens) || 0),
       provider: String(item.provider || ''),
@@ -845,6 +873,7 @@ function renderRecords() {
 
   listEl.innerHTML = pagedRecords.map((item) => {
     const meta = getStatusMeta(item.status);
+    const sourceMeta = getRecordSourceMeta(item.sourceType);
     const providerText = item.provider ? escapeHtml(item.provider) : '-';
     const detailText = formatRecordDetail(item.detail);
     const detail = detailText ? `<span>详情：${escapeHtml(detailText)}</span>` : '';
@@ -858,7 +887,10 @@ function renderRecords() {
       <li class="history-item">
         <div class="history-top">
           ${repoHtml}
-          <span class="history-status ${meta.className}">${meta.label}</span>
+          <span class="history-badges">
+            <span class="history-source ${sourceMeta.className}">${sourceMeta.label}</span>
+            <span class="history-status ${meta.className}">${meta.label}</span>
+          </span>
         </div>
         <div class="history-meta">
           <span>Tokens：${formatNumber(item.tokens)}</span>
@@ -976,6 +1008,49 @@ function bindEvents() {
     setStatus('README 翻译已关闭，相关高级开关已自动关闭。');
   });
 
+  const issuePrSwitch = byId('enable_issue_pr_translation');
+  issuePrSwitch?.addEventListener('change', async () => {
+    const values = collectValues();
+
+    if (values.enable_issue_pr_translation) {
+      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+      if (!ruled.ok) {
+        issuePrSwitch.checked = false;
+        setStatus(ruled.message, 'error');
+        return;
+      }
+
+      const savedConfig = getProviderConfig(LAST_SAVED_VALUES);
+      if (!savedConfig.ok) {
+        issuePrSwitch.checked = false;
+        setStatus('请先在“API 设置”中保存可用配置，再开启 Issue / PR 对话翻译。', 'error');
+        return;
+      }
+
+      try {
+        const permission = await ensureProviderHostPermission(LAST_SAVED_VALUES, { request: false });
+        if (!permission.ok) {
+          issuePrSwitch.checked = false;
+          setStatus(permission.message, 'error');
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        issuePrSwitch.checked = false;
+        setStatus('读取接口权限失败，请重新点击“保存设置”或“测试连通性”。', 'error');
+        return;
+      }
+
+      applyValues(ruled.values);
+      await savePartialValues({ enable_issue_pr_translation: true });
+      setStatus('Issue / PR 对话翻译已开启并保存。进入 Issue 或 PR 页面后，可手动翻译单条评论。', 'success');
+      return;
+    }
+
+    await savePartialValues({ enable_issue_pr_translation: false });
+    setStatus('Issue / PR 对话翻译已关闭并保存。', 'success');
+  });
+
   ADVANCED_SWITCH_KEYS.forEach((key) => {
     byId(key)?.addEventListener('change', () => {
       if (!byId('enable_readme_translation')?.checked) {
@@ -996,15 +1071,22 @@ function bindEvents() {
         return;
       }
 
-      const permission = await ensureProviderHostPermission(ruled.values, { request: true });
-      if (!permission.ok) {
-        setStatus(permission.message, 'error');
-        return;
+      if (isAnyAiTranslationEnabled(ruled.values)) {
+        const permission = await ensureProviderHostPermission(ruled.values, { request: true });
+        if (!permission.ok) {
+          setStatus(permission.message, 'error');
+          return;
+        }
       }
 
       applyValues(ruled.values);
       await saveValues(ruled.values);
-      setStatus('设置已保存。接口域名权限已就绪，可点击“测试连通性”进一步验证。', 'success');
+      setStatus(
+        isAnyAiTranslationEnabled(ruled.values)
+          ? '设置已保存。接口域名权限已就绪，可点击“测试连通性”进一步验证。'
+          : '设置已保存。',
+        'success',
+      );
     } catch (error) {
       console.error(error);
       setStatus('保存失败，请检查输入内容或稍后重试。', 'error');

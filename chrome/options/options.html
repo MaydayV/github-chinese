@@ -40,6 +40,21 @@
         </section>
 
         <section class="card">
+          <h2>Issue / PR 对话翻译</h2>
+          <label for="enable_issue_pr_translation" class="switch-row">
+            <span class="switch-copy">
+              <strong>启用 Issue / PR 对话翻译</strong>
+              <small>在 Issue 和 Pull Request 页面为正文与评论增加“翻译”按钮，点击后仅翻译当前评论内容。</small>
+            </span>
+            <span class="ios-switch-wrap">
+              <input id="enable_issue_pr_translation" type="checkbox" class="ios-switch-input">
+              <span class="ios-switch" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="hint">复用“API 设置”中的翻译服务。第一版默认手动触发，不会自动翻译整页讨论。</p>
+        </section>
+
+        <section class="card">
           <h2>高级功能</h2>
           <div class="switch-stack">
             <label for="readme_enable_token_record" class="switch-row">
