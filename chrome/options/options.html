@@ -96,9 +96,17 @@
               <option value="deepl">DeepL</option>
               <option value="google">Google Cloud Translation</option>
               <option value="azure">Microsoft Translator (Azure)</option>
-              <option value="openai">OpenAI 兼容接口（DeepSeek/Kimi/中转站等）</option>
+              <option value="qwen_mt">Qwen-MT（机器翻译）</option>
+              <option value="openai">OpenAI 官方接口</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="qwen">Qwen 对话模型</option>
+              <option value="minimax">MiniMax</option>
+              <option value="kimi">Kimi</option>
+              <option value="zhipu">智谱 GLM</option>
+              <option value="volcengine">火山方舟</option>
+              <option value="openai_compatible">自定义 OpenAI 兼容接口</option>
             </select>
-            <p class="hint">选择当前使用的翻译平台。翻译目标语言固定为简体中文（zh-CN）。若使用国产大模型或中转站，请选择 OpenAI 兼容接口。</p>
+            <p class="hint">选择当前使用的翻译平台。翻译目标语言固定为简体中文（zh-CN）。不同厂商会预填适合 README 翻译的快速高性价比模型。</p>
           </div>
         </section>
 
@@ -149,21 +157,40 @@
           </div>
         </section>
 
-        <section class="card provider" data-provider="openai">
-          <h2>OpenAI 兼容接口配置</h2>
+        <section class="card provider" data-provider="qwen_mt">
+          <h2>Qwen-MT 配置</h2>
+          <div class="field">
+            <label for="readme_qwen_mt_api_url">API 地址</label>
+            <input id="readme_qwen_mt_api_url" type="url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">
+            <p class="hint">Qwen-MT 是专用机器翻译模型，默认使用 OpenAI 兼容 Chat Completions 地址，并通过 `translation_options` 指定翻译目标。</p>
+          </div>
+          <div class="field">
+            <label for="readme_qwen_mt_api_key">API Key</label>
+            <input id="readme_qwen_mt_api_key" type="password" placeholder="DashScope API Key">
+            <p class="hint">来自阿里云百炼 / Qwen Cloud 的 API Key。</p>
+          </div>
+          <div class="field">
+            <label for="readme_qwen_mt_model">模型</label>
+            <input id="readme_qwen_mt_model" type="text" placeholder="qwen-mt-turbo">
+            <p class="hint">默认 `qwen-mt-turbo`，可按额度和质量需求改为 `qwen-mt-flash`、`qwen-mt-plus` 或 `qwen-mt-lite`。</p>
+          </div>
+        </section>
+
+        <section class="card provider" data-provider="ai_chat">
+          <h2>AI 对话接口配置</h2>
           <div class="field">
             <label for="readme_openai_api_url">API 地址</label>
             <input id="readme_openai_api_url" type="url" placeholder="https://api.openai.com/v1/chat/completions">
-            <p class="hint">可填完整 `/chat/completions` 地址，也可填 base URL（插件会自动补全）。为通过商店审核并降低权限风险，默认仅支持 HTTPS（本地 localhost 可用 HTTP）。</p>
+            <p class="hint">选择上方厂商后会自动预填官方 base URL 与模型。自定义 OpenAI 兼容接口也可填完整 `/chat/completions` 地址。为通过商店审核并降低权限风险，默认仅支持 HTTPS（本地 localhost 可用 HTTP）。</p>
           </div>
           <div class="field">
             <label for="readme_openai_api_key">API Key</label>
             <input id="readme_openai_api_key" type="password" placeholder="Bearer Key">
-            <p class="hint">支持 OpenAI、DeepSeek、Kimi 及兼容 OpenAI 协议的平台。</p>
+            <p class="hint">支持 Bearer Token 鉴权的 OpenAI Chat Completions 兼容接口。</p>
           </div>
           <div class="field">
             <label for="readme_openai_model">模型</label>
-            <input id="readme_openai_model" type="text" placeholder="gpt-4o-mini / deepseek-chat / kimi-k2">
+            <input id="readme_openai_model" type="text" placeholder="gpt-4.1-mini / deepseek-v4-flash / qwen-flash / MiniMax-M2.7-highspeed">
             <p class="hint">填接口实际可用的模型名，大小写请与平台要求一致。</p>
           </div>
           <p class="hint">README 翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>

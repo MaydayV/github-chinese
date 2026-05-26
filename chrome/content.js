@@ -25,7 +25,10 @@
         readme_azure_region: '',
         readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
         readme_openai_api_key: '',
-        readme_openai_model: 'gpt-4o-mini',
+        readme_openai_model: 'gpt-4.1-mini',
+        readme_qwen_mt_api_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        readme_qwen_mt_api_key: '',
+        readme_qwen_mt_model: 'qwen-mt-turbo',
     };
 
     const FeatureSet = { ...STORAGE_DEFAULTS };
@@ -69,9 +72,28 @@
             '[translate="no"]',
             '[aria-hidden="true"]'
         ].join(', '),
+        BLOCK_SELECTOR: [
+            'p',
+            'li',
+            'blockquote',
+            'details',
+            'summary',
+            'td',
+            'th',
+            'figcaption',
+            'h1',
+            'h2',
+            'h3',
+            'h4',
+            'h5',
+            'h6'
+        ].join(', '),
         MAX_BATCH_ITEMS: 24,
         MAX_BATCH_CHARS: 6500,
+        OPENAI_MAX_BATCH_ITEMS: 6,
+        OPENAI_MAX_BATCH_CHARS: 2400,
         PROGRESSIVE_GROUP_SIZE: 12,
+        OPENAI_PROGRESSIVE_GROUP_SIZE: 6,
         DEBOUNCE_MS: 700,
         RECORD_MAX_ENTRIES: 200,
         REPO_CACHE_MAX_ENTRIES: 24,
@@ -88,6 +110,7 @@
         inFlight: false,
         rerunRequested: false,
         stateByElement: new WeakMap(),
+        isApplyingTranslation: false,
         translationCache: new Map(),
         repoCacheMap: new Map(),
         repoCacheLoaded: false,
@@ -95,6 +118,7 @@
     };
 
     const FIXED_TARGET_LANG = 'zh-CN';
+    const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
 
     let pageConfig = {};
 
@@ -271,6 +295,7 @@
         new MutationObserver(mutations => {
             if (!FeatureSet.enable_extension) return;
             handleUrlChange();
+            if (readmeRuntime.isApplyingTranslation) return;
             if (pageConfig.currentPageType) processMutations(mutations);
             if (FeatureSet.enable_readme_translation) {
                 scheduleReadmeTranslation('mutation');
@@ -666,6 +691,28 @@
         return groups;
     }
 
+    function getReadmeTaskBlock(readmeEl, task) {
+        const parent = task?.node?.parentElement;
+        if (!parent) return readmeEl;
+
+        const block = parent.closest(README_CONFIG.BLOCK_SELECTOR);
+        return block && readmeEl.contains(block) ? block : parent;
+    }
+
+    function buildProgressiveTaskGroups(readmeEl, tasks, groupSize) {
+        const blockMap = new Map();
+        tasks.forEach((task) => {
+            const block = getReadmeTaskBlock(readmeEl, task);
+            if (!blockMap.has(block)) {
+                blockMap.set(block, []);
+            }
+            blockMap.get(block).push(task);
+        });
+
+        return buildProgressiveGroups([...blockMap.values()], groupSize)
+            .map(group => group.flat());
+    }
+
     function trimTranslationRecords(records, maxEntries) {
         const list = Array.isArray(records) ? records : [];
         const limit = Math.max(1, Number(maxEntries) || 1);
@@ -805,6 +852,45 @@
         return translatedCount;
     }
 
+    function withReadmeDomMutationGuard(callback) {
+        readmeRuntime.isApplyingTranslation = true;
+        try {
+            return callback();
+        } finally {
+            window.setTimeout(() => {
+                readmeRuntime.isApplyingTranslation = false;
+            }, 0);
+        }
+    }
+
+    function applyReadmeHtml(readmeEl, html) {
+        return withReadmeDomMutationGuard(() => {
+            readmeEl.innerHTML = html;
+        });
+    }
+
+    function applyReadmeTextGroupTranslations(tasksByText, texts, translatedMap) {
+        return withReadmeDomMutationGuard(() => applyTextGroupTranslations(tasksByText, texts, translatedMap));
+    }
+
+    function applyTaskTranslations(tasks, translatedMap) {
+        let translatedCount = 0;
+
+        tasks.forEach((task) => {
+            const translated = translatedMap.get(task.normalizedText);
+            if (!translated || translated === task.normalizedText) return;
+
+            task.node.data = task.rawText.replace(task.trimmedText, translated);
+            translatedCount += 1;
+        });
+
+        return translatedCount;
+    }
+
+    function applyReadmeTaskTranslations(tasks, translatedMap) {
+        return withReadmeDomMutationGuard(() => applyTaskTranslations(tasks, translatedMap));
+    }
+
     async function waitForNextPaint() {
         await new Promise((resolve) => {
             window.requestAnimationFrame(() => resolve());
@@ -817,7 +903,7 @@
 
         const state = getReadmeElementState(readmeEl);
         if (state.originalHtml && readmeEl.innerHTML !== state.originalHtml) {
-            readmeEl.innerHTML = state.originalHtml;
+            applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
         state.translatedHash = '';
@@ -910,7 +996,7 @@
         const sourceText = normalizeText(readmeEl.textContent || '');
         if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
             if (readmeEl.innerHTML !== state.originalHtml) {
-                readmeEl.innerHTML = state.originalHtml;
+                applyReadmeHtml(readmeEl, state.originalHtml);
             }
 
             state.translatedSignature = signature;
@@ -925,7 +1011,7 @@
         });
 
         if (cacheHit?.translatedHtml) {
-            readmeEl.innerHTML = cacheHit.translatedHtml;
+            applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
 
@@ -965,13 +1051,17 @@
         let totalTokens = 0;
 
         if (FeatureSet.readme_enable_progressive) {
-            const groups = buildProgressiveGroups(uniqueTexts, README_CONFIG.PROGRESSIVE_GROUP_SIZE);
+            const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+            const groupSize = usesAiBatchLimits
+                ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
+                : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
+            const groups = buildProgressiveTaskGroups(readmeEl, tasks, groupSize);
 
             for (let index = 0; index < groups.length; index += 1) {
-                const group = groups[index];
-                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(group, providerConfig);
+                const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
+                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
                 totalTokens += groupTokens;
-                translatedCount += applyTextGroupTranslations(tasksByText, group, translatedMap);
+                translatedCount += applyReadmeTaskTranslations(groups[index], translatedMap);
 
                 if (index < groups.length - 1) {
                     await waitForNextPaint();
@@ -980,7 +1070,7 @@
         } else {
             const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
             totalTokens += tokens;
-            translatedCount += applyTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
+            translatedCount += applyReadmeTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
         }
 
 
@@ -1138,13 +1228,40 @@
                 };
             }
 
-            case 'openai': {
+            case 'qwen_mt': {
+                const rawUrl = normalizeUrl(FeatureSet.readme_qwen_mt_api_url);
+                const url = normalizeOpenAiEndpoint(rawUrl);
+                const key = (FeatureSet.readme_qwen_mt_api_key || '').trim();
+                const model = (FeatureSet.readme_qwen_mt_model || '').trim();
+                if (!url || !key || !model) {
+                    return { ok: false, message: 'Qwen-MT 需要 API 地址、API Key 与模型名。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    model,
+                    signature: `${provider}|${targetLang}|${url}|${model}|${createHash(key)}`,
+                };
+            }
+
+            case 'openai':
+            case 'openai_compatible':
+            case 'deepseek':
+            case 'qwen':
+            case 'minimax':
+            case 'kimi':
+            case 'zhipu':
+            case 'volcengine': {
                 const rawUrl = normalizeUrl(FeatureSet.readme_openai_api_url);
                 const url = normalizeOpenAiEndpoint(rawUrl);
                 const key = (FeatureSet.readme_openai_api_key || '').trim();
                 const model = (FeatureSet.readme_openai_model || '').trim();
                 if (!url || !key || !model) {
-                    return { ok: false, message: 'OpenAI 兼容接口需要 API 地址、API Key 与模型名。' };
+                    return { ok: false, message: 'AI 对话接口需要 API 地址、API Key 与模型名。' };
                 }
 
                 return {
@@ -1179,7 +1296,14 @@
             }
         });
 
-        const batches = buildBatches(uncached, README_CONFIG.MAX_BATCH_ITEMS, README_CONFIG.MAX_BATCH_CHARS);
+        const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+        const maxBatchItems = usesAiBatchLimits
+            ? README_CONFIG.OPENAI_MAX_BATCH_ITEMS
+            : README_CONFIG.MAX_BATCH_ITEMS;
+        const maxBatchChars = usesAiBatchLimits
+            ? README_CONFIG.OPENAI_MAX_BATCH_CHARS
+            : README_CONFIG.MAX_BATCH_CHARS;
+        const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
         for (const batch of batches) {
             const batchResult = await translateBatchWithFallback(batch, providerConfig);
             const batchResults = batchResult.translations;
@@ -1215,7 +1339,7 @@
             };
         } catch (error) {
             // OpenAI 兼容接口在部分平台上会因 JSON 输出不稳定导致整批失败，此时退化为更小批次重试。
-            if (providerConfig.provider !== 'openai' || batch.length <= 1) {
+            if ((!AI_CHAT_PROVIDERS.includes(providerConfig.provider) && providerConfig.provider !== 'qwen_mt') || batch.length <= 1) {
                 throw error;
             }
 
@@ -1266,7 +1390,16 @@
                 return translateWithGoogle(texts, providerConfig);
             case 'azure':
                 return translateWithAzure(texts, providerConfig);
+            case 'qwen_mt':
+                return translateWithQwenMt(texts, providerConfig);
             case 'openai':
+            case 'openai_compatible':
+            case 'deepseek':
+            case 'qwen':
+            case 'minimax':
+            case 'kimi':
+            case 'zhipu':
+            case 'volcengine':
                 return translateWithOpenAiCompatible(texts, providerConfig);
             default:
                 throw new Error(`未知翻译服务: ${providerConfig.provider}`);
@@ -1341,6 +1474,41 @@
         };
     }
 
+    async function translateWithQwenMt(texts, providerConfig) {
+        const translations = [];
+        let tokens = 0;
+
+        for (const text of texts) {
+            const data = await proxyFetchJson({
+                url: providerConfig.url,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${providerConfig.key}`,
+                },
+                body: JSON.stringify({
+                    model: providerConfig.model,
+                    messages: [{ role: 'user', content: text }],
+                    translation_options: {
+                        source_lang: 'auto',
+                        target_lang: 'Chinese',
+                    },
+                }),
+            });
+
+            const firstChoice = data?.choices?.[0] || {};
+            const content = firstChoice?.message?.content ?? firstChoice?.text;
+            const translated = Array.isArray(content)
+                ? content.map(part => part?.text || '').join('')
+                : String(content || '').trim();
+
+            translations.push(translated);
+            tokens += getReadmeUsageTokens(data);
+        }
+
+        return { translations, tokens };
+    }
+
     async function translateWithOpenAiCompatible(texts, providerConfig) {
         const targetLanguage = '简体中文';
 
@@ -1361,6 +1529,7 @@
                 },
             ],
         };
+        applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
         const data = await proxyFetchJson({
             url: providerConfig.url,
@@ -1386,6 +1555,7 @@
 
     function parseOpenAiArray(rawText, expectedLength) {
         let text = (rawText || '').trim();
+        text = stripOpenAiReasoningBlocks(text);
         text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
         const start = text.indexOf('[');
@@ -1416,6 +1586,10 @@
         }
 
         return parsed.map(item => String(item ?? '').trim());
+    }
+
+    function stripOpenAiReasoningBlocks(text) {
+        return String(text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     }
 
     async function proxyFetchJson(request) {
@@ -1463,15 +1637,90 @@
     function normalizeOpenAiEndpoint(url) {
         if (!url) return '';
 
-        if (/\/chat\/completions\/?$/i.test(url)) {
-            return url;
+        const parsedUrl = parseApiUrl(url);
+        if (!parsedUrl) return url;
+
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const path = parsedUrl.pathname.replace(/\/+$/, '');
+        if (/\/chat\/completions$/i.test(path)) {
+            return `${parsedUrl.origin}${path}`;
         }
 
-        if (/\/v1\/?$/i.test(url)) {
-            return `${url.replace(/\/+$/, '')}/chat/completions`;
+        if (!path) {
+            return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions`;
         }
 
-        return `${url.replace(/\/+$/, '')}/v1/chat/completions`;
+        return `${parsedUrl.origin}${path}/chat/completions`;
+    }
+
+    function parseApiUrl(url) {
+        try {
+            return new URL(url);
+        } catch {
+            return null;
+        }
+    }
+
+    function getProviderDefaultBasePath(hostname) {
+        if (hostname === 'api.deepseek.com') return '';
+        if (/^dashscope(?:-(?:us|intl|finance))?\.aliyuncs\.com$/i.test(hostname)) return '/compatible-mode/v1';
+        if (hostname === 'open.bigmodel.cn') return '/api/paas/v4';
+        if (/^ark\.[^.]+\.volces\.com$/i.test(hostname)) return '/api/v3';
+        if (
+            hostname === 'api.openai.com'
+            || hostname === 'api.minimaxi.com'
+            || hostname === 'api.minimax.io'
+            || hostname === 'api.moonshot.ai'
+        ) {
+            return '/v1';
+        }
+
+        return '/v1';
+    }
+
+    function getProviderHost(url) {
+        return parseApiUrl(url)?.hostname.toLowerCase() || '';
+    }
+
+    function isDeepSeekEndpoint(url) {
+        return getProviderHost(url) === 'api.deepseek.com';
+    }
+
+    function isQwenEndpoint(url) {
+        return /^dashscope(?:-(?:us|intl|finance))?\.aliyuncs\.com$/i.test(getProviderHost(url));
+    }
+
+    function isMiniMaxEndpoint(url) {
+        const host = getProviderHost(url);
+        return host === 'api.minimaxi.com' || host === 'api.minimax.io';
+    }
+
+    function isKimiEndpoint(url) {
+        return getProviderHost(url) === 'api.moonshot.ai';
+    }
+
+    function isZhipuEndpoint(url) {
+        return getProviderHost(url) === 'open.bigmodel.cn';
+    }
+
+    function applyOpenAiCompatibleRequestOptions(payload, providerConfig) {
+        if (!payload) return payload;
+
+        if (isDeepSeekEndpoint(providerConfig?.url) || isKimiEndpoint(providerConfig?.url)) {
+            payload.stream = false;
+            payload.thinking = { type: 'disabled' };
+        } else if (isQwenEndpoint(providerConfig?.url)) {
+            payload.stream = false;
+            payload.enable_thinking = false;
+        } else if (isMiniMaxEndpoint(providerConfig?.url)) {
+            payload.stream = false;
+            payload.reasoning_split = true;
+        } else if (isZhipuEndpoint(providerConfig?.url)) {
+            payload.stream = false;
+            payload.thinking = { type: 'disabled' };
+            payload.do_sample = false;
+        }
+        return payload;
     }
 
     function normalizeUrl(url) {

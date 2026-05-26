@@ -15,7 +15,10 @@ const DEFAULTS = {
   readme_azure_region: '',
   readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
   readme_openai_api_key: '',
-  readme_openai_model: 'gpt-4o-mini',
+  readme_openai_model: 'gpt-4.1-mini',
+  readme_qwen_mt_api_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+  readme_qwen_mt_api_key: '',
+  readme_qwen_mt_model: 'qwen-mt-turbo',
 };
 
 const LOCAL_STORAGE_KEYS = {
@@ -40,6 +43,18 @@ const RECORDS_STATE = {
   cacheEntries: [],
   page: 1,
   pageSize: 8,
+};
+
+const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
+
+const AI_PROVIDER_DEFAULTS = {
+  openai: { apiUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' },
+  deepseek: { apiUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  qwen: { apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-flash' },
+  minimax: { apiUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7-highspeed' },
+  kimi: { apiUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' },
+  zhipu: { apiUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4.7-flash' },
+  volcengine: { apiUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-1-6-flash-250615' },
 };
 
 let LAST_SAVED_VALUES = { ...DEFAULTS };
@@ -110,21 +125,147 @@ function applyValues(values) {
 }
 
 function refreshProviderPanel(provider) {
+  const normalizedProvider = AI_CHAT_PROVIDERS.includes(provider) ? 'ai_chat' : provider;
   document.querySelectorAll('.provider').forEach((panel) => {
-    panel.classList.toggle('is-active', panel.dataset.provider === provider);
+    panel.classList.toggle('is-active', panel.dataset.provider === normalizedProvider);
   });
+}
+
+function getAiProviderDefaults(provider) {
+  return AI_PROVIDER_DEFAULTS[provider] ? { ...AI_PROVIDER_DEFAULTS[provider] } : null;
+}
+
+function getQwenMtDefaults() {
+  return {
+    apiUrl: DEFAULTS.readme_qwen_mt_api_url,
+    model: DEFAULTS.readme_qwen_mt_model,
+  };
+}
+
+function applyProviderDefaultsToValues(values) {
+  const provider = (values.readme_provider || '').trim().toLowerCase();
+  const nextValues = { ...values };
+
+  if (provider === 'qwen_mt') {
+    const defaults = getQwenMtDefaults();
+    nextValues.readme_qwen_mt_api_url = defaults.apiUrl;
+    nextValues.readme_qwen_mt_model = defaults.model;
+    return nextValues;
+  }
+
+  const defaults = getAiProviderDefaults(provider);
+  if (!defaults) return nextValues;
+
+  nextValues.readme_openai_api_url = defaults.apiUrl;
+  nextValues.readme_openai_model = defaults.model;
+  return nextValues;
+}
+
+function getAiProviderLabel(provider) {
+  const labels = {
+    openai: 'OpenAI 官方接口',
+    openai_compatible: 'OpenAI 兼容接口',
+    deepseek: 'DeepSeek',
+    qwen: 'Qwen 对话模型',
+    minimax: 'MiniMax',
+    kimi: 'Kimi',
+    zhipu: '智谱 GLM',
+    volcengine: '火山方舟',
+  };
+  return labels[provider] || 'AI 对话接口';
 }
 
 function normalizeUrl(url) {
   return String(url || '').trim().replace(/\s+/g, '');
 }
 
+function parseApiUrl(url) {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function getProviderDefaultBasePath(hostname) {
+  if (hostname === 'api.deepseek.com') return '';
+  if (/^dashscope(?:-(?:us|intl|finance))?\.aliyuncs\.com$/i.test(hostname)) return '/compatible-mode/v1';
+  if (hostname === 'open.bigmodel.cn') return '/api/paas/v4';
+  if (/^ark\.[^.]+\.volces\.com$/i.test(hostname)) return '/api/v3';
+  if (
+    hostname === 'api.openai.com'
+    || hostname === 'api.minimaxi.com'
+    || hostname === 'api.minimax.io'
+    || hostname === 'api.moonshot.ai'
+  ) {
+    return '/v1';
+  }
+
+  return '/v1';
+}
+
+function getProviderHost(url) {
+  return parseApiUrl(url)?.hostname.toLowerCase() || '';
+}
+
+function isDeepSeekEndpoint(url) {
+  return getProviderHost(url) === 'api.deepseek.com';
+}
+
+function isQwenEndpoint(url) {
+  return /^dashscope(?:-(?:us|intl|finance))?\.aliyuncs\.com$/i.test(getProviderHost(url));
+}
+
+function isMiniMaxEndpoint(url) {
+  const host = getProviderHost(url);
+  return host === 'api.minimaxi.com' || host === 'api.minimax.io';
+}
+
+function isKimiEndpoint(url) {
+  return getProviderHost(url) === 'api.moonshot.ai';
+}
+
+function isZhipuEndpoint(url) {
+  return getProviderHost(url) === 'open.bigmodel.cn';
+}
+
 function normalizeOpenAiEndpoint(url) {
   if (!url) return '';
 
-  if (/\/chat\/completions\/?$/i.test(url)) return url;
-  if (/\/v1\/?$/i.test(url)) return `${url.replace(/\/+$/, '')}/chat/completions`;
-  return `${url.replace(/\/+$/, '')}/v1/chat/completions`;
+  const parsedUrl = parseApiUrl(url);
+  if (!parsedUrl) return url;
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const path = parsedUrl.pathname.replace(/\/+$/, '');
+  if (/\/chat\/completions$/i.test(path)) {
+    return `${parsedUrl.origin}${path}`;
+  }
+
+  if (!path) {
+    return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions`;
+  }
+
+  return `${parsedUrl.origin}${path}/chat/completions`;
+}
+
+function applyOpenAiCompatibleRequestOptions(payload, config) {
+  if (!payload) return payload;
+
+  if (isDeepSeekEndpoint(config?.url) || isKimiEndpoint(config?.url)) {
+    payload.stream = false;
+    payload.thinking = { type: 'disabled' };
+  } else if (isQwenEndpoint(config?.url)) {
+    payload.stream = false;
+    payload.enable_thinking = false;
+  } else if (isMiniMaxEndpoint(config?.url)) {
+    payload.stream = false;
+    payload.reasoning_split = true;
+  } else if (isZhipuEndpoint(config?.url)) {
+    payload.stream = false;
+    payload.thinking = { type: 'disabled' };
+    payload.do_sample = false;
+  }
+  return payload;
 }
 
 function mapTargetLangForDeepL() {
@@ -169,12 +310,28 @@ function getProviderConfig(values) {
       }
       return { ok: true, provider, targetLang, url, key, region };
     }
-    case 'openai': {
+    case 'qwen_mt': {
+      const url = normalizeOpenAiEndpoint(normalizeUrl(values.readme_qwen_mt_api_url));
+      const key = (values.readme_qwen_mt_api_key || '').trim();
+      const model = (values.readme_qwen_mt_model || '').trim();
+      if (!url || !key || !model) {
+        return { ok: false, message: 'Qwen-MT 需要 API 地址、API Key 和模型名。' };
+      }
+      return { ok: true, provider, targetLang, url, key, model };
+    }
+    case 'openai':
+    case 'openai_compatible':
+    case 'deepseek':
+    case 'qwen':
+    case 'minimax':
+    case 'kimi':
+    case 'zhipu':
+    case 'volcengine': {
       const url = normalizeOpenAiEndpoint(normalizeUrl(values.readme_openai_api_url));
       const key = (values.readme_openai_api_key || '').trim();
       const model = (values.readme_openai_model || '').trim();
       if (!url || !key || !model) {
-        return { ok: false, message: 'OpenAI 兼容接口需要 API 地址、API Key 和模型名。' };
+        return { ok: false, message: `${getAiProviderLabel(provider)}需要 API 地址、API Key 和模型名。` };
       }
       return { ok: true, provider, targetLang, url, key, model };
     }
@@ -393,14 +550,16 @@ async function proxyFetchJson(request) {
 
 async function testDeepL(config) {
   const body = new URLSearchParams();
-  body.append('auth_key', config.key);
   body.append('target_lang', mapTargetLangForDeepL());
   body.append('text', 'README translation connectivity test.');
 
   const data = await proxyFetchJson({
     url: config.url,
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `DeepL-Auth-Key ${config.key}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body: body.toString(),
   });
 
@@ -456,12 +615,13 @@ async function testOpenAiCompatible(config) {
   const payload = {
     model: config.model,
     temperature: 0,
-    max_tokens: 16,
+    max_tokens: 32,
     messages: [
       { role: 'system', content: 'You are a connectivity checker. Reply with exactly OK.' },
       { role: 'user', content: 'Connection test' },
     ],
   };
+  applyOpenAiCompatibleRequestOptions(payload, config);
 
   const data = await proxyFetchJson({
     url: config.url,
@@ -484,6 +644,35 @@ async function testOpenAiCompatible(config) {
   }
 }
 
+async function testQwenMt(config) {
+  const data = await proxyFetchJson({
+    url: config.url,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.key}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [{ role: 'user', content: 'README translation connectivity test.' }],
+      translation_options: {
+        source_lang: 'auto',
+        target_lang: 'Chinese',
+      },
+    }),
+  });
+
+  const choice = data?.choices?.[0] || {};
+  const content = choice?.message?.content ?? choice?.text;
+  const text = Array.isArray(content)
+    ? content.map((part) => part?.text || '').join('')
+    : String(content || '').trim();
+
+  if (!text) {
+    throw new Error('Qwen-MT 未返回有效翻译内容。');
+  }
+}
+
 async function testProviderConnection(values) {
   const config = getProviderConfig(values);
   if (!config.ok) {
@@ -500,9 +689,19 @@ async function testProviderConnection(values) {
     case 'azure':
       await testAzure(config);
       return 'Azure Translator 连通性正常。';
+    case 'qwen_mt':
+      await testQwenMt(config);
+      return 'Qwen-MT 连通性正常。';
     case 'openai':
+    case 'openai_compatible':
+    case 'deepseek':
+    case 'qwen':
+    case 'minimax':
+    case 'kimi':
+    case 'zhipu':
+    case 'volcengine':
       await testOpenAiCompatible(config);
-      return 'OpenAI 兼容接口连通性正常。';
+      return `${getAiProviderLabel(config.provider)}连通性正常。`;
     default:
       throw new Error(`未知 provider: ${config.provider}`);
   }
@@ -705,7 +904,8 @@ function bindEvents() {
 
   const providerEl = byId('readme_provider');
   providerEl?.addEventListener('change', () => {
-    refreshProviderPanel(providerEl.value);
+    const nextValues = applyProviderDefaultsToValues(collectValues());
+    applyValues(nextValues);
     setStatus('');
   });
 
