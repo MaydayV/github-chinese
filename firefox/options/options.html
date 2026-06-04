@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>README 翻译设置</title>
+  <title>内容翻译设置</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main class="page">
     <header class="hero">
-      <p class="eyebrow">GitHub 中文汉化插件 · README Translator</p>
-      <h1>README 翻译设置</h1>
-      <p>将 README 翻译能力拆分为“功能开关 / API 设置 / 翻译记录”三个区域。建议先完成 API 配置并保存，再启用 README 翻译。</p>
+      <p class="eyebrow">GitHub 中文汉化插件 · Translation</p>
+      <h1>内容翻译设置</h1>
+      <p>配置 README、Issue、Pull Request 和 Release 正文翻译。先保存翻译接口配置，再开启需要的翻译功能。</p>
     </header>
 
     <form id="settingsForm" class="form">
       <section class="card tabs-card">
-        <div class="tabs" role="tablist" aria-label="README 翻译设置标签">
+        <div class="tabs" role="tablist" aria-label="内容翻译设置标签">
           <button type="button" class="tab-btn is-active" data-tab-target="features" role="tab" aria-selected="true">功能开关</button>
-          <button type="button" class="tab-btn" data-tab-target="api" role="tab" aria-selected="false">API 设置</button>
+          <button type="button" class="tab-btn" data-tab-target="api" role="tab" aria-selected="false">翻译接口</button>
           <button type="button" class="tab-btn" data-tab-target="records" role="tab" aria-selected="false">翻译记录</button>
         </div>
       </section>
@@ -51,7 +51,7 @@
               <span class="ios-switch" aria-hidden="true"></span>
             </span>
           </label>
-          <p class="hint">复用“API 设置”中的翻译服务。默认手动触发，不会自动翻译整页内容。</p>
+          <p class="hint">复用“翻译接口”中的服务配置。默认手动触发，不会自动翻译整页内容。</p>
         </section>
 
         <section class="card">
@@ -95,9 +95,9 @@
         <section class="card assist">
           <h2>使用说明</h2>
           <ul class="guide-list">
-            <li>步骤 1：切到“API 设置”填写服务地址、Key、模型并保存。</li>
+            <li>步骤 1：切到“翻译接口”填写服务地址、Key、模型并保存。</li>
             <li>步骤 2：点击“测试连通性”确认接口可用。</li>
-            <li>步骤 3：回到“功能开关”开启 README 翻译，再按需开启高级功能。</li>
+            <li>步骤 3：回到“功能开关”开启需要的翻译功能，再按需开启高级功能。</li>
             <li>步骤 4：在“翻译记录”查看 tokens 消耗、缓存命中与翻译状态。</li>
           </ul>
         </section>
@@ -126,7 +126,7 @@
               <option value="volcengine">火山方舟</option>
               <option value="openai_compatible">自定义 OpenAI 兼容接口</option>
             </select>
-            <p class="hint">选择当前使用的翻译平台。翻译目标语言固定为简体中文（zh-CN）。不同厂商会预填适合 README 翻译的快速高性价比模型。</p>
+            <p class="hint">选择当前使用的翻译接口。翻译目标语言固定为简体中文（zh-CN）。该配置同时用于 README、Issue、Pull Request 和 Release 正文翻译。</p>
           </div>
         </section>
 
@@ -228,7 +228,7 @@
             <p id="testStatus" class="status status-context" aria-live="polite"></p>
             <p class="hint">点击后会用当前表单配置发送一次最小测试请求，不会修改页面内容。首次测试某个 API 域名时，浏览器会弹出域名访问授权提示。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
           </div>
-          <p class="hint">README 翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>
+          <p class="hint">对话模型翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>
         </section>
 
         <div class="panel-actions">

@@ -37,10 +37,10 @@
 
 - 覆盖 `github.com`、`gist.github.com`、`skills.github.com`、`education.github.com`、`www.githubstatus.com`
 - 使用内置词库与规则在本地执行界面翻译，无需依赖在线翻译服务
-- 支持仓库 README 英文内容翻译（可选）：可配置翻译平台 API 或 OpenAI 兼容接口
-- 支持 Issue / Pull Request 对话内容翻译（可选）：可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
+- 支持仓库 README 英文内容翻译（可选）：可配置 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT 或 OpenAI 兼容接口
+- 支持 Issue / Pull Request / Release 正文翻译（可选）：复用同一套翻译接口配置，可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
 - 弹窗提供总开关；切换后若当前标签页为 GitHub 页面，将自动刷新并立即生效
-- 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue 或 Pull Request
+- 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue、Pull Request 或 Release
 - 提供 Chrome、Edge、Firefox 三套浏览器扩展目录，便于按浏览器加载
 
 ## 🔒 隐私与数据
@@ -48,7 +48,7 @@
 - 默认仅进行本地界面翻译
 - 仅本地保存插件配置（如开关状态、API 配置、缓存与记录）
 - 不收集、不出售用户个人数据
-- 当你主动开启 README 或 Issue / Pull Request 对话翻译时，仅会将待翻译内容发送到你所配置的翻译服务
+- 当你主动开启 README、Issue、Pull Request 或 Release 正文翻译时，仅会将待翻译内容发送到你所配置的翻译接口
 
 ## 💻 安装指南
 
@@ -98,13 +98,14 @@
 1. 更新插件图标资源与弹窗入口文件
 1. 补充后台代理请求脚本，支持扩展内可选翻译接口请求
 1. 同步 Chrome manifest 版本至 `2.2.5`，并更新版本检查脚本
+1. 更新设置页和 README 文案，明确翻译接口同时服务 README、Issue、Pull Request 和 Release 正文翻译
 
 ### v2.2.4 (2026-05-26)
 
-1. 新增 Issue / Pull Request 对话翻译，可手动翻译正文与单条评论
+1. 新增 Issue / Pull Request / Release 正文翻译，可手动翻译正文与单条评论
 1. 支持原文、译文、双语三种视图切换
 1. 复用 README 翻译的分段渐进翻译、缓存复用与翻译记录能力
-1. 翻译记录新增来源标签，区分 README、Issue 与 Pull Request
+1. 翻译记录新增来源标签，区分 README、Issue、Pull Request 与 Release
 1. 优化翻译按钮位置与 GitHub 绿色按钮样式
 1. 修复插件上下文失效时的错误提示与重试状态
 
@@ -112,14 +113,14 @@
 
 1. 同步上游词条并补回 Chrome 插件本地补充词条
 1. 清理重复翻译词条，减少词库冗余
-1. 优化 README 翻译设置页结构与交互文案
+1. 优化内容翻译设置页结构与交互文案
 1. 改进翻译记录、缓存与高级功能开关的设置体验
 
 ### v2.2.2 (2026-05-26)
 
-1. README 翻译支持多厂商 AI 翻译接口
+1. README 翻译支持多厂商翻译接口
 1. 新增 OpenAI 兼容接口配置，支持自定义 API 地址与模型
-1. 增加 Qwen MT、DeepL、Google、Azure 等翻译服务配置入口
+1. 增加 DeepL、Google、Azure、Qwen-MT 等翻译服务配置入口
 1. 优化 API 权限申请与连通性配置流程
 
 ### v2.2.1 (2026-05-05)

@@ -426,7 +426,7 @@ async function ensureProviderHostPermission(values, options = {}) {
   if (!request) {
     return {
       ok: false,
-      message: `尚未授权访问 ${origin.hostLabel}。请在“API 设置”点击“保存设置”或“测试连通性”完成授权。`,
+      message: `尚未授权访问 ${origin.hostLabel}。请在“翻译接口”点击“保存设置”或“测试连通性”完成授权。`,
     };
   }
 
@@ -474,7 +474,7 @@ function enforceFeatureSwitchRules(values, options = {}) {
       return {
         ok: false,
         values: nextValues,
-        message: `请先填写并保存有效的 API 设置后再启用 AI 翻译功能。${providerResult.message}`,
+        message: `请先填写并保存有效的翻译接口设置后再启用内容翻译功能。${providerResult.message}`,
       };
     }
   }
@@ -567,7 +567,7 @@ async function proxyFetchJson(request) {
 async function testDeepL(config) {
   const body = new URLSearchParams();
   body.append('target_lang', mapTargetLangForDeepL());
-  body.append('text', 'README translation connectivity test.');
+  body.append('text', 'Translation connectivity test.');
 
   const data = await proxyFetchJson({
     url: config.url,
@@ -591,7 +591,7 @@ async function testGoogle(config) {
   const body = new URLSearchParams();
   body.append('target', config.targetLang);
   body.append('format', 'text');
-  body.append('q', 'README translation connectivity test.');
+  body.append('q', 'Translation connectivity test.');
 
   const data = await proxyFetchJson({
     url: url.toString(),
@@ -619,7 +619,7 @@ async function testAzure(config) {
       'Ocp-Apim-Subscription-Region': config.region,
       'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
     },
-    body: JSON.stringify([{ text: 'README translation connectivity test.' }]),
+    body: JSON.stringify([{ text: 'Translation connectivity test.' }]),
   });
 
   if (!Array.isArray(data) || !data[0]?.translations?.[0]?.text) {
@@ -670,7 +670,7 @@ async function testQwenMt(config) {
     },
     body: JSON.stringify({
       model: config.model,
-      messages: [{ role: 'user', content: 'README translation connectivity test.' }],
+      messages: [{ role: 'user', content: 'Translation connectivity test.' }],
       translation_options: {
         source_lang: 'auto',
         target_lang: 'Chinese',
@@ -980,7 +980,7 @@ function bindEvents() {
       if (!savedConfig.ok) {
         mainSwitch.checked = false;
         updateAdvancedSwitchUi(false);
-        setStatus('请先在“API 设置”中保存可用配置，再开启 README 翻译。', 'error');
+        setStatus('请先在“翻译接口”中保存可用配置，再开启 README 翻译。', 'error');
         return;
       }
 
@@ -1025,7 +1025,7 @@ function bindEvents() {
       const savedConfig = getProviderConfig(LAST_SAVED_VALUES);
       if (!savedConfig.ok) {
         issuePrSwitch.checked = false;
-        setStatus('请先在“API 设置”中保存可用配置，再开启正文翻译。', 'error');
+        setStatus('请先在“翻译接口”中保存可用配置，再开启正文翻译。', 'error');
         return;
       }
 
@@ -1119,7 +1119,7 @@ function bindEvents() {
         await chrome.storage.sync.set({ ...DEFAULTS });
         LAST_SAVED_VALUES = { ...DEFAULTS };
         applyValues({ ...DEFAULTS });
-        setStatus('README 翻译设置已恢复默认值。', 'success');
+        setStatus('内容翻译设置已恢复默认值。', 'success');
       } catch (error) {
         console.error(error);
         setStatus('恢复默认值失败，请稍后重试。', 'error');
