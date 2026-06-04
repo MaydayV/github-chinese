@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "GitHub 中文汉化插件",
+  "name": "GitHub 中文汉化翻译插件",
   "version": "2.3.0",
-  "description": "GitHub 中文汉化插件用于将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。",
+  "description": "GitHub 中文汉化翻译插件用于将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。",
   "homepage_url": "https://star.caodan.io",
   "icons": {
     "16": "assets/icons/icon16.png",
@@ -29,7 +29,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "GitHub 中文汉化插件",
+    "default_title": "GitHub 中文汉化翻译插件",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "assets/icons/icon16.png",

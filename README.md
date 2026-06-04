@@ -1,6 +1,6 @@
 <div align="center"><a name="readme-top"></a>
 
-# GitHub 中文汉化插件
+# GitHub 中文汉化翻译插件
 
 > 将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。
 
@@ -97,6 +97,7 @@
 1. README 完整说明内容翻译能力，明确翻译接口同时用于 README、Issue、Pull Request 和 Release 正文翻译
 1. 设置页标题与提示文案改为“内容翻译设置 / 翻译接口”，避免误解为仅支持 README 或 AI 翻译
 1. 连通性测试请求文本改为中文，三端设置脚本保持一致
+1. 插件名称调整为“GitHub 中文汉化翻译插件”，覆盖汉化与翻译关键词
 
 ### v2.2.5 (2026-06-05)
 
@@ -183,7 +184,7 @@
 <!-- LINK GROUP -->
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
-[github-project-link]: https://github.com/MaydayV/github-chinese "GitHub 中文汉化插件"
+[github-project-link]: https://github.com/MaydayV/github-chinese "GitHub 中文汉化翻译插件"
 [github-issues-link]: https://github.com/MaydayV/github-chinese/issues "议题"
 [github-issues-shield]: https://img.shields.io/github/issues/MaydayV/github-chinese?style=flat-square&logo=github&label=Issue
 [github-stars-link]: https://github.com/MaydayV/github-chinese/stargazers "星标"
