@@ -119,6 +119,11 @@
             '[data-testid="issue-body"] .markdown-body',
             '[data-testid="comment-body"] .markdown-body',
         ].join(', '),
+        RELEASE_BODY_SELECTORS: [
+            'div.Box-body > div.markdown-body',
+            '[data-test-selector="release-card"] div.markdown-body',
+            '[data-testid="release-card"] div.markdown-body',
+        ].join(', '),
         BLOCK_SELECTOR: README_CONFIG.BLOCK_SELECTOR,
         SKIP_PARENT_SELECTOR: [
             README_CONFIG.SKIP_PARENT_SELECTOR,
@@ -1263,15 +1268,33 @@
         return /^\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+(?:\/|$)/.test(window.location.pathname);
     }
 
+    function isReleaseNotesPage() {
+        if (window.location.hostname !== 'github.com') return false;
+
+        const pathname = String(window.location.pathname || '');
+        if (/^\/[^/]+\/[^/]+\/releases\/(?:new|edit)(?:\/|$)/.test(pathname)) return false;
+        return /^\/[^/]+\/[^/]+\/releases(?:\/(?:tag\/[^/]+|latest))?(?:\/|$)/.test(pathname);
+    }
+
+    function isDiscussionTranslationTargetPage() {
+        return isIssueOrPrDiscussionPage() || isReleaseNotesPage();
+    }
+
     function isIssuePrTranslationEnabled() {
-        return FeatureSet.enable_extension && FeatureSet.enable_issue_pr_translation && isIssueOrPrDiscussionPage();
+        return FeatureSet.enable_extension && FeatureSet.enable_issue_pr_translation && isDiscussionTranslationTargetPage();
     }
 
     function getIssuePrRecordSourceType() {
+        if (isReleaseNotesPage()) return 'release';
+
         const match = String(window.location.pathname || '').match(/^\/[^/]+\/[^/]+\/(issues|pull)\//);
         if (match?.[1] === 'issues') return 'issue';
         if (match?.[1] === 'pull') return 'pull';
         return 'issue';
+    }
+
+    function getDiscussionRecordSourceType(item) {
+        return item?.sourceType || getIssuePrRecordSourceType();
     }
 
     function getIssuePrDiscussionState(item) {
@@ -1294,17 +1317,30 @@
 
     function findDiscussionItems() {
         const seen = new Set();
-        return [...document.querySelectorAll(ISSUE_PR_CONFIG.COMMENT_BODY_SELECTORS)]
+        const isReleaseNotes = isReleaseNotesPage();
+        const selectors = isReleaseNotes
+            ? ISSUE_PR_CONFIG.RELEASE_BODY_SELECTORS
+            : ISSUE_PR_CONFIG.COMMENT_BODY_SELECTORS;
+
+        return [...document.querySelectorAll(selectors)]
             .map((markdownEl) => {
                 if (!markdownEl || seen.has(markdownEl)) return null;
                 seen.add(markdownEl);
                 if (markdownEl.closest('.ghcn-discussion-translation-panel')) return null;
 
-                if (markdownEl.parentElement?.closest('[data-testid="markdown-body"]')) {
+                if (!isReleaseNotes && markdownEl.parentElement?.closest('[data-testid="markdown-body"]')) {
                     return null;
                 }
 
-                const rootEl = markdownEl.closest([
+                const rootEl = isReleaseNotes
+                    ? markdownEl.closest([
+                        '[data-test-selector="release-card"]',
+                        '[data-testid="release-card"]',
+                        '.Box',
+                        'section',
+                        'article',
+                    ].join(', '))
+                    : markdownEl.closest([
                     '[data-testid="issue-body"]',
                     '[data-testid="comment-body"]',
                     '[data-testid^="comment-viewer-outer-box"]',
@@ -1319,7 +1355,9 @@
                 ].join(', '));
                 if (!rootEl) return null;
 
-                const viewerEl = markdownEl.closest([
+                const viewerEl = isReleaseNotes
+                    ? (markdownEl.parentElement || markdownEl)
+                    : markdownEl.closest([
                     '[data-testid="issue-body-viewer"]',
                     '[data-testid="comment-body-viewer"]',
                     '[class*="IssueCommentBody"]',
@@ -1331,7 +1369,13 @@
                 const text = normalizeText(markdownEl.textContent || '');
                 if (!text) return null;
 
-                return { rootEl, viewerEl, markdownEl, text };
+                return {
+                    rootEl,
+                    viewerEl,
+                    markdownEl,
+                    text,
+                    sourceType: isReleaseNotes ? 'release' : getIssuePrRecordSourceType(),
+                };
             })
             .filter(Boolean);
     }
@@ -1345,6 +1389,8 @@
     }
 
     function findDiscussionActionsSlot(item) {
+        if (item?.sourceType === 'release') return null;
+
         const rootEl = item?.rootEl;
         if (!rootEl) return null;
 
@@ -1364,14 +1410,28 @@
         const repoInfo = getCurrentRepoInfo();
         if (!repoInfo?.fullName || !sourceHash || !signature) return '';
 
+        const sourceType = getDiscussionRecordSourceType(item);
         const discussionMatch = String(window.location.pathname || '').match(/^\/[^/]+\/[^/]+\/(issues|pull)\/(\d+)/);
-        const discussionType = discussionMatch?.[1] || 'discussion';
-        const discussionNumber = discussionMatch?.[2] || 'unknown';
+        const discussionType = discussionMatch?.[1] || sourceType;
+        const discussionNumber = discussionMatch?.[2] || getReleaseIdentifier(item) || 'unknown';
         const commentId = item?.rootEl?.id
             || item?.rootEl?.querySelector('a[href*="#issue-"], a[href*="#issuecomment-"], a[href*="#discussion_r"]')?.hash?.slice(1)
+            || item?.rootEl?.querySelector('a[href*="/releases/tag/"]')?.getAttribute('href')?.split('/releases/tag/')[1]
             || createHash(item?.markdownEl?.textContent || '');
 
         return `${repoInfo.fullName}|${discussionType}|${discussionNumber}|${commentId}|${sourceHash}|${signature}`;
+    }
+
+    function getReleaseIdentifier(item) {
+        const pathname = String(window.location.pathname || '');
+        const pathTag = pathname.match(/^\/[^/]+\/[^/]+\/releases\/tag\/(.+)$/)?.[1];
+        if (pathTag) return `tag:${pathTag}`;
+
+        const href = item?.rootEl?.querySelector('a[href*="/releases/tag/"]')?.getAttribute('href') || '';
+        const hrefTag = href.match(/\/releases\/tag\/([^?#]+)/)?.[1];
+        if (hrefTag) return `tag:${hrefTag}`;
+
+        return pathname.replace(/^\/[^/]+\/[^/]+\/releases\/?/, '') || 'releases';
     }
 
     function injectIssuePrControlStyles() {
@@ -1385,6 +1445,10 @@
                 align-items: center;
                 gap: 8px;
                 margin-right: 6px;
+            }
+            .ghcn-discussion-translate-toolbar--release {
+                display: flex;
+                margin: 0 0 8px;
             }
             .ghcn-discussion-translate-btn {
                 border: 1px solid var(--borderColor-muted, #d0d7de);
@@ -1473,15 +1537,24 @@
         if (state.toolbarEl?.isConnected) return;
 
         const slotEl = findDiscussionActionsSlot(item);
-        if (!slotEl) return;
+        if (!slotEl && item.sourceType !== 'release') return;
 
         const toolbar = document.createElement('div');
         toolbar.className = 'ghcn-discussion-translate-toolbar';
+        if (item.sourceType === 'release') {
+            toolbar.classList.add('ghcn-discussion-translate-toolbar--release');
+        }
         toolbar.dataset.ghcnDiscussionTranslate = 'toolbar';
 
         state.toolbarEl = toolbar;
         renderDiscussionToolbar(item);
-        slotEl.insertBefore(toolbar, slotEl.firstChild);
+        if (slotEl) {
+            slotEl.insertBefore(toolbar, slotEl.firstChild);
+        } else if (item.sourceType === 'release') {
+            item.viewerEl.insertBefore(toolbar, item.markdownEl);
+        } else {
+            return;
+        }
         item.markdownEl.dataset.ghcnDiscussionTranslate = 'ready';
     }
 
@@ -1651,12 +1724,12 @@
             state.errorMessage = '';
 
             await appendReadmeTranslationRecord({
-                sourceType: getIssuePrRecordSourceType(),
+                sourceType: getDiscussionRecordSourceType(item),
                 status: 'cache_hit',
                 tokens: 0,
                 durationMs: performance.now() - startAt,
                 sourceHash,
-                detail: 'discussion_cache_hit',
+                detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
             }).catch((error) => {
                 console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
             });
@@ -1725,12 +1798,12 @@
         });
 
         await appendReadmeTranslationRecord({
-            sourceType: getIssuePrRecordSourceType(),
+            sourceType: getDiscussionRecordSourceType(item),
             status: 'success',
             tokens: totalTokens,
             durationMs: performance.now() - startAt,
             sourceHash,
-            detail: `discussion_translated_nodes=${translatedCount}`,
+            detail: `${getDiscussionRecordSourceType(item)}_translated_nodes=${translatedCount}`,
         }).catch((error) => {
             console.warn('[Issue/PR翻译] 写入翻译记录失败:', error);
         });

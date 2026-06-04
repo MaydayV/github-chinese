@@ -6,10 +6,10 @@ const content = readFileSync(new URL('../content.js', import.meta.url), 'utf8');
 const optionsHtml = readFileSync(new URL('../options/options.html', import.meta.url), 'utf8');
 const optionsJs = readFileSync(new URL('../options/options.js', import.meta.url), 'utf8');
 
-test('Issue and PR translation setting is exposed in storage and options UI', () => {
+test('discussion body translation setting is exposed in storage and options UI', () => {
   assert.match(optionsJs, /enable_issue_pr_translation:\s*false/);
   assert.match(optionsHtml, /id="enable_issue_pr_translation"/);
-  assert.match(optionsHtml, /Issue \/ PR 对话翻译/);
+  assert.match(optionsHtml, /Issue \/ PR \/ Release 正文翻译/);
 });
 
 test('content script can identify and decorate Issue and PR discussions', () => {
@@ -21,6 +21,18 @@ test('content script can identify and decorate Issue and PR discussions', () => 
   assert.match(content, /\[data-testid="issue-body-viewer"\] \[data-testid="markdown-body"\]/);
   assert.match(content, /data-ghcn-discussion-translate/);
   assert.doesNotMatch(content, /insertAdjacentElement\('beforebegin',\s*toolbar\)/);
+});
+
+test('content script reuses discussion translation for Release notes', () => {
+  assert.match(content, /function isReleaseNotesPage\(/);
+  assert.match(content, /function isDiscussionTranslationTargetPage\(/);
+  assert.match(content, /RELEASE_BODY_SELECTORS/);
+  assert.match(content, /div\.Box-body > div\.markdown-body/);
+  assert.match(content, /sourceType:\s*isReleaseNotes \? 'release'/);
+  assert.match(content, /ghcn-discussion-translate-toolbar--release/);
+  assert.match(content, /if \(!slotEl && item\.sourceType !== 'release'\) return/);
+  assert.match(content, /item\.viewerEl\.insertBefore\(toolbar,\s*item\.markdownEl\)/);
+  assert.match(content, /getDiscussionRecordSourceType\(item\)/);
 });
 
 test('Issue and PR translation keeps original DOM and exposes view modes', () => {
@@ -57,15 +69,17 @@ test('Issue and PR translation switch persists when toggled', () => {
 test('Issue and PR translation follows README progressive cache and record settings', () => {
   assert.match(content, /function buildDiscussionCacheKey\(/);
   assert.match(content, /function getIssuePrRecordSourceType\(/);
+  assert.match(content, /function getDiscussionRecordSourceType\(/);
   assert.match(content, /getRepoCachedTranslation\(cacheKey\)/);
   assert.match(content, /upsertRepoCachedTranslation\(cacheKey/);
   assert.match(content, /FeatureSet\.readme_enable_progressive/);
   assert.match(content, /appendReadmeTranslationRecord\(/);
-  assert.match(content, /sourceType:\s*getIssuePrRecordSourceType\(\)/);
+  assert.match(content, /sourceType:\s*getDiscussionRecordSourceType\(item\)/);
   assert.match(content, /sourceType:\s*record\?\.sourceType \|\| 'readme'/);
   assert.match(optionsJs, /sourceType:\s*normalizeRecordSourceType\(item\.sourceType\)/);
   assert.match(optionsJs, /getRecordSourceMeta\(item\.sourceType\)/);
-  assert.match(content, /detail: `discussion_translated_nodes=\$\{translatedCount\}`/);
+  assert.match(optionsJs, /release:\s*\{\s*label:\s*'Release'/);
+  assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
 });
 
 test('Issue and PR translation covers React comments and legacy PR timeline comments', () => {

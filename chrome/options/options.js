@@ -765,10 +765,11 @@ function formatRecordDetail(detail) {
   const text = String(detail || '').trim();
   if (!text) return '';
 
-  let match = text.match(/^(?:nodes|translated_nodes|discussion_translated_nodes)=(\d+)$/i);
+  let match = text.match(/^(?:nodes|translated_nodes|discussion_translated_nodes|issue_translated_nodes|pull_translated_nodes|release_translated_nodes)=(\d+)$/i);
   if (match) return `翻译文本节点：${match[1]}`;
 
   if (text === 'discussion_cache_hit') return '命中讨论内容缓存';
+  if (/^(?:issue|pull|release)_cache_hit$/i.test(text)) return '命中正文缓存';
 
   match = text.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
   if (match) return `触发来源：${match[1]}`;
@@ -778,7 +779,7 @@ function formatRecordDetail(detail) {
 
 function normalizeRecordSourceType(sourceType) {
   const value = String(sourceType || '').trim().toLowerCase();
-  if (value === 'issue' || value === 'pull' || value === 'readme') return value;
+  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme') return value;
   return 'readme';
 }
 
@@ -788,6 +789,7 @@ function getRecordSourceMeta(sourceType) {
     readme: { label: 'README', className: 'is-readme' },
     issue: { label: 'Issue', className: 'is-issue' },
     pull: { label: 'Pull Request', className: 'is-pull' },
+    release: { label: 'Release', className: 'is-release' },
   };
   return map[value];
 }
@@ -1023,7 +1025,7 @@ function bindEvents() {
       const savedConfig = getProviderConfig(LAST_SAVED_VALUES);
       if (!savedConfig.ok) {
         issuePrSwitch.checked = false;
-        setStatus('请先在“API 设置”中保存可用配置，再开启 Issue / PR 对话翻译。', 'error');
+        setStatus('请先在“API 设置”中保存可用配置，再开启正文翻译。', 'error');
         return;
       }
 
@@ -1043,12 +1045,12 @@ function bindEvents() {
 
       applyValues(ruled.values);
       await savePartialValues({ enable_issue_pr_translation: true });
-      setStatus('Issue / PR 对话翻译已开启并保存。进入 Issue 或 PR 页面后，可手动翻译单条评论。', 'success');
+      setStatus('正文翻译已开启并保存。进入 Issue、PR 或 Release 页面后，可手动翻译当前内容。', 'success');
       return;
     }
 
     await savePartialValues({ enable_issue_pr_translation: false });
-    setStatus('Issue / PR 对话翻译已关闭并保存。', 'success');
+    setStatus('正文翻译已关闭并保存。', 'success');
   });
 
   ADVANCED_SWITCH_KEYS.forEach((key) => {
