@@ -41,6 +41,7 @@
 - 支持 Issue / Pull Request 对话内容翻译（可选）：可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
 - 弹窗提供总开关；切换后若当前标签页为 GitHub 页面，将自动刷新并立即生效
 - 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue 或 Pull Request
+- 提供 Chrome、Edge、Firefox 三套浏览器扩展目录，便于按浏览器加载
 
 ## 🔒 隐私与数据
 
@@ -60,11 +61,19 @@
 1. 安装后可在 `chrome://extensions/` 中确认扩展已启用（建议固定到工具栏）
 1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
 
-### 开发者模式加载
+### 开发者模式加载（Chrome / Edge）
 
-1. 打开 `chrome://extensions/`
+1. Chrome 打开 `chrome://extensions/`；Edge 打开 `edge://extensions/`
 1. 开启右上角 `开发者模式`
-1. 点击 `加载已解压的扩展程序`，选择本仓库的 `chrome` 目录（包含 `manifest.json`）
+1. 点击 `加载已解压的扩展程序`
+1. Chrome 选择本仓库的 `chrome` 目录；Edge 选择本仓库的 `edge` 目录
+1. 确认扩展已启用后，刷新 GitHub 页面
+
+### 临时加载（Firefox）
+
+1. 打开 `about:debugging#/runtime/this-firefox`
+1. 点击 `临时载入附加组件`
+1. 选择本仓库 `firefox/manifest.json`
 1. 确认扩展已启用后，刷新 GitHub 页面
 
 <div align="right">
@@ -76,11 +85,19 @@
 ## 🔧 本地调试
 
 1. 克隆本仓库到本地
-1. 打开 `chrome://extensions/`，开启 `开发者模式`
-1. 点击 `加载已解压的扩展程序`，选择 `chrome` 目录
-1. 修改 `chrome/locals.js` 中的词条后，在扩展管理页点击刷新按钮即可生效
+1. Chrome / Edge 在扩展管理页开启 `开发者模式`，加载 `chrome` 或 `edge` 目录
+1. Firefox 在 `about:debugging#/runtime/this-firefox` 中临时载入 `firefox/manifest.json`
+1. 修改对应浏览器目录下的 `locals.js` 后，在扩展管理页点击刷新按钮即可生效
 
 ## 🔄 更新日志
+
+### v2.2.5 (2026-06-05)
+
+1. 新增 Edge 插件目录，可通过 `edge/` 在 Edge 开发者模式加载
+1. 新增 Firefox 插件目录，适配 Firefox 扩展后台脚本与 Gecko 配置
+1. 更新插件图标资源与弹窗入口文件
+1. 补充后台代理请求脚本，支持扩展内可选翻译接口请求
+1. 同步 Chrome manifest 版本至 `2.2.5`，并更新版本检查脚本
 
 ### v2.2.4 (2026-05-26)
 
