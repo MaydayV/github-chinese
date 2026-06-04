@@ -567,7 +567,7 @@ async function proxyFetchJson(request) {
 async function testDeepL(config) {
   const body = new URLSearchParams();
   body.append('target_lang', mapTargetLangForDeepL());
-  body.append('text', 'Translation connectivity test.');
+  body.append('text', '翻译接口连通性测试。');
 
   const data = await proxyFetchJson({
     url: config.url,
@@ -591,7 +591,7 @@ async function testGoogle(config) {
   const body = new URLSearchParams();
   body.append('target', config.targetLang);
   body.append('format', 'text');
-  body.append('q', 'Translation connectivity test.');
+  body.append('q', '翻译接口连通性测试。');
 
   const data = await proxyFetchJson({
     url: url.toString(),
@@ -619,7 +619,7 @@ async function testAzure(config) {
       'Ocp-Apim-Subscription-Region': config.region,
       'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
     },
-    body: JSON.stringify([{ text: 'Translation connectivity test.' }]),
+    body: JSON.stringify([{ text: '翻译接口连通性测试。' }]),
   });
 
   if (!Array.isArray(data) || !data[0]?.translations?.[0]?.text) {
@@ -633,8 +633,8 @@ async function testOpenAiCompatible(config) {
     temperature: 0,
     max_tokens: 32,
     messages: [
-      { role: 'system', content: 'You are a connectivity checker. Reply with exactly OK.' },
-      { role: 'user', content: 'Connection test' },
+      { role: 'system', content: '你是连通性检查器，只回复 OK。' },
+      { role: 'user', content: '连通性测试' },
     ],
   };
   applyOpenAiCompatibleRequestOptions(payload, config);
@@ -670,7 +670,7 @@ async function testQwenMt(config) {
     },
     body: JSON.stringify({
       model: config.model,
-      messages: [{ role: 'user', content: 'Translation connectivity test.' }],
+      messages: [{ role: 'user', content: '翻译接口连通性测试。' }],
       translation_options: {
         source_lang: 'auto',
         target_lang: 'Chinese',
