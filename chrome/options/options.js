@@ -878,7 +878,7 @@ function renderRecords() {
     const sourceMeta = getRecordSourceMeta(item.sourceType);
     const providerText = item.provider ? escapeHtml(item.provider) : '-';
     const detailText = formatRecordDetail(item.detail);
-    const detail = detailText ? `<span>详情：${escapeHtml(detailText)}</span>` : '';
+    const detail = detailText ? `<span>${escapeHtml(detailText)}</span>` : '';
     const repoText = escapeHtml(item.repo);
     const repoUrl = buildRepoUrl(item.repo);
     const repoHtml = repoUrl

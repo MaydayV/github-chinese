@@ -9,7 +9,8 @@ const optionsJs = readFileSync(new URL('../options/options.js', import.meta.url)
 test('discussion body translation setting is exposed in storage and options UI', () => {
   assert.match(optionsJs, /enable_issue_pr_translation:\s*false/);
   assert.match(optionsHtml, /id="enable_issue_pr_translation"/);
-  assert.match(optionsHtml, /Issue \/ PR \/ Release 正文翻译/);
+  assert.match(optionsHtml, /Issue \/ PR \/ Release/);
+  assert.match(optionsHtml, /启用正文翻译/);
 });
 
 test('content script can identify and decorate Issue and PR discussions', () => {
