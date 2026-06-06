@@ -31,6 +31,8 @@
 
 ### [👉 前往 Chrome 应用商店安装 👈](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=item-share-cb)
 
+### [👉 前往 Edge 加载项商店安装 👈](https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck)
+
 </div>
 
 ## 🌟 功能特性
@@ -59,6 +61,15 @@
 1. 点击上方链接进入 Chrome 应用商店
 1. 点击 `添加至 Chrome`，并确认安装
 1. 安装后可在 `chrome://extensions/` 中确认扩展已启用（建议固定到工具栏）
+1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
+
+### Edge 加载项商店安装
+
+[**前往 Edge 加载项商店安装**](https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck)
+
+1. 点击上方链接进入 Edge 加载项商店
+1. 点击 `获取`，并确认安装
+1. 安装后可在 `edge://extensions/` 中确认扩展已启用（建议固定到工具栏）
 1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
 
 ### 开发者模式加载（Chrome / Edge）
@@ -97,6 +108,7 @@
 1. README 完整说明内容翻译能力，明确翻译接口同时用于 README、Issue、Pull Request 和 Release 正文翻译
 1. 设置页标题与提示文案改为“内容翻译设置 / 翻译接口”，避免误解为仅支持 README 或 AI 翻译
 1. 连通性测试请求文本改为中文，三端设置脚本保持一致
+
 ### v2.2.5 (2026-06-05)
 
 1. 新增 Edge 插件目录，可通过 `edge/` 在 Edge 开发者模式加载
