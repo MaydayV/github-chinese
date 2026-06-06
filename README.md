@@ -33,6 +33,8 @@
 
 ### [👉 前往 Edge 加载项商店安装 👈](https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck)
 
+### [👉 前往 Firefox 附加组件商店安装 👈](https://addons.mozilla.org/zh-CN/firefox/addon/github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6/)
+
 </div>
 
 ## 🌟 功能特性
@@ -70,6 +72,15 @@
 1. 点击上方链接进入 Edge 加载项商店
 1. 点击 `获取`，并确认安装
 1. 安装后可在 `edge://extensions/` 中确认扩展已启用（建议固定到工具栏）
+1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
+
+### Firefox 附加组件商店安装
+
+[**前往 Firefox 附加组件商店安装**](https://addons.mozilla.org/zh-CN/firefox/addon/github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6/)
+
+1. 点击上方链接进入 Firefox 附加组件商店
+1. 点击 `添加到 Firefox`，并确认安装
+1. 安装后可在 `about:addons` 中确认扩展已启用（建议固定到工具栏）
 1. 打开任意 GitHub 页面即可自动中文化；如未立即生效，请刷新页面或重启浏览器
 
 ### 开发者模式加载（Chrome / Edge）
