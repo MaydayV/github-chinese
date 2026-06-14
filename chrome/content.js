@@ -189,6 +189,7 @@
     function handleFeatureToggle(key, newFeatureState) {
         switch (key) {
             case 'enable_extension':
+                updateCompatibilityStyles();
                 if (newFeatureState) {
                     document.documentElement.lang = CONFIG.LANG;
                     refreshCurrentPageTranslations();
@@ -229,6 +230,30 @@
                 handleFeatureToggle(key, change.newValue);
             });
         });
+    }
+
+    function updateCompatibilityStyles() {
+        const existingStyle = document.getElementById('ghcn-compatibility-styles');
+        if (!FeatureSet.enable_extension) {
+            existingStyle?.remove();
+            return;
+        }
+        if (existingStyle) return;
+
+        const style = document.createElement('style');
+        style.id = 'ghcn-compatibility-styles';
+        style.textContent = `
+            button[data-component="Button"][aria-label="Search or jump to…"] [data-component="text"] {
+                font-size: 0;
+            }
+
+            button[data-component="Button"][aria-label="Search or jump to…"] [data-component="text"]::after {
+                content: "请键入 / 去搜索";
+                font-size: 0.875rem;
+                white-space: nowrap;
+            }
+        `;
+        document.documentElement.appendChild(style);
     }
 
     // 更新页面设置
@@ -2467,6 +2492,7 @@
 
         await loadFeatureSet();
         watchFeatureChanges();
+        updateCompatibilityStyles();
 
         // 设置中文环境
         if (FeatureSet.enable_extension) {

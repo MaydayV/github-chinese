@@ -107,7 +107,8 @@ I18N.conf = {
         '*': [
             'div.QueryBuilder-StyledInputContainer', // 顶部搜索栏 关键词
             '#qb-input-query span', // 搜索页面 搜索栏 关键词
-            '[class*="Search-module__"]', // 顶部新版 React 搜索组件，改写内部文本会导致弹层关闭
+            '[class*="Search-module__"]', // 顶部新版 React 搜索按钮，使用 CSS 翻译避免改写 DOM
+            '#search-suggestions-dialog', // 顶部搜索弹层，改写内部 DOM 会导致弹层关闭
 			'div.styled-input-content', // 筛选条
         ],
     },
@@ -233,7 +234,8 @@ I18N.conf = {
             '.comment-body', '.js-preview-body',
             '.markdown-title',
             'span.ActionListItem-descriptionWrap',  // 顶部搜索栏 关键词
-            '[class*="Search-module__"]', // 顶部新版 React 搜索组件
+            '[class*="Search-module__"]', // 顶部新版 React 搜索按钮
+            '#search-suggestions-dialog', // 顶部搜索弹层
             'CODE', 'SCRIPT', 'STYLE', 'LINK', 'IMG', 'MARKED-TEXT', 'PRE', 'KBD', 'SVG', 'MARK', // 特定元素标签
 			'div.styled-input-content', // 筛选条
         ],
