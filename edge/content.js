@@ -350,6 +350,39 @@
     }
 
     /**
+     * GitHub 的 SSR React 组件在 hydration 完成后才添加 loaded 类。
+     * 在此之前改写文本会造成 hydration 失败，并让组件交互失效。
+     */
+    function watchReactHydration() {
+        const handleLoadedReactRoot = element => {
+            if (
+                !FeatureSet.enable_extension
+                || !pageConfig.currentPageType
+                || !element.matches?.('react-app.loaded, react-partial.loaded')
+            ) {
+                return;
+            }
+
+            traverseNode(element);
+        };
+
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(({ target, type }) => {
+                if (type === 'attributes') handleLoadedReactRoot(target);
+            });
+        });
+
+        observer.observe(document.body, {
+            attributes: true,
+            subtree: true,
+            attributeFilter: ['class'],
+        });
+
+        // 避免组件恰好在观察器启动前完成 hydration 而漏翻译
+        document.querySelectorAll('react-app.loaded, react-partial.loaded').forEach(handleLoadedReactRoot);
+    }
+
+    /**
      * traverseNode 函数：遍历指定的节点，并对节点进行翻译。
      * @param {Node} node - 需要遍历的节点。
      */
@@ -2501,6 +2534,7 @@
 
             // 监视页面变化
             watchUpdate();
+            watchReactHydration();
             scheduleReadmeTranslation('DOMContentLoaded');
             scheduleIssuePrTranslationControls('DOMContentLoaded');
         });
