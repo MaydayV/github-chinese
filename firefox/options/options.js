@@ -412,6 +412,24 @@ async function ensureProviderHostPermission(values, options = {}) {
   }
 
   const origins = [origin.originPattern];
+  if (request) {
+    const granted = await permissionsRequest(origins);
+    if (!granted) {
+      return {
+        ok: false,
+        message: `你未授予 ${origin.hostLabel} 的访问权限，无法调用该翻译接口。`,
+      };
+    }
+
+    return {
+      ok: true,
+      config,
+      hostLabel: origin.hostLabel,
+      originPattern: origin.originPattern,
+      grantedByRequest: true,
+    };
+  }
+
   const alreadyGranted = await permissionsContains(origins);
   if (alreadyGranted) {
     return {
@@ -423,27 +441,9 @@ async function ensureProviderHostPermission(values, options = {}) {
     };
   }
 
-  if (!request) {
-    return {
-      ok: false,
-      message: `尚未授权访问 ${origin.hostLabel}。请在“翻译接口”点击“保存设置”或“测试连通性”完成授权。`,
-    };
-  }
-
-  const granted = await permissionsRequest(origins);
-  if (!granted) {
-    return {
-      ok: false,
-      message: `你未授予 ${origin.hostLabel} 的访问权限，无法调用该翻译接口。`,
-    };
-  }
-
   return {
-    ok: true,
-    config,
-    hostLabel: origin.hostLabel,
-    originPattern: origin.originPattern,
-    grantedByRequest: true,
+    ok: false,
+    message: `尚未授权访问 ${origin.hostLabel}。请在“翻译接口”点击“保存设置”或“测试连通性”完成授权。`,
   };
 }
 
