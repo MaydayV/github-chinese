@@ -113,6 +113,14 @@
 
 ## 🔄 更新日志
 
+### v2.3.3 (2026-06-23)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.3`
+1. 手动同步上游 React 全局导航、搜索弹层与 Primer Portal 弹层兼容修复，减少新版 GitHub 顶栏漏译和交互异常
+1. 同步上游导航标签、组织被标记提示及 `Pricing`、`Healthcare`、`Nonprofits` 等词条修正
+1. 修复 Firefox 第三方 API 翻译接口授权流程，点击“测试连通性”可正常触发域名授权弹窗
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.3.1 (2026-06-14)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.1`
