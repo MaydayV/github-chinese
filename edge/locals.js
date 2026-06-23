@@ -107,6 +107,9 @@ I18N.conf = {
         '*': [
             'react-app:not(.loaded)', // 等待 GitHub React 完成 hydration
             'react-partial:not(.loaded)', // 等待 GitHub React 完成 hydration
+            'header.GlobalNav', // React 版全局导航
+            'header.GlobalNav [class*="Search-module__"]', // React 版顶部搜索按钮
+            'qbsearch-input', // 顶部搜索框自定义元素
             'div.QueryBuilder-StyledInputContainer', // 顶部搜索栏 关键词
             '#qb-input-query span', // 搜索页面 搜索栏 关键词
 			'div.styled-input-content', // 筛选条
@@ -233,6 +236,10 @@ I18N.conf = {
         '*': [
             'react-app:not(.loaded)', // 等待 GitHub React 完成 hydration
             'react-partial:not(.loaded)', // 等待 GitHub React 完成 hydration
+            'header.GlobalNav', // React 版全局导航
+            'header.GlobalNav [class*="Search-module__"]', // React 版顶部搜索按钮
+            'qbsearch-input', // 顶部搜索框自定义元素
+            '#__primerPortalRoot__', // React 弹层挂载点
             '.comment-body', '.js-preview-body',
             '.markdown-title',
             'span.ActionListItem-descriptionWrap',  // 顶部搜索栏 关键词
@@ -275,7 +282,7 @@ I18N.conf = {
      * tree 视图 文件名 react-directory-filename-column 提交信息 react-directory-commit-message
      * 代码差异页面 代码 pl-s1|pl-smi|pl-token|pl-c1|pl-kos|pl-k|pl-c|pl-en
      */
-    reIgnoreClass: /(cm-line|ͼ.*|pl-s1|pl-smi|pl-token|pl-c1|pl-kos|pl-k|pl-c|pl-en|CodeMirror|blob-code|highlight-.*|repo-and-owner|js-path-segment|final-path|files js-navigation-container|js-comment-body|js-preview-body|comment-form-textarea|markdown-title|js-tree-finder-virtual-filter|js-navigation-open Link--primary|js-modifier-key|capped-list-label|blob-code blob-code-inner js-file-line|markdown-body my-3|f4 my-3|commit-author$|search-match|react-directory-filename-column|react-directory-commit-message|react-code-text|zausi)/,
+    reIgnoreClass: /(GlobalNav|Search-module|QueryBuilder|cm-line|ͼ.*|pl-s1|pl-smi|pl-token|pl-c1|pl-kos|pl-k|pl-c|pl-en|CodeMirror|blob-code|highlight-.*|repo-and-owner|js-path-segment|final-path|files js-navigation-container|js-comment-body|js-preview-body|comment-form-textarea|markdown-title|js-tree-finder-virtual-filter|js-navigation-open Link--primary|js-modifier-key|capped-list-label|blob-code blob-code-inner js-file-line|markdown-body my-3|f4 my-3|commit-author$|search-match|react-directory-filename-column|react-directory-commit-message|react-code-text|zausi)/,
 
     /**
      * 忽略区域的 itemprop 属性正则
@@ -291,16 +298,80 @@ I18N.conf = {
      * /blob页面 右侧 符号筛选 filter-results
      * fix repo详情页文件路径breadcrumb
      */
-    reIgnoreId: /(readme|^offset|breadcrumb|file-name-id|filter-results)/,
+    reIgnoreId: /(__primerPortalRoot__|search-suggestions-dialog|readme|^offset|breadcrumb|file-name-id|filter-results)/,
 
     /**
      * 忽略区域的 标签 正则
      * /i 规则不区分大小写
      */
-    reIgnoreTag: ['CODE', 'SCRIPT', 'STYLE', 'LINK', 'IMG', 'MARKED-TEXT', 'PRE', 'KBD'],
+    reIgnoreTag: ['CODE', 'SCRIPT', 'STYLE', 'LINK', 'IMG', 'MARKED-TEXT', 'PRE', 'KBD', 'QBSEARCH-INPUT'],
     // marked-text --> 文件搜索模式/<user-name>/<repo-name>/find/<branch> 文件列表条目
     // ^script$ --> 避免勿过滤 notifications-list-subscription-form
     // ^pre$ --> 避免勿过滤
+
+    reactGlobalNavLabels: {
+        "Overview": "概况",
+        "Repositories": "仓库",
+        "Code": "代码",
+        "Issues": "议题",
+        "Pull requests": "拉取请求",
+        "Discussions": "讨论",
+        "Actions": "操作",
+        "Projects": "项目",
+        "Wiki": "Wiki",
+        "Security": "安全",
+        "Security and quality": "安全和质量",
+        "Insights": "洞察",
+        "Settings": "设置",
+        "Packages": "软件包",
+        "Releases": "发行版",
+        "Stars": "星标",
+        "Agents": "智能体",
+        "Models": "模型",
+        "Set status": "状态设置",
+        "Profile": "个人资料",
+        "Gists": "代码片段",
+        "Copilot settings": "Copilot 设置",
+        "Feature preview": "功能预览",
+        "Appearance": "外观",
+        "Accessibility": "无障碍",
+        "Try Enterprise": "试用企业版",
+        "Sign out": "退出",
+        "Free": "免费",
+        "Type / to search": "输入 / 搜索",
+        "Search code, repositories, users, issues, pull requests...": "搜索代码、仓库、用户、议题、拉取请求...",
+        "Search": "搜索",
+        "Clear": "清除",
+        "Search syntax tips": "搜索语法提示",
+        "Give feedback": "反馈",
+        "Saved searches": "保存搜索",
+        "Use saved searches to filter your results more quickly": "使用保存的搜索快速筛选结果",
+        "Create saved search": "创建保存的搜索",
+        "Provide feedback": "提供反馈",
+        "Submit feedback": "提交反馈",
+        "Cancel": "取消",
+        "Name": "名称",
+        "Query": "查询",
+        "0 suggestions.": "0 条建议。",
+        "To see all available qualifiers, see our documentation.": "要查看全部可用限定符，请参阅文档。",
+        "People": "成员",
+        "Teams": "团队",
+        "Sponsoring": "赞助",
+        "Followers": "关注者",
+        "Following": "正在关注",
+        "Activity": "活动",
+        "Branches": "分支",
+        "Tags": "标签",
+        "Codespaces": "代码空间",
+        "Dashboard": "仪表板",
+        "Explore": "探索",
+        "Marketplace": "市场",
+        "Sponsors": "赞助者",
+        "Organizations": "组织",
+        "Enterprises": "企业版",
+        "Billing": "账单",
+        "Copilot": "GitHub Copilot",
+    },
 };
 
 I18N["zh-CN"] = {};
@@ -619,27 +690,27 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                     "Changelog": "更新日志",
                     "GitHub Marketplace": "GitHub 市场",
 
-                "View all features": "查看所有功能",
+                "View all features": "查看全部功能",
 
             "Solutions": "解决方案",
                 "BY COMPANY SIZE": "企业规模",
                     "Enterprises": "企业",
                     "Small and medium teams": "中小团队",
                     "Startups": "初创公司",
-                    "Nonprofits": "非盈利组织",
+                    "Nonprofits": "非营利组织",
                 "BY USE CASE": "使用案例",
                     "App Modernization": "应用现代化",
                     "DevSecOps": "开发安全运维",
                     "DevOps": "开发运维",
                     "CI/CD": "持续集成/持续部署",
-                    "View all use cases": "查看所有使用案例",
-                "BY INDUSTRY": "工业",
-                    "Healthcare": "健康护理",
+                    "View all use cases": "查看全部使用案例",
+                "BY INDUSTRY": "行业",
+                    "Healthcare": "医疗健康",
                     "Financial services": "金融服务",
                     "Manufacturing": "制造业",
                     "Government": "政府",
-                    "View all industries": "查看所有工业",
-                "View all solutions": "查看所有解决方案",
+                    "View all industries": "查看所有行业",
+                "View all solutions": "查看全部解决方案",
 
             "Resources": "资源",
                 "EXPLORE BY TOPIC": "按主题探索",
@@ -657,6 +728,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                     "Customer support": "客户支持",
                     "Community forum": "社区论坛",
                     "Trust center": "信任中心",
+                "View all resources": "查看全部资源",
 
             "Open Source": "开源",
                 "COMMUNITY": "社区",
@@ -683,7 +755,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                         "Enterprise-grade AI features": "企业级 AI 功能",
                     "Premium Support": "高级支持",
                         "Enterprise-grade 24/7 support": "企业级 24 小时全天候支持",
-            "Pricing": "价格",
+            "Pricing": "定价",
             "Search": "搜索",
             "Sign in": "登录",
             "Sign up": "注册",
@@ -712,7 +784,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             // 未登录时
                 "Enterprise": "企业",
                 "Security": "安全",
-                "Pricing": "价格",
+                "Pricing": "定价",
 
         // 左上角下拉栏 (已登录)
             "Open menu": "打开菜单",
@@ -1990,11 +2062,15 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
 
 I18N["zh-CN"]["orgs-public"] = { // 组织公共部分
     "static": { // 静态翻译
+        "Because of that, your organization is hidden from the public. If you believe this is a mistake,": "因此，您的组织已对公众隐藏。如果您认为这是一个错误，",
+        "contact support": "联系支持人员",
+        "to have your organization’s status reviewed.": "以便审核您组织的状态。",
     },
     "regexp": [ // 正则翻译
         [/Invite someone to/, "邀请加入到组织"],
         [/New team in/, "新建团队在组织"],
         [/New repository in/, "新建仓库在组织"],
+        [/The (.+) organization has been flagged\./, "$1 组织已被标记。"],
         [/This organization was marked as archived by an administrator on (.+). It is no longer maintained./, (match, p1) => {
             const dateRegExp = I18N["zh-CN"]["public"]["time-regexp"];
             const translatedDate = dateRegExp.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), p1);

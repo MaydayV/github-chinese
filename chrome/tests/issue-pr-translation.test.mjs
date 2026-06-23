@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const content = readFileSync(new URL('../content.js', import.meta.url), 'utf8');
+const locals = readFileSync(new URL('../locals.js', import.meta.url), 'utf8');
 const optionsHtml = readFileSync(new URL('../options/options.html', import.meta.url), 'utf8');
 const optionsJs = readFileSync(new URL('../options/options.js', import.meta.url), 'utf8');
 
@@ -91,4 +92,29 @@ test('Issue and PR translation covers React comments and legacy PR timeline comm
   assert.match(content, /ActionsButtonsContainer/);
   assert.match(content, /comment-header-right-side-items/);
   assert.match(content, /\.timeline-comment-actions/);
+});
+
+test('global navigation translation handles React portals without breaking hydration guards', () => {
+  assert.match(content, /function setupReactGlobalNavTranslation\(/);
+  assert.match(content, /function isReactGlobalNavPortalNode\(/);
+  assert.match(content, /setupReactGlobalNavTranslation\(\)/);
+  assert.match(content, /#__primerPortalRoot__ \[role="dialog"\]/);
+  assert.match(content, /isReactGlobalNavPortalNode\(element\)/);
+  assert.match(content, /scheduleReactGlobalNavRefresh/);
+  assert.match(locals, /'react-app:not\(\.loaded\)'/);
+  assert.match(locals, /'react-partial:not\(\.loaded\)'/);
+  assert.match(locals, /'header\.GlobalNav'/);
+  assert.match(locals, /'#__primerPortalRoot__'/);
+  assert.match(locals, /'qbsearch-input'/);
+});
+
+test('latest upstream navigation labels and flagged organization terms are present', () => {
+  assert.match(locals, /reactGlobalNavLabels/);
+  assert.match(locals, /"To see all available qualifiers, see our documentation\.": "要查看全部可用限定符，请参阅文档。"/);
+  assert.match(locals, /"Nonprofits": "非营利组织"/);
+  assert.match(locals, /"Healthcare": "医疗健康"/);
+  assert.match(locals, /"Pricing": "定价"/);
+  assert.match(locals, /"View all resources": "查看全部资源"/);
+  assert.match(locals, /"Because of that, your organization is hidden from the public/);
+  assert.match(locals, /The \(\.\+\) organization has been flagged/);
 });
