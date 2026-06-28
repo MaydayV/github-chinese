@@ -99,6 +99,9 @@ test('global navigation translation handles React portals without breaking hydra
   assert.match(content, /function isReactGlobalNavPortalNode\(/);
   assert.match(content, /setupReactGlobalNavTranslation\(\)/);
   assert.match(content, /#__primerPortalRoot__ \[role="dialog"\]/);
+  assert.match(content, /#search-suggestions-dialog/);
+  assert.match(content, /\[aria-label="Quick search"\]/);
+  assert.match(content, /\[aria-label="Search suggestions"\]/);
   assert.match(content, /isReactGlobalNavPortalNode\(element\)/);
   assert.match(content, /scheduleReactGlobalNavRefresh/);
   assert.match(locals, /'react-app:not\(\.loaded\)'/);
