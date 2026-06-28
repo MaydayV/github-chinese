@@ -1344,9 +1344,15 @@
         }
     }
 
+    function replaceElementChildrenFromHtml(element, html) {
+        const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+        const nodes = Array.from(parsed.body.childNodes, node => document.importNode(node, true));
+        element.replaceChildren(...nodes);
+    }
+
     function applyReadmeHtml(readmeEl, html) {
         return withReadmeDomMutationGuard(() => {
-            readmeEl.innerHTML = html;
+            replaceElementChildrenFromHtml(readmeEl, html);
         });
     }
 
@@ -1511,7 +1517,7 @@
         }
 
         if (readmeEl.innerHTML !== state.originalHtml) {
-            readmeEl.innerHTML = state.originalHtml;
+            applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
         const tasks = collectReadmeTextTasks(readmeEl);
@@ -2097,7 +2103,7 @@
 
         if (cacheHit?.translatedHtml) {
             const translatedEl = createTranslatedClone(markdownEl);
-            translatedEl.innerHTML = cacheHit.translatedHtml;
+            replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
             state.translatedEl?.remove();
             state.translatedEl = translatedEl;
             markdownEl.insertAdjacentElement('afterend', translatedEl);
@@ -2822,9 +2828,9 @@
     }
 
     function decodeHtmlEntities(text) {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = text;
-        return textarea.value;
+        const safeText = String(text || '').replace(/<\/textarea/gi, '&lt;/textarea');
+        const parsed = new DOMParser().parseFromString(`<!doctype html><textarea>${safeText}</textarea>`, 'text/html');
+        return parsed.querySelector('textarea')?.value || '';
     }
 
     function truncateText(text, maxLength) {

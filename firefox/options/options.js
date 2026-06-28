@@ -835,6 +835,58 @@ function setRecordsPage(page) {
   renderRecords();
 }
 
+function createRecordSpan(text, className = '') {
+  const span = document.createElement('span');
+  if (className) span.className = className;
+  span.textContent = text;
+  return span;
+}
+
+function createRecordListItem(item) {
+  const meta = getStatusMeta(item.status);
+  const sourceMeta = getRecordSourceMeta(item.sourceType);
+  const detailText = formatRecordDetail(item.detail);
+  const repoUrl = buildRepoUrl(item.repo);
+
+  const itemEl = document.createElement('li');
+  itemEl.className = 'history-item';
+
+  const topEl = document.createElement('div');
+  topEl.className = 'history-top';
+
+  if (repoUrl) {
+    const linkEl = document.createElement('a');
+    linkEl.className = 'history-repo-link';
+    linkEl.href = repoUrl;
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener noreferrer';
+    linkEl.textContent = item.repo || '';
+    topEl.append(linkEl);
+  } else {
+    topEl.append(createRecordSpan(item.repo || '', 'history-repo'));
+  }
+
+  const badgesEl = document.createElement('span');
+  badgesEl.className = 'history-badges';
+  badgesEl.append(
+    createRecordSpan(sourceMeta.label, `history-source ${sourceMeta.className}`.trim()),
+    createRecordSpan(meta.label, `history-status ${meta.className}`.trim())
+  );
+  topEl.append(badgesEl);
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'history-meta';
+  metaEl.append(
+    createRecordSpan(`Tokens：${formatNumber(item.tokens)}`),
+    createRecordSpan(`时间：${formatTime(item.createdAt)}`),
+    createRecordSpan(`服务：${item.provider || '-'}`)
+  );
+  if (detailText) metaEl.append(createRecordSpan(detailText));
+
+  itemEl.append(topEl, metaEl);
+  return itemEl;
+}
+
 function renderRecords() {
   const listEl = byId('recordsList');
   const summaryEl = byId('recordsSummary');
@@ -857,7 +909,10 @@ function renderRecords() {
   if (clearRepoCacheEl) clearRepoCacheEl.disabled = cacheEntries.length === 0;
 
   if (!allRecords.length) {
-    listEl.innerHTML = '<li class="history-empty">暂无翻译记录，开启“记录翻译消耗”后会自动累积。</li>';
+    const emptyEl = document.createElement('li');
+    emptyEl.className = 'history-empty';
+    emptyEl.textContent = '暂无翻译记录，开启“记录翻译消耗”后会自动累积。';
+    listEl.replaceChildren(emptyEl);
     summaryEl.textContent = `暂无记录。当前缓存条目：${cacheEntries.length}`;
     pagerEl.hidden = true;
     pageInfoEl.textContent = '';
@@ -873,36 +928,7 @@ function renderRecords() {
   const end = start + RECORDS_STATE.pageSize;
   const pagedRecords = allRecords.slice(start, end);
 
-  listEl.innerHTML = pagedRecords.map((item) => {
-    const meta = getStatusMeta(item.status);
-    const sourceMeta = getRecordSourceMeta(item.sourceType);
-    const providerText = item.provider ? escapeHtml(item.provider) : '-';
-    const detailText = formatRecordDetail(item.detail);
-    const detail = detailText ? `<span>${escapeHtml(detailText)}</span>` : '';
-    const repoText = escapeHtml(item.repo);
-    const repoUrl = buildRepoUrl(item.repo);
-    const repoHtml = repoUrl
-      ? `<a class="history-repo-link" href="${repoUrl}" target="_blank" rel="noopener noreferrer">${repoText}</a>`
-      : `<span class="history-repo">${repoText}</span>`;
-
-    return `
-      <li class="history-item">
-        <div class="history-top">
-          ${repoHtml}
-          <span class="history-badges">
-            <span class="history-source ${sourceMeta.className}">${sourceMeta.label}</span>
-            <span class="history-status ${meta.className}">${meta.label}</span>
-          </span>
-        </div>
-        <div class="history-meta">
-          <span>Tokens：${formatNumber(item.tokens)}</span>
-          <span>时间：${formatTime(item.createdAt)}</span>
-          <span>服务：${providerText}</span>
-          ${detail}
-        </div>
-      </li>
-    `;
-  }).join('');
+  listEl.replaceChildren(...pagedRecords.map(createRecordListItem));
 
   pagerEl.hidden = totalPages <= 1;
   pageInfoEl.textContent = `${currentPage} / ${totalPages}`;
