@@ -442,8 +442,6 @@
             const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
             if (!element) return true;
             if (element.closest?.(unsafeTextSelector)) return true;
-            if (element.closest?.(searchModuleSelector)) return true;
-            if (element.closest?.(searchSurfaceSelector)) return true;
 
             return false;
         }

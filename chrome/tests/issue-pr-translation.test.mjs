@@ -106,6 +106,8 @@ test('global navigation translation handles React portals without breaking hydra
   assert.match(locals, /'header\.GlobalNav'/);
   assert.match(locals, /'#__primerPortalRoot__'/);
   assert.match(locals, /'qbsearch-input'/);
+  assert.doesNotMatch(content, /closest\?\.\(searchModuleSelector\)/);
+  assert.doesNotMatch(content, /closest\?\.\(searchSurfaceSelector\)/);
 });
 
 test('latest upstream navigation labels and flagged organization terms are present', () => {
@@ -117,4 +119,14 @@ test('latest upstream navigation labels and flagged organization terms are prese
   assert.match(locals, /"View all resources": "查看全部资源"/);
   assert.match(locals, /"Because of that, your organization is hidden from the public/);
   assert.match(locals, /The \(\.\+\) organization has been flagged/);
+});
+
+test('new quick search dialog labels are translated', () => {
+  assert.match(locals, /"Open quick search dialog, type \/ to search": "打开快速搜索对话框，键入 \/ 搜索"/);
+  assert.match(locals, /"Quick search": "快速搜索"/);
+  assert.match(locals, /"Search suggestions": "搜索建议"/);
+  assert.match(locals, /"Breadcrumbs": "面包屑导航"/);
+  assert.match(locals, /"Chat with Copilot": "与 Copilot 聊天"/);
+  assert.match(locals, /"Open Copilot chat": "打开 Copilot 聊天"/);
+  assert.match(locals, /Jump to \(\.\+\), repository/);
 });
