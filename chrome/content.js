@@ -558,6 +558,20 @@
             timer = window.setTimeout(() => translateReactGlobalNavLabels(options), delay);
         }
 
+        function translateReactGlobalNavPortalsSoon() {
+            if (!FeatureSet.enable_extension) return;
+
+            const translatePortals = () => {
+                observeReactGlobalNav();
+                translateReactGlobalNavPortals();
+            };
+
+            window.requestAnimationFrame(translatePortals);
+            [80, 200].forEach(delay => {
+                window.setTimeout(translatePortals, delay);
+            });
+        }
+
         function scheduleReactGlobalNavSeries() {
             [800, 1600, 3000].forEach(delay => {
                 window.setTimeout(translateReactGlobalNavLabels, delay);
@@ -616,10 +630,12 @@
 
         window.addEventListener('turbo:load', scheduleReactGlobalNavSeries);
         window.addEventListener('urlchange', scheduleReactGlobalNavSeries);
-        document.addEventListener('click', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('focusin', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('focusout', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('pointerover', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
+        ['click', 'focusin', 'focusout', 'pointerover'].forEach(eventName => {
+            document.addEventListener(eventName, () => {
+                translateReactGlobalNavPortalsSoon();
+                scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
+            }, true);
+        });
     }
 
     /**

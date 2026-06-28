@@ -104,6 +104,8 @@ test('global navigation translation handles React portals without breaking hydra
   assert.match(content, /\[aria-label="Search suggestions"\]/);
   assert.match(content, /isReactGlobalNavPortalNode\(element\)/);
   assert.match(content, /scheduleReactGlobalNavRefresh/);
+  assert.match(content, /function translateReactGlobalNavPortalsSoon\(/);
+  assert.match(content, /requestAnimationFrame\(translatePortals\)/);
   assert.match(locals, /'react-app:not\(\.loaded\)'/);
   assert.match(locals, /'react-partial:not\(\.loaded\)'/);
   assert.match(locals, /'header\.GlobalNav'/);
