@@ -339,6 +339,16 @@ I18N.conf = {
         "Sign out": "退出",
         "Free": "免费",
         "Type / to search": "输入 / 搜索",
+        "Type": "键入",
+        "to search": "搜索",
+        "Open quick search dialog, type / to search": "打开快速搜索对话框，键入 / 搜索",
+        "Quick search": "快速搜索",
+        "Search or jump to...": "搜索或跳转到…",
+        "Search suggestions": "搜索建议",
+        "Recent": "最近",
+        "Jump to": "跳转到",
+        "Suggestions": "建议",
+        "Breadcrumbs": "面包屑导航",
         "Search code, repositories, users, issues, pull requests...": "搜索代码、仓库、用户、议题、拉取请求...",
         "Search": "搜索",
         "Clear": "清除",
@@ -368,6 +378,9 @@ I18N.conf = {
         "Marketplace": "市场",
         "Sponsors": "赞助者",
         "Organizations": "组织",
+        "Open Copilot chat": "打开 Copilot 聊天",
+        "Chat with Copilot": "与 Copilot 聊天",
+        "Start a new Copilot thread": "启动新的 Copilot 对话",
         "Enterprises": "企业版",
         "Billing": "账单",
         "Copilot": "GitHub Copilot",
@@ -1771,6 +1784,9 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
 
     },
     "regexp": [ // 正则翻译
+        // React 新版搜索弹层
+        [/Jump to (.+), repository/, "跳转到 $1 仓库"],
+
         // Copilot 窗口
         [/Chatting about ([^ ]+)/, "关于 $1 的对话"],
         [/Chatting with (\d+) attachments?/, "附加 $1 个附件"],

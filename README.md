@@ -113,6 +113,14 @@
 
 ## 🔄 更新日志
 
+### v2.3.4 (2026-06-28)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.4`
+1. 修复 GitHub 新版快速搜索弹窗展开后 `Recent`、`Repositories`、`Suggestions`、`Jump to` 等内容漏译
+1. 优化左上角菜单与右上角头像菜单的 React Portal 弹窗翻译速度，减少展开后的英文闪现
+1. 补充快速搜索、搜索建议与 Copilot 入口相关词条
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.3.3 (2026-06-23)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.3`

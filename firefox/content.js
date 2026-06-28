@@ -291,6 +291,11 @@
 
     function isReactGlobalNavPortalNode(node) {
         const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+        if (element?.matches?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')
+            || element?.querySelector?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')) {
+            return true;
+        }
+
         const portalRoot = element?.closest?.('#__primerPortalRoot__');
         if (!portalRoot) return false;
 
@@ -336,7 +341,7 @@
         const hasControlledSurface = portal.matches?.('[role="menu"], [role="dialog"], [role="tooltip"]')
             || portal.querySelector?.('[role="menu"], [role="dialog"], [role="tooltip"]');
         return !!hasControlledSurface
-            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input');
+            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input, #__primerPortalRoot__, [role="dialog"]');
     }
 
     function setupReactGlobalNavTranslation() {
@@ -344,7 +349,14 @@
 
         const labels = I18N.conf.reactGlobalNavLabels || {};
         const dataContentLabelSelector = 'header.GlobalNav [data-component="text"][data-content]';
-        const portalSurfaceSelector = '#__primerPortalRoot__ [role="menu"], #__primerPortalRoot__ [role="dialog"], #__primerPortalRoot__ [role="tooltip"]';
+        const portalSurfaceSelector = [
+            '#__primerPortalRoot__ [role="menu"]',
+            '#__primerPortalRoot__ [role="dialog"]',
+            '#__primerPortalRoot__ [role="tooltip"]',
+            '#search-suggestions-dialog',
+            '[aria-label="Quick search"]',
+            '[aria-label="Search suggestions"]',
+        ].join(', ');
         const searchSurfaceSelector = 'qbsearch-input';
         const searchModuleSelector = 'header.GlobalNav [class*="Search-module__"]';
         const unsafeTextSelector = [
@@ -442,8 +454,6 @@
             const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
             if (!element) return true;
             if (element.closest?.(unsafeTextSelector)) return true;
-            if (element.closest?.(searchModuleSelector)) return true;
-            if (element.closest?.(searchSurfaceSelector)) return true;
 
             return false;
         }
@@ -548,6 +558,20 @@
             timer = window.setTimeout(() => translateReactGlobalNavLabels(options), delay);
         }
 
+        function translateReactGlobalNavPortalsSoon() {
+            if (!FeatureSet.enable_extension) return;
+
+            const translatePortals = () => {
+                observeReactGlobalNav();
+                translateReactGlobalNavPortals();
+            };
+
+            window.requestAnimationFrame(translatePortals);
+            [80, 200].forEach(delay => {
+                window.setTimeout(translatePortals, delay);
+            });
+        }
+
         function scheduleReactGlobalNavSeries() {
             [800, 1600, 3000].forEach(delay => {
                 window.setTimeout(translateReactGlobalNavLabels, delay);
@@ -577,6 +601,9 @@
             [
                 document.querySelector('header.GlobalNav'),
                 document.querySelector('#__primerPortalRoot__'),
+                document.querySelector('#search-suggestions-dialog'),
+                document.querySelector('[aria-label="Quick search"]'),
+                document.querySelector('[aria-label="Search suggestions"]'),
             ].forEach(surface => {
                 if (!surface || observedSurfaces.has(surface)) return;
 
@@ -603,10 +630,12 @@
 
         window.addEventListener('turbo:load', scheduleReactGlobalNavSeries);
         window.addEventListener('urlchange', scheduleReactGlobalNavSeries);
-        document.addEventListener('click', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('focusin', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('focusout', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
-        document.addEventListener('pointerover', () => scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true }), true);
+        ['click', 'focusin', 'focusout', 'pointerover'].forEach(eventName => {
+            document.addEventListener(eventName, () => {
+                translateReactGlobalNavPortalsSoon();
+                scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
+            }, true);
+        });
     }
 
     /**
