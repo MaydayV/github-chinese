@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub 中文汉化翻译插件 - Chrome、Edge、Firefox 的 GitHub 中文化扩展</title>
+  <meta name="description" content="GitHub 中文汉化翻译插件由 MaydayV 开发，使用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
+  <meta name="keywords" content="GitHub 中文,GitHub 汉化,GitHub 翻译,GitHub 中文化插件,GitHub Chinese,Chrome 扩展,Edge 扩展,Firefox 附加组件,README 翻译,Issue 翻译,Pull Request 翻译">
+  <meta name="author" content="MaydayV">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://maydayv.github.io/github-chinese/">
+  <link rel="icon" type="image/png" sizes="48x48" href="chrome/assets/icons/icon48.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="chrome/assets/icons/icon128.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://maydayv.github.io/github-chinese/">
+  <meta property="og:title" content="GitHub 中文汉化翻译插件 - MaydayV">
+  <meta property="og:description" content="本地词库汉化 GitHub 界面，按需翻译 README、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
+  <meta property="og:image" content="https://maydayv.github.io/github-chinese/chrome/assets/icons/icon512.png">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="GitHub 中文汉化翻译插件">
+  <meta name="twitter:description" content="由 MaydayV 开发的 GitHub 中文化浏览器扩展。本地汉化界面，按需翻译正文内容。">
+  <meta name="twitter:image" content="https://maydayv.github.io/github-chinese/chrome/assets/icons/icon512.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "GitHub 中文汉化翻译插件",
+    "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
+    "applicationCategory": "BrowserApplication",
+    "operatingSystem": "Chrome, Edge, Firefox",
+    "softwareVersion": "2.3.4",
+    "url": "https://maydayv.github.io/github-chinese/",
+    "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
+    "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+    "author": {
+      "@type": "Person",
+      "name": "MaydayV",
+      "url": "https://github.com/MaydayV"
+    },
+    "creator": {
+      "@type": "Person",
+      "name": "MaydayV",
+      "url": "https://github.com/MaydayV"
+    },
+    "codeRepository": "https://github.com/MaydayV/github-chinese",
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "featureList": [
+      "GitHub 界面本地汉化",
+      "README 正文翻译",
+      "Issue 正文和评论翻译",
+      "Pull Request 正文和评论翻译",
+      "Release 正文翻译",
+      "Chrome、Edge、Firefox 三端支持",
+      "本地保存配置和缓存"
+    ],
+    "description": "由 MaydayV 开发的浏览器扩展，使用本地词库将 GitHub 界面文本汉化为简体中文，并按需支持 README、Issue、Pull Request 和 Release 正文翻译。"
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "GitHub 中文汉化翻译插件",
+    "url": "https://maydayv.github.io/github-chinese/",
+    "inLanguage": "zh-CN",
+    "publisher": {
+      "@type": "Person",
+      "name": "MaydayV",
+      "url": "https://github.com/MaydayV"
+    },
+    "about": {
+      "@type": "SoftwareApplication",
+      "name": "GitHub 中文汉化翻译插件"
+    }
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件是什么？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "GitHub 中文汉化翻译插件是由 MaydayV 开发的浏览器扩展，用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、Issue、Pull Request 和 Release 正文。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "这个插件支持哪些浏览器？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件支持 Chrome、Microsoft Edge 和 Firefox，分别提供 Chrome 应用商店、Edge 加载项商店和 Firefox 附加组件安装入口。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件会上传用户数据吗？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "界面汉化默认在浏览器本地完成，不需要上传数据。只有用户主动触发 README、Issue、Pull Request 或 Release 正文翻译时，待翻译内容才会发送到用户配置的翻译服务。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件和浏览器自带翻译有什么区别？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件使用 GitHub 专用词库替换界面文本，尽量保持 GitHub 原有交互和代码结构；浏览器自带翻译是通用整页翻译，可能影响动态页面、代码块和界面状态。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件是谁开发的？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "GitHub 中文汉化翻译插件由开发者 MaydayV 开发维护，项目源码托管在 GitHub 仓库 MaydayV/github-chinese。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件是否免费？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件本身免费开源。界面汉化不需要付费服务；正文翻译功能是否产生费用，取决于用户自行配置的翻译 API 服务商。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件支持哪些 GitHub 内容翻译？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件支持 README、Issue、Pull Request 和 Release 正文翻译，可用于阅读英文项目文档、问题讨论、代码评审说明和版本发布说明。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件是否会自动翻译整页？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "界面文本会通过本地词库自动汉化；README、Issue、Pull Request 和 Release 正文翻译需要用户主动触发，不会默认自动翻译整页正文。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件支持哪些翻译接口？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件支持 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT、OpenAI 官方接口以及 OpenAI 兼容接口等翻译服务配置。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件适合谁使用？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者和需要阅读英文仓库文档的中文用户。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件会影响代码显示吗？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "插件的界面汉化主要处理 GitHub 菜单、按钮、标题、提示语等界面文本；正文翻译会尽量保留 Markdown、代码块、链接和图片路径结构。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件如何安装？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "用户可以通过 Chrome 应用商店、Microsoft Edge 加载项商店或 Firefox 附加组件页面安装。安装后打开 GitHub 页面即可使用。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "GitHub 中文汉化翻译插件是否是 GitHub 官方产品？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "不是。GitHub 中文汉化翻译插件是社区开源项目，并非 GitHub 官方产品。"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "如何安装 GitHub 中文汉化翻译插件",
+    "description": "通过浏览器扩展商店安装 GitHub 中文汉化翻译插件，打开 GitHub 页面后自动进行中文界面汉化。",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "name": "选择浏览器",
+        "text": "根据当前浏览器选择 Chrome 应用商店、Edge 加载项商店或 Firefox 附加组件。"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "安装扩展",
+        "text": "在对应商店页面点击添加或获取，确认安装浏览器扩展。"
+      },
+      {
+        "@type": "HowToStep",
+        "name": "打开 GitHub",
+        "text": "访问 github.com，插件会使用本地词库自动汉化 GitHub 界面。"
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef3f1;
+      --card: #fdfefe;
+      --text: #172033;
+      --muted: #4f6078;
+      --line: #c7d6ea;
+      --line-soft: #e2ebf8;
+      --primary: #2f6dff;
+      --primary-dark: #1e4fd2;
+      --test: #0c9d86;
+      --test-dark: #0a7f6d;
+      --success: #0b7e66;
+      --danger: #b42332;
+      --shadow: 0 14px 38px rgba(25, 47, 97, 0.08);
+      --max: 1120px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      font: 14px/1.55 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "SF Pro Display", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(125% 110% at 0% 0%, #dce9ff 0%, transparent 60%),
+        radial-gradient(120% 110% at 100% 0%, #d9fff0 0%, transparent 54%),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    .container {
+      width: min(var(--max), calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(238, 243, 241, 0.74);
+      border-bottom: 1px solid rgba(199, 214, 234, 0.64);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      height: 64px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 22px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      justify-self: start;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .brand img {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+    }
+
+    .brand span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: 0;
+      padding: 5px;
+      list-style: none;
+      border: 1px solid rgba(199, 214, 234, 0.88);
+      border-radius: 999px;
+      background: rgba(253, 254, 254, 0.72);
+      box-shadow: 0 8px 24px rgba(25, 47, 97, 0.06);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      justify-self: center;
+    }
+
+    .nav-links a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      border-radius: 999px;
+      padding: 6px 12px;
+      transition: color 0.16s ease, background 0.16s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: #eef4ff;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.35;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+    }
+
+    .nav > .btn {
+      justify-self: end;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      box-shadow: 0 9px 24px rgba(34, 84, 202, 0.3);
+    }
+
+    .btn-test {
+      color: #fff;
+      background: linear-gradient(135deg, var(--test), var(--test-dark));
+      box-shadow: 0 8px 18px rgba(12, 157, 134, 0.22);
+    }
+
+    .btn-ghost {
+      color: #2f405a;
+      background: #dbe6f5;
+    }
+
+    .hero {
+      padding: 86px 0 74px;
+      text-align: center;
+    }
+
+    .hero-icon {
+      width: 86px;
+      height: 86px;
+      margin: 0 auto 24px;
+      border-radius: 22px;
+      box-shadow: 0 18px 45px rgba(25, 47, 97, 0.14);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 700;
+      color: #506482;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 880px;
+      margin: 0 auto;
+      font-size: clamp(44px, 7vw, 78px);
+      line-height: 1.06;
+      letter-spacing: -0.03em;
+      font-weight: 800;
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      margin: 18px auto 0;
+      color: var(--muted);
+      font-size: clamp(18px, 2.2vw, 23px);
+      line-height: 1.6;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .hero-note {
+      margin: 16px 0 0;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .developer-line {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 18px;
+      color: #506482;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .developer-line a {
+      color: #2455cc;
+    }
+
+    .developer-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: #9fb2cc;
+    }
+
+    .product-stage {
+      padding-bottom: 72px;
+    }
+
+    .product-shell {
+      max-width: 980px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(253, 254, 254, 0.9);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .window-bar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, #f9fcff, #f4f8ff);
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: #d2deee;
+    }
+
+    .product-view {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 0;
+      min-height: 390px;
+    }
+
+    .github-preview {
+      padding: 28px;
+      border-right: 1px solid var(--line-soft);
+      background: #ffffff;
+    }
+
+    .preview-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .repo-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #23385f;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      border: 1px solid #bfd2ee;
+      border-radius: 999px;
+      padding: 3px 10px;
+      color: #2f4d7a;
+      background: #edf4ff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .readme-card {
+      border: 1px solid #d8e3f4;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .readme-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #d8e3f4;
+      background: #f7fbff;
+      color: #22334d;
+      font-weight: 800;
+    }
+
+    .readme-body {
+      padding: 20px 18px 22px;
+    }
+
+    .readme-title {
+      margin-bottom: 10px;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .readme-lines {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .line {
+      height: 10px;
+      border-radius: 999px;
+      background: #dbe6f5;
+    }
+
+    .line:nth-child(2) {
+      width: 86%;
+    }
+
+    .line:nth-child(3) {
+      width: 66%;
+    }
+
+    .settings-preview {
+      padding: 28px;
+      background:
+        radial-gradient(120% 100% at 100% 0%, #e3fff4 0%, transparent 54%),
+        #f8fbff;
+    }
+
+    .settings-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: 0 12px 28px rgba(25, 47, 97, 0.08);
+      padding: 18px 20px;
+    }
+
+    .settings-card + .settings-card {
+      margin-top: 14px;
+    }
+
+    .settings-card h3 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 13px;
+      background: linear-gradient(180deg, #f9fcff, #f5f9ff);
+    }
+
+    .switch-copy {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .switch-copy strong {
+      font-size: 15px;
+    }
+
+    .switch-copy small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .ios-switch {
+      width: 54px;
+      height: 32px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #45da8b, #22b86b);
+      border: 1px solid #1fa761;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .ios-switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 25px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(20, 29, 52, 0.25);
+    }
+
+    .field-preview {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field-preview span {
+      font-weight: 700;
+      color: #22334d;
+    }
+
+    .select-preview {
+      min-height: 42px;
+      border: 1px solid #b4c6e5;
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: #38537f;
+      background: #fdfefe;
+      font-size: 15px;
+    }
+
+    section {
+      padding: 74px 0;
+    }
+
+    .section-head {
+      max-width: 760px;
+      margin: 0 auto 34px;
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: clamp(32px, 4.8vw, 54px);
+      line-height: 1.12;
+      letter-spacing: -0.025em;
+    }
+
+    .section-head p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      min-height: 206px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .card-label {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid #bfd2ee;
+      border-radius: 999px;
+      padding: 3px 10px;
+      color: #2f4d7a;
+      background: #edf4ff;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      margin-bottom: 10px;
+      font-size: 21px;
+      line-height: 1.3;
+    }
+
+    .card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .install-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      text-align: center;
+    }
+
+    .browser-logo {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 14px;
+      filter: drop-shadow(0 10px 18px rgba(25, 47, 97, 0.12));
+    }
+
+    .install-card h3 {
+      margin-bottom: 8px;
+      font-size: 22px;
+    }
+
+    .install-card p {
+      min-height: 48px;
+      margin-bottom: 18px;
+      color: var(--muted);
+    }
+
+    .privacy-panel {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(253, 254, 254, 0.9);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .privacy-focus {
+      border-radius: 14px;
+      padding: 26px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--test), var(--test-dark));
+    }
+
+    .privacy-focus h3 {
+      margin-bottom: 12px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    .privacy-focus p {
+      margin-bottom: 0;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 16px;
+    }
+
+    .privacy-list {
+      display: grid;
+      align-content: center;
+      gap: 10px;
+      margin: 0;
+      padding: 8px 10px;
+      list-style: none;
+    }
+
+    .privacy-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .seo-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      color: var(--success);
+      background: #e9faf4;
+      border: 1px solid #9ed8c8;
+      flex: 0 0 auto;
+      font-weight: 800;
+    }
+
+    .final {
+      padding-bottom: 88px;
+      text-align: center;
+    }
+
+    .final-box {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(253, 254, 254, 0.9);
+      box-shadow: var(--shadow);
+      padding: 48px 24px;
+    }
+
+    .final-box h2 {
+      margin-bottom: 12px;
+    }
+
+    .final-box p {
+      margin: 0 auto 24px;
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    footer {
+      border-top: 1px solid rgba(199, 214, 234, 0.72);
+      padding: 28px 0;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-weight: 600;
+    }
+
+    .footer-links a:hover {
+      color: var(--text);
+    }
+
+    @media (max-width: 900px) {
+      .nav-links {
+        display: none;
+      }
+
+      .product-view,
+      .privacy-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .github-preview {
+        border-right: 0;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .card-grid,
+      .install-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .install-card p {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        width: min(var(--max), calc(100% - 28px));
+      }
+
+      .brand span {
+        max-width: 190px;
+      }
+
+      .nav .btn {
+        display: none;
+      }
+
+      .hero {
+        padding: 58px 0 48px;
+      }
+
+      .hero-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+      }
+
+      h1 {
+        font-size: 42px;
+      }
+
+      .hero-copy,
+      .section-head p,
+      .final-box p {
+        font-size: 16px;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .product-shell {
+        border-radius: 18px;
+      }
+
+      .github-preview,
+      .settings-preview {
+        padding: 18px;
+      }
+
+      section {
+        padding: 56px 0;
+      }
+
+      .card,
+      .install-card {
+        padding: 18px;
+      }
+
+      .footer-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="container nav" aria-label="主导航">
+      <a class="brand" href="#top" aria-label="GitHub 中文汉化翻译插件首页">
+        <img src="chrome/assets/icons/icon48.png" width="30" height="30" alt="">
+        <span>GitHub 中文汉化翻译插件</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">功能</a></li>
+        <li><a href="#install">安装</a></li>
+        <li><a href="#privacy">隐私</a></li>
+        <li><a href="https://github.com/MaydayV/github-chinese" rel="noopener">源码</a></li>
+      </ul>
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=github_pages" rel="noopener">安装插件</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container">
+        <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
+        <p class="eyebrow">GitHub Chinese · v2.3.4</p>
+        <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
+        <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、Issue、Pull Request 和 Release 正文。</p>
+        <div class="hero-actions" aria-label="主要操作">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=github_pages" rel="noopener">Chrome 应用商店</a>
+          <a class="btn btn-test" href="https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck" rel="noopener">Edge 加载项</a>
+          <a class="btn btn-ghost" href="https://addons.mozilla.org/zh-CN/firefox/addon/github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6/" rel="noopener">Firefox 附加组件</a>
+        </div>
+        <div class="developer-line">
+          <span>开发者</span>
+          <span class="developer-dot" aria-hidden="true"></span>
+          <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
+        </div>
+        <p class="hero-note">免费开源。界面汉化默认在浏览器本地完成。</p>
+      </div>
+    </section>
+
+    <div class="container product-stage" aria-label="插件界面预览">
+      <div class="product-shell">
+        <div class="window-bar" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+        <div class="product-view">
+          <div class="github-preview">
+            <div class="preview-toolbar">
+              <div class="repo-name">MaydayV / github-chinese</div>
+              <span class="pill">已汉化</span>
+            </div>
+            <div class="readme-card">
+              <div class="readme-head">
+                <span>README.md</span>
+                <span class="pill">翻译</span>
+              </div>
+              <div class="readme-body">
+                <h2 class="readme-title">GitHub 中文汉化翻译插件</h2>
+                <p>将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本本地化为简体中文。</p>
+                <div class="readme-lines" aria-hidden="true">
+                  <span class="line"></span>
+                  <span class="line"></span>
+                  <span class="line"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-preview">
+            <div class="settings-card">
+              <h3>内容翻译设置</h3>
+              <div class="switch-row">
+                <span class="switch-copy">
+                  <strong>启用 README 翻译</strong>
+                  <small>仅翻译内容区域，不影响代码块、链接和 Markdown 结构。</small>
+                </span>
+                <span class="ios-switch" aria-hidden="true"></span>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="field-preview">
+                <span>翻译服务</span>
+                <div class="select-preview">Qwen-MT（机器翻译）</div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="switch-row">
+                <span class="switch-copy">
+                  <strong>正文翻译</strong>
+                  <small>Issue、Pull Request、Release 手动触发。</small>
+                </span>
+                <span class="ios-switch" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Capabilities</p>
+          <h2 id="features-title">界面本地汉化，内容按需翻译。</h2>
+          <p>日常浏览不依赖在线服务；只有主动翻译正文时，才使用你配置的翻译接口。</p>
+        </div>
+        <div class="card-grid">
+          <article class="card">
+            <span class="card-label">界面</span>
+            <h3>GitHub 专用词库</h3>
+            <p>覆盖菜单、按钮、标题、提示语和弹窗内容，适配 GitHub 主站及相关页面。</p>
+          </article>
+          <article class="card">
+            <span class="card-label">正文</span>
+            <h3>README / Issue / PR / Release</h3>
+            <p>正文翻译手动触发，支持原文、译文和双语视图，适合阅读文档和参与讨论。</p>
+          </article>
+          <article class="card">
+            <span class="card-label">接口</span>
+            <h3>多服务商配置</h3>
+            <p>支持 DeepL、Google、Azure、Qwen-MT、OpenAI 及兼容接口，配置保存在本地。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">选择你的浏览器。</h2>
+          <p>三端插件同步维护。安装后打开 GitHub 页面即可生效。</p>
+        </div>
+        <div class="install-grid">
+          <article class="install-card">
+            <img class="browser-logo" src="assets/browser-logos/chrome.svg" width="54" height="54" alt="Chrome logo">
+            <h3>Chrome</h3>
+            <p>推荐从 Chrome 应用商店安装，自动接收后续更新。</p>
+            <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=github_pages" rel="noopener">前往安装</a>
+          </article>
+          <article class="install-card">
+            <img class="browser-logo" src="assets/browser-logos/edge.svg" width="54" height="54" alt="Microsoft Edge logo">
+            <h3>Edge</h3>
+            <p>使用 Microsoft Edge 加载项商店版本，适配 Chromium 内核。</p>
+            <a class="btn btn-test" href="https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck" rel="noopener">前往安装</a>
+          </article>
+          <article class="install-card">
+            <img class="browser-logo" src="assets/browser-logos/firefox.svg" width="54" height="54" alt="Firefox logo">
+            <h3>Firefox</h3>
+            <p>通过 Mozilla 附加组件安装，支持 Firefox 扩展权限流程。</p>
+            <a class="btn btn-ghost" href="https://addons.mozilla.org/zh-CN/firefox/addon/github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6/" rel="noopener">前往安装</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" aria-labelledby="privacy-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Privacy</p>
+          <h2 id="privacy-title">默认不把数据发出去。</h2>
+          <p>界面汉化由本地词库完成。正文翻译只在你主动点击后调用所选服务商。</p>
+        </div>
+        <div class="privacy-panel">
+          <div class="privacy-focus">
+            <h3>本地优先。</h3>
+            <p>开关状态、API Key、缓存和翻译记录均存储在浏览器本地。</p>
+          </div>
+          <ul class="privacy-list">
+            <li><span class="check">✓</span><span>界面汉化无需在线翻译服务。</span></li>
+            <li><span class="check">✓</span><span>不收集、不出售用户个人数据。</span></li>
+            <li><span class="check">✓</span><span>正文翻译仅发送到你配置的接口。</span></li>
+            <li><span class="check">✓</span><span>可随时关闭 README、Issue、PR 和 Release 翻译功能。</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="seo-only" aria-label="GitHub 中文汉化翻译插件问答">
+      <h2>GitHub 中文汉化翻译插件 GEO 问答</h2>
+      <dl>
+        <dt>GitHub 中文汉化翻译插件是什么？</dt>
+        <dd>它是由 MaydayV 开发的开源浏览器扩展，用本地词库把 GitHub 界面汉化为简体中文，并在用户主动触发时翻译 README、Issue、Pull Request 和 Release 正文。</dd>
+        <dt>开发者是谁？</dt>
+        <dd>插件开发者是 MaydayV，项目源码托管在 GitHub 仓库 MaydayV/github-chinese。</dd>
+        <dt>支持哪些浏览器？</dt>
+        <dd>插件支持 Chrome、Microsoft Edge 和 Firefox。</dd>
+        <dt>是否免费？</dt>
+        <dd>插件本身免费开源；正文翻译功能是否产生费用，取决于用户自行配置的翻译 API 服务商。</dd>
+        <dt>是否是 GitHub 官方产品？</dt>
+        <dd>不是。它是社区开源项目，并非 GitHub 官方产品。</dd>
+        <dt>和浏览器自带翻译有什么区别？</dt>
+        <dd>插件针对 GitHub 界面维护专用词库，尽量保持 GitHub 原有交互、代码块和 Markdown 结构；浏览器自带翻译是通用整页翻译。</dd>
+        <dt>会上传用户数据吗？</dt>
+        <dd>界面汉化默认在浏览器本地完成。只有用户主动点击正文翻译时，待翻译内容才会发送到用户自己配置的翻译服务。</dd>
+        <dt>支持哪些正文翻译场景？</dt>
+        <dd>支持 README、Issue、Pull Request 和 Release 正文翻译，并可按原文、译文、双语视图查看。</dd>
+        <dt>支持哪些翻译接口？</dt>
+        <dd>支持 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT、OpenAI 官方接口以及 OpenAI 兼容接口等翻译服务配置。</dd>
+        <dt>适合哪些用户？</dt>
+        <dd>适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者和需要阅读英文仓库文档的中文用户。</dd>
+        <dt>安装后如何使用？</dt>
+        <dd>安装后打开 github.com，插件会使用本地词库自动汉化 GitHub 界面；正文翻译需要用户在对应页面手动触发。</dd>
+        <dt>是否会影响代码显示？</dt>
+        <dd>界面汉化主要处理 GitHub 菜单、按钮、标题、提示语等文本；正文翻译会尽量保留 Markdown、代码块、链接和图片路径结构。</dd>
+      </dl>
+    </section>
+
+    <section class="final" aria-labelledby="final-title">
+      <div class="container">
+        <div class="final-box">
+          <p class="eyebrow">Open Source</p>
+          <h2 id="final-title">社区项目，持续维护。</h2>
+          <p>本扩展由 MaydayV 开发维护，为非官方开源项目。词条基于 maboloshi/github-chinese 社区项目，并按 Chrome、Edge、Firefox 三端维护。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://github.com/MaydayV/github-chinese" rel="noopener">查看源码</a>
+            <a class="btn btn-test" href="https://github.com/MaydayV" rel="noopener">开发者主页</a>
+            <a class="btn btn-ghost" href="https://github.com/MaydayV/github-chinese/issues" rel="noopener">反馈问题</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <span>© 2026 GitHub 中文汉化翻译插件 · 开发者 MaydayV</span>
+      <ul class="footer-links">
+        <li><a href="https://github.com/MaydayV" rel="noopener">开发者</a></li>
+        <li><a href="https://github.com/MaydayV/github-chinese" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/MaydayV/github-chinese/blob/chrome/README.md" rel="noopener">README</a></li>
+        <li><a href="https://github.com/maboloshi/github-chinese" rel="noopener">词条来源</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>
