@@ -113,6 +113,14 @@
 
 ## 🔄 更新日志
 
+### v2.3.5 (2026-07-06)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.5`
+1. 补充 GitHub Sponsors 账户页、注册页、身份确认和账单信息表单相关词条
+1. 新增 `settings/credentials` 凭据设置页翻译，覆盖访问令牌、OAuth 应用、GitHub Apps 和 SSH 密钥条目
+1. 补齐新版全局搜索 `aria-label`、设置导航和数量统计文本翻译
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.3.4 (2026-06-28)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.4`

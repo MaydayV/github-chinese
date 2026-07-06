@@ -6,7 +6,11 @@ const path = require('path');
 const assert = require('assert');
 
 const popupCss = fs.readFileSync(path.resolve(__dirname, '../chrome/popup/popup.css'), 'utf8');
-const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../chrome/manifest.json'), 'utf8'));
+const expectedVersion = '2.3.5';
+const manifests = ['chrome', 'edge', 'firefox'].map((browser) => ({
+  browser,
+  manifest: JSON.parse(fs.readFileSync(path.resolve(__dirname, `../${browser}/manifest.json`), 'utf8')),
+}));
 
 assert.strictEqual(
   /(\.usage-note\s*\{[\s\S]*?text-align:\s*center;)/m.test(popupCss),
@@ -14,10 +18,12 @@ assert.strictEqual(
   'usage-note 文案应居中显示',
 );
 
-assert.strictEqual(
-  manifest.version,
-  '2.3.0',
-  'manifest 版本号应更新为 2.3.0',
-);
+for (const { browser, manifest } of manifests) {
+  assert.strictEqual(
+    manifest.version,
+    expectedVersion,
+    `${browser} manifest 版本号应更新为 ${expectedVersion}`,
+  );
+}
 
 console.log('PASS');
