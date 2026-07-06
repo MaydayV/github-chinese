@@ -344,6 +344,7 @@ I18N.conf = {
         "Open quick search dialog, type / to search": "打开快速搜索对话框，键入 / 搜索",
         "Quick search": "快速搜索",
         "Search or jump to...": "搜索或跳转到…",
+        "Search or jump to…": "搜索或跳转到…",
         "Search suggestions": "搜索建议",
         "Recent": "最近",
         "Jump to": "跳转到",
@@ -22935,6 +22936,7 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
         // 赞助者账户页面 https://github.com/sponsors/accounts
             // 标题
                 "GitHub Sponsors accounts": "GitHub 赞助者账户",
+                "GitHub Sponsors dashboards": "GitHub 赞助者仪表板",
             // 管理
                 "Manage who you sponsor": "管理您赞助的对象",
                     "You haven't sponsored anyone yet.": "您还没有赞助任何人。",
@@ -22946,7 +22948,9 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
 
             "GitHub Sponsors applications": "GitHub 赞助者申请",
                 "Pending": "排队",
+                "Label: Pending": "标签：排队",
                     "This GitHub Sponsors profile is waiting to be reviewed by GitHub.": "此 GitHub 赞助者个人资料正在等待 GitHub 审核。",
+                    "You've been accepted to join the program! Set up your GitHub Sponsors profile now.": "您已获准加入该计划！请立即设置您的 GitHub 赞助者个人资料。",
                 "Manage": "管理",
 
         // GitHub 赞助者个人资料 https://github.com/sponsors/<user-name>
