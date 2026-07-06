@@ -22999,6 +22999,14 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
                 "Launch a": "启动一个",
                 "GitHub Sponsors profile": "GitHub 赞助者资料",
                 "and start receiving funding.": "并开始获得资金。",
+                "Your profile isn't live yet. We need more information to continue.": "您的个人资料尚未上线。我们需要更多信息才能继续。",
+                "Confirm your": "确认您账户的",
+                "GitHub two-factor authentication": "GitHub 双因素身份验证",
+                "for your account.": "。",
+                "Publish your GitHub Sponsors profile": "发布您的 GitHub 赞助者个人资料",
+                "Completed steps": "已完成步骤",
+                "Fill out your": "填写您的",
+                "profile details": "个人资料详情",
             // 联系电子邮箱
                 "Select a verified email address for us to contact you about your GitHub Sponsors profile. This will not be shared publicly. You can manage verified email addresses in your": "选择一个经过验证的电子邮件地址，以便我们就您的 GitHub 赞助者资料与您联系。该地址不会公开共享。您可以在您的",
             // 收款方式
