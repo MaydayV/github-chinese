@@ -23344,13 +23344,10 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
             "Payouts email": "付款电子邮箱",
             "The email address used to contact you about payouts from Stripe Connect.": "用于就 Stripe Connect 付款与您联系的电子邮箱地址。",
             "Edit in Stripe Connect account settings": "在 Stripe Connect 账户设置中编辑",
-            "Hong Kong (HK)": "香港（HK）",
             "This is required for tax purposes.": "这是出于税务目的所必需的。",
             "Disable GitHub Sponsors account": "停用 GitHub 赞助者账户",
             "You can disable your GitHub Sponsors account if you decide you no longer want to join the program. You can always re-enable your account later to proceed with the approval process.": "如果您决定不再参与该计划，可以停用 GitHub 赞助者账户。您也可以稍后重新启用账户以继续审核流程。",
             "Disable account": "停用账户",
-            "Billing country: HK": "账单国家/地区：HK",
-            "Currency code: hkd": "货币代码：HKD",
             "Label: Active": "标签：活跃",
             "Label: Verified": "标签：已验证",
 
