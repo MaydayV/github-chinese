@@ -113,6 +113,13 @@
 
 ## 🔄 更新日志
 
+### v2.4.0 (2026-07-10)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.0`
+1. 补充 GitHub Sponsors 仪表板、账单与 Copilot 用量页面的本地化词条
+1. 按页面功能语义修正成就、排序、设置开关、拉取请求和 Sponsors 操作文本
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.3.5 (2026-07-06)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.3.5`
