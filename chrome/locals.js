@@ -23193,6 +23193,24 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
             "Webhooks": "Web 钩子",
             "Payouts": "付款",
             "Overview": "概况",
+            "Your GitHub Sponsors profile was approved and is now public! You're ready for others to sponsor you from your": "您的 GitHub Sponsors 个人资料已获批准并公开！其他人现在可以通过您的",
+            "user profile": "用户个人资料",
+            "and user hovercard.": "和用户悬浮卡片来赞助您。",
+            "Your GitHub Sponsors profile": "您的 GitHub Sponsors 个人资料",
+            "Read more about managing your profile": "详细了解如何管理您的个人资料",
+            "Your profile is live at": "您的个人资料已上线，地址为",
+            "Next steps": "后续步骤",
+            "Here are some things you can do to grow your sponsorship": "以下是帮助您拓展赞助的一些做法",
+            "Enable the sponsor button": "启用赞助按钮",
+            "The sponsor button is now live on": "赞助按钮现已显示在",
+            "’s user profile! You can also enable the sponsor button on all": "的用户个人资料中！您还可以在所有",
+            "’s repositories by": "的仓库中通过以下方式启用赞助按钮：",
+            "creating and enabling a": "创建并启用一个",
+            "Share it out": "推广它",
+            "Let others know that your Sponsors profile is now live by embedding the Sponsors widget on your personal websites or sharing out on social media.": "通过在个人网站嵌入 Sponsors 小组件或分享到社交媒体，让更多人知道您的 Sponsors 个人资料现已上线。",
+            "Post on X": "发布到 X",
+            "Embed it": "嵌入",
+            "All requirements have been met": "已满足所有要求",
 
         // 赞助者仪表板 - 个人资料 https://github.com/sponsors/<user-name>/dashboard/profile
             "Short bio (250 characters)": "简短简介（250 个字符）",
@@ -23492,6 +23510,7 @@ I18N["zh-CN"]["sponsors"] = { // 赞助界面
     "regexp": [ // 正则匹配
         [/You are previewing ([^ ]+)’s GitHub Sponsors profile./, "您正在预览 $1 组织的 GitHub 赞助者个人资料。"], // sponsors/<org-name>?preview=true
         [/Edit ([^ ]+)’s profile./, "编辑 $1 组织的个人资料。"], // sponsors/<org-name>?preview=true
+        [/Sponsor @([^ ]+)/, "赞助 @$1"], // sponsors/<user-name>/dashboard
         [/([^ ]+) does not directly depend on any repositories whose maintainers can be sponsored./, "$1 不直接依赖于任何可以赞助其维护人员的仓库。"],
         [/(\d+) repositor(y|ies) they own or maintain/, "他们拥有或维护 $1 个仓库"],
         [/others? sponsor, including (\d+) organizations?/, "位其他赞助者，包括 $1 个组织"],

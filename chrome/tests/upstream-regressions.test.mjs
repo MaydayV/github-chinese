@@ -55,3 +55,21 @@ test('upstream issue and PR fixes exist in every browser build', () => {
     assert.ok(locales.conf.ignoreMutationSelectorPage['repository/pull'].includes('span.PRIVATE_TreeView-item-content-text'), browser);
   }
 });
+
+test('Sponsors dashboard onboarding terms and action label are translated', () => {
+  for (const [browser, file] of locales) {
+    const localeData = loadLocale(file);
+    const sponsors = localeData['zh-CN'].sponsors;
+    for (const [source, expected] of Object.entries({
+      'Your GitHub Sponsors profile': '您的 GitHub Sponsors 个人资料',
+      'Enable the sponsor button': '启用赞助按钮',
+      'Post on X': '发布到 X',
+      'Embed it': '嵌入',
+      'All requirements have been met': '已满足所有要求',
+    })) {
+      assert.equal(sponsors.static[source], expected, `${browser}: ${source}`);
+    }
+    assert.equal(localeData.conf.reactGlobalNavLabels['Sponsors dashboard navigation'], '赞助者仪表板导航', browser);
+    assert.equal(translate(sponsors.regexp, 'Sponsor @MaydayV'), '赞助 @MaydayV', browser);
+  }
+});

@@ -113,6 +113,13 @@
 
 ## 🔄 更新日志
 
+### v2.4.1 (2026-07-16)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.1`
+1. 补齐 GitHub Sponsors 仪表板个人资料上线、赞助按钮、推广、嵌入与完成状态词条
+1. 修复 Sponsors 操作按钮动态 `Sponsor @用户名` 无障碍标签翻译
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.4.0 (2026-07-10)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.0`
