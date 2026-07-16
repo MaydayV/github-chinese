@@ -63,6 +63,7 @@ I18N.conf = {
         'repository/pull': [
             "td.blob-code", // 代码差异 分屏/同屏
             '.js-full-logs-container', // 工作流运行日志
+            'span.PRIVATE_TreeView-item-content-text', // PR 变更文件树中的文件夹和文件名
         ],
         'repository/compare': [
             "tbody", // 代码差异
@@ -176,6 +177,7 @@ I18N.conf = {
         'repository/pull': [
             'td.blob-code', // 代码差异 分屏/同屏
             '.js-full-logs-container', // 工作流运行日志
+            'span.PRIVATE_TreeView-item-content-text', // PR 变更文件树中的文件夹和文件名
         ],
         'repository/compare': [
             'td.blob-code', // 代码差异 分屏/同屏
@@ -1987,6 +1989,11 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             all = minute ? minute + '分' + second + '秒' : second + '秒';
             return (prefix ? all + '之内' : all);
         }],
+        [/^(\d+)(y|mo|h|d|w|m|s)(?: ago)?$/, function (all, count, suffix) {
+            var suffixKey = {y: '年', mo: '个月', h: '小时', d: '天', w: '周', m: '分钟', s: '秒'};
+
+            return count + ' ' + suffixKey[suffix] + '之前';
+        }],
 
         // 其他翻译
         [/to enable two-factor authentication as an additional security measure. Your activity on GitHub includes you in this requirement. You will need to enable two-factor authentication on your account before ([^ ]+), or be restricted from account actions./, "启用双因素身份验证（2FA）作为额外安全措施。您在 GitHub 上的活动让您接收到此要求。您将需要在 $1 前启用双因素身份验证，否则会被限制账户操作。"],
@@ -2104,8 +2111,8 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
                 return count + ' ' + unitKey[unit] + (prefix === 'in' ? '之内' : '之前');
             }
         }],
-        [/(\d+)(y|h|d|w|m)/, function (all, count, suffix) {
-            var suffixKey = {y: '年', h: '小时', d: '天', w: '周', m: '个月'};
+        [/(\d+)(y|mo|h|d|w|m|s)(?: ago)?/, function (all, count, suffix) {
+            var suffixKey = {y: '年', mo: '个月', h: '小时', d: '天', w: '周', m: '分钟', s: '秒'};
 
             return count + ' ' + suffixKey[suffix] + '之前';
         }],
@@ -10129,6 +10136,10 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
                             "No issue type": "无议题类型",
                 // 搜索
                 "Try adjusting your search filters.": "尝试调整搜索筛选器。",
+                "No projects were found. Please try a different search query.": "未找到项目。请尝试其他搜索关键词。",
+                "Collapse sidebar": "折叠侧边栏",
+                "Load older activity": "加载更早的活动",
+                "Load newer activity": "加载更新的活动",
 
             // [/Want to contribute to ([^ ]+)/, "想为 $1 做贡献吗？"], /issues
             "If you have a bug or an idea, read the": "如果您发现一个错误或有任何想法，请阅读",
@@ -15145,6 +15156,7 @@ I18N["zh-CN"]["repository/releases"] = { // 仓库 - 发行版页面
             "Pre-release": "预发行版",
             "Latest": "最新发行版",
             "Draft": "草案",
+            "Release list": "发行版列表",
 
             "Compare": "对比",
                 "Choose a tag to compare": "选择标签进行比较",
