@@ -184,6 +184,26 @@
         scheduleIssuePrTranslationControls('refreshCurrentPageTranslations');
     }
 
+    /**
+     * Turbo 软导航后整页/片段可能被替换为未翻译英文，且返回时 react-partial
+     * 往往已是 .loaded，hydration watcher 不会再触发。MutationObserver 也可能
+     * 输给随后的 React reconcile。因此在 turbo:load 后做短延迟全量扫描。
+     */
+    function translateTurboSettledDom() {
+        if (!FeatureSet.enable_extension || !pageConfig.currentPageType || !document.body) return;
+        traverseNode(document.body);
+        transTitle();
+        transBySelector();
+    }
+
+    function scheduleTurboPageTranslation() {
+        translateTurboSettledDom();
+        scheduleReactGlobalNavRefresh();
+        [80, 250, 800, 1800].forEach(delay => {
+            window.setTimeout(translateTurboSettledDom, delay);
+        });
+    }
+
     function isReadmeSettingKey(key) {
         return key === 'enable_readme_translation' || key === 'enable_issue_pr_translation' || key.startsWith('readme_');
     }
@@ -2874,11 +2894,11 @@
         document.addEventListener('turbo:load', () => {
             updatePageConfig('turbo:load');
             scheduleIssuePrTranslationControls('turbo:load');
+            scheduleReadmeTranslation('turbo:load');
             if (!FeatureSet.enable_extension || !pageConfig.currentPageType) return;
 
-            transTitle(); // 翻译页面标题
-            transBySelector();
-            scheduleReadmeTranslation('turbo:load');
+            // 软导航后必须全量扫描；仅靠 title/selector 会漏掉仓库顶栏等 React 文案
+            scheduleTurboPageTranslation();
         });
 
         // 首次页面翻译
