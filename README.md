@@ -113,6 +113,13 @@
 
 ## 🔄 更新日志
 
+### v2.4.2 (2026-07-22)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.2`
+1. 补齐仓库设置（常规、规则集、Actions、OIDC、Copilot 云端智能体）、确认访问、Projects、Agents、Issues 等页面词条
+1. 校正规则集升级提示、Actions 白名单横幅、OIDC 主题声明、MCP 拆句等翻译语义
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.4.1 (2026-07-16)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.1`

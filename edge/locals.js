@@ -400,6 +400,23 @@ I18N.conf = {
         "Breadcrumb": "面包屑导航",
         "Sponsors dashboard navigation": "赞助者仪表板导航",
         "Sponsors Navigation": "赞助者导航",
+        "Switch repository": "切换仓库",
+        "Repository navigation": "仓库导航",
+        "More items, including current item": "更多项目，包括当前项",
+        "Agent navigation": "智能体导航",
+        "Session filters": "会话筛选",
+        "Agent management": "智能体管理",
+        "Filter sessions": "筛选会话",
+        "Filter by status": "按状态筛选",
+        "Task filters": "任务筛选",
+        "Cycle through tips": "循环浏览提示",
+        "Previous tip": "上一条提示",
+        "Next tip": "下一条提示",
+        "Toggle sidebar": "切换侧边栏",
+        "Needs attention": "需要关注",
+        "Automations": "自动化",
+        "Filter projects by state": "按状态筛选项目",
+
         "Dismiss this message": "关闭此消息",
     },
 };
@@ -1397,7 +1414,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Loading": "加载中",
             "Copy": "复制",
             "Copied!": "✅ 复制成功!",
-            "Copy to clipboard": "复制到剪切板",
+            "Copy to clipboard": "复制到剪贴板",
             "Interaction limits": "互动限制",
             "More options": "更多选项",
             "Got it!": "知道了！",
@@ -1416,6 +1433,48 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Automatically feature my top funders of all time": "自动展示我的历史最高资助者",
             "I want to manually add my featured sponsors": "我要手动添加精选赞助者",
             "Add or remove": "添加或移除",
+            "Switch repository": "切换仓库",
+            "Repository navigation": "仓库导航",
+            "More items, including current item": "更多项目，包括当前项",
+            "You signed out in another tab or window.": "您已在另一个标签页或窗口中退出。",
+            "You switched accounts on another tab or window.": "您已在另一个标签页或窗口中切换账户。",
+            "You signed in with another tab or window.": "您已在另一个标签页或窗口中登录。",
+            "to refresh your session.": "以刷新您的会话。",
+            "Reload": "重新加载",
+            "Dismiss alert": "关闭提醒",
+            "Dismiss error": "关闭错误",
+            "Dismiss banner": "关闭横幅",
+            "Footer": "页脚",
+            "GitHub Homepage": "GitHub 首页",
+            "General settings": "常规设置",
+            "Policies": "策略",
+            "OIDC": "OIDC",
+            "Code, planning, and automation": "代码、规划与自动化",
+            "Code, planning, 和 automation": "代码、规划与自动化",
+            "Copy to clipboard": "复制到剪贴板",
+            "Learn about dealing with special characters on the command line.": "了解如何在命令行中处理特殊字符。",
+            "Effects of making this repository public": "将此仓库设为公开的影响",
+            "Effects of deleting this repository": "删除此仓库的影响",
+            "Assigned to me": "分配给我",
+            "Created by me": "由我创建",
+
+            "Repository projects": "仓库项目",
+            "There are no projects linked to this repository yet.": "尚无链接到此仓库的项目。",
+            "Search by name…": "按名称搜索…",
+            "Search by name...": "按名称搜索…",
+            "No projects found": "未找到项目",
+            "More project actions": "更多项目操作",
+            "Filter projects by state": "按状态筛选项目",
+
+            "Mentioned": "提及我",
+            "Recent activity": "最近活动",
+            "Views": "视图",
+            "Feedback": "反馈",
+            "Milestones": "里程碑",
+            "Issues sidebar navigation": "议题侧边栏导航",
+            "Issue filters": "议题筛选",
+            "Open Issues sidebar navigation": "打开议题侧边栏导航",
+
             "Give feedback": "反馈",
             "Give us your feedback": "向我们提供反馈意见",
             "Download": "下载",
@@ -3561,7 +3620,6 @@ I18N["zh-CN"]["confirm-access"] = { // “授权访问” 对话框
                 "More information about sudo mode authentication": "更多关于 sudo 模式身份验证的信息",
             "Open your two-factor authenticator (TOTP) app or browser extension to view your authentication code.": "打开您的双因素身份验证器 (TOTP) 应用或浏览器扩展以查看您的身份验证码。",
             "Verify": "验证",
-            "Verify": "验证",
             "Verifying…": "验证中…",
             "Your authentication code has been sent.": "您的验证码已发送。",
 
@@ -3591,7 +3649,34 @@ I18N["zh-CN"]["confirm-access"] = { // “授权访问” 对话框
             "Retry passkey": "重试通行密钥",
 
             "Unable to verify with your passkey?": "无法验证您的通行密钥？",
+            "This browser or device is reporting partial passkey support.": "此浏览器或设备报告仅部分支持通行密钥。",
+            "Webauthn isn't supported. Use a different browser or device to use your passkey.": "不支持 WebAuthn。请使用其他浏览器或设备以使用通行密钥。",
+            "Waiting for input from browser interaction...": "正在等待浏览器交互输入…",
+            "When your phone is ready, click the button below.": "当手机准备就绪时，请点击下方按钮。",
+            "GitHub Mobile icon": "GitHub Mobile 图标",
+            "We sent you a verification request on your GitHub Mobile app. Approve the request to enter sudo mode.": "我们已向您的 GitHub Mobile 应用发送验证请求。批准该请求以进入 sudo 模式。",
+            "Enter the verification code": "输入验证码",
+            "When you are ready, trigger a mailer to verify your identity.": "准备好后，触发邮件发送以验证您的身份。",
+            "Verify via email": "通过电子邮件验证",
+            "Tip:": "提示：",
+            "You are entering": "您正在进入",
+            "sudo mode": "sudo 模式",
+            ". After you've performed a sudo-protected action, you'll only be asked to re-authenticate again after a few hours of inactivity.": "。在您执行受 sudo 保护的操作后，仅在几小时不活动后才会再次要求重新身份验证。",
+            "Terms": "条款",
+            "Privacy": "隐私",
+            "Docs": "文档",
+            "Contact GitHub Support": "联系 GitHub 支持",
+            "Manage cookies": "管理 Cookie",
+            "Do not share my personal information": "请勿分享我的个人信息",
+            "Uh oh!": "哎呀！",
+            "There was an error while loading.": "加载时出错。",
+            "Please reload this page": "请重新加载此页面",
+
     },
+    "regexp": [
+        [/Enter the verification code sent to (.+)\. If it doesn’t appear within a few minutes, check your spam folder\./, "输入发送至 $1 的验证码。如果几分钟内未收到，请检查垃圾邮件文件夹。"],
+        [/Enter the verification code sent to (.+)\. If it doesn't appear within a few minutes, check your spam folder\./, "输入发送至 $1 的验证码。如果几分钟内未收到，请检查垃圾邮件文件夹。"],
+    ],
 };
 
 I18N["zh-CN"]["payment-module"] = { // 通用账单及支付信息模块
@@ -6534,6 +6619,20 @@ I18N["zh-CN"]["settings/copilot"] = { // 设置 - GitHub Copilot
         // 编程智能体(预览 https://github.com/settings/copilot/coding_agent
             // 顶部提示
                 "Cloud agent": "云端智能体",
+
+        "No Copilot cloud agent access": "无 Copilot 云端智能体访问权限",
+        "Allow access to locations frequently used to install tools, packages, and dependencies.": "允许访问常用于安装工具、软件包和依赖项的位置。",
+        "Learn more about customizing network access.": "了解更多关于自定义网络访问的信息。",
+        "Learn more about the recommended allowlist": "了解更多关于推荐白名单的信息",
+        "When Copilot pushes changes, require approval from a maintainer with write access before Actions workflows are run. When this policy is disabled, Actions workflows run automatically when Copilot pushes, except when the push comes from an automation.": "当 Copilot 推送更改时，要求具有写入权限的维护者批准后再运行 Actions 工作流。禁用此策略后，Copilot 推送时 Actions 工作流将自动运行，除非推送来自自动化。",
+        "Allow automations": "允许自动化",
+        "When enabled, users with write access can create automations that automatically run agents on a schedule or in response to events like new issues or updated pull requests.": "启用后，具有写入权限的用户可以创建自动化，按计划或响应新议题、更新的拉取请求等事件自动运行智能体。",
+        "Only allow automations to be triggered by users with write access": "仅允许具有写入权限的用户触发自动化",
+        "When enabled, automations will only run if the user triggering the event has write access to the repository. When disabled, users can create automations that listen for events triggered by users without write access.": "启用后，仅当触发事件的用户对该仓库具有写入权限时，自动化才会运行。禁用后，用户可以创建监听无写入权限用户所触发事件的自动化。",
+        "Allowing automations to be triggered by users without write access to the repository increases risk of prompt injection attacks, where an untrusted user can cause an agent to take actions in the repository using the agent's permissions.": "允许无仓库写入权限的用户触发自动化会增加提示注入攻击风险：不受信任的用户可能利用智能体的权限在仓库中执行操作。",
+        "You can configure your own MCP servers by adding JSON configuration below. MCP servers can optionally access secrets defined in the repository's": "您可以在下方添加 JSON 配置来配置自己的 MCP 服务器。MCP 服务器可选择访问仓库",
+        "environment.": "环境中定义的机密。",
+
                 "Copilot cloud agent": "Copilot 云端智能体",
                 "You can enable Copilot cloud agent for other users, but you won't be able to assign tasks to Copilot because you don't have a Copilot Pro, Copilot Pro+, Copilot Business or Copilot Enterprise license.": "您可以为其他用户启用 Copilot 云端智能体，但由于您没有 Copilot Pro、Copilot Pro+、Copilot Business 或 Copilot Enterprise 许可证，因此无法向 Copilot 分配任务。",
                 "You can enable Copilot coding agent for other users, but you won't be able to assign tasks to Copilot because you don't have a Copilot Pro+ or Copilot Enterprise license.": "您可以为其他用户启用 Copilot 编程智能体，但由于您没有 Copilot Pro+ 或 Copilot 企业版许可证，因此无法向 Copilot 分配任务。",
@@ -8702,6 +8801,7 @@ I18N["zh-CN"]["repository-public"] = { // 仓库 - 公共部分
         }],
         // 成为协作者提示
         [/You now have push access to the ([^ ]+) repository./, "您现在拥有推送至 $1 仓库的权限"],
+        [/Settings: ([^/]+)\/([^ ]+)/, "设置：$1/$2"],
         ...I18N["zh-CN"]["orgs-public"]["regexp"],
         // 提交 - 作者窗
         [/(\d+) authors?/, "$1 作者"],
@@ -10138,6 +10238,31 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
                 "Try adjusting your search filters.": "尝试调整搜索筛选器。",
                 "No projects were found. Please try a different search query.": "未找到项目。请尝试其他搜索关键词。",
                 "Collapse sidebar": "折叠侧边栏",
+
+                "Assigned to me": "分配给我",
+                "Created by me": "由我创建",
+                "Mentioned": "提及我",
+                "Recent activity": "最近活动",
+                "Views": "视图",
+                "Feedback": "反馈",
+                "Issues sidebar navigation": "议题侧边栏导航",
+                "Issue filters": "议题筛选",
+                "Open Issues sidebar navigation": "打开议题侧边栏导航",
+                "Filter all issues": "筛选全部议题",
+                "Search Issues": "搜索议题",
+                "All issues": "全部议题",
+                "Select all": "全选",
+                "list items": "列表项",
+                "Filter by author": "按作者筛选",
+                "Filter by label": "按标签筛选",
+                "Filter by project": "按项目筛选",
+                "Filter by milestone": "按里程碑筛选",
+                ", descending": "，降序",
+                "分配给 me": "分配给我",
+                "Actions": "操作",
+                "0 list items / 0 选中": "0 个列表项 / 0 已选中",
+                "Pages": "页面",
+
                 "Load older activity": "加载更早的活动",
                 "Load newer activity": "加载更新的活动",
 
@@ -10888,6 +11013,7 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
         [/(.+) will be first item in the list./, "“$1” 将移至最前。"],
         [/(.+) will be last item in the list./, "“$1” 将移至最后。"],
         [/of (\d+) selected/, "/ $1 选中"],
+        [/(\d+) list items \/ (\d+) (?:selected|选中)/, "$1 个列表项 / $2 已选中"],
         [/(\d+\%) completed/, "$1 完成"],
         [/Issue (#\d+) created/, "议题 $1 已创建"],
         [/Lines (\d+) to (\d+) in/, "第 $1 - $2 行，"],
@@ -17409,6 +17535,13 @@ I18N["zh-CN"]["repository-settings-menu"] = { // 仓库设置公共部分
                 "GitHub Apps": "GitHub 应用",
                 "Email notifications": "邮件通知",
                 "Autolink references": "自动链接引用",
+            "Code, planning, and automation": "代码、规划与自动化",
+            "Code, planning, 和 automation": "代码、规划与自动化",
+            "Policies": "策略",
+            "OIDC": "OIDC",
+            "Cloud agent": "云端智能体",
+            "General settings": "常规设置",
+
 
     },
     "regexp": [ // 正则翻译
@@ -17529,6 +17662,19 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
             "Get organized with issue templates": "使用议题模板进行组织",
             "Give contributors issue templates that help you cut through the noise and help them push your project forward.": "为贡献者提供议题模板，帮助您消除干扰并帮助他们推进您的项目。",
             "Set up templates": "设置模板",
+
+            "Issue permissions": "议题权限",
+                "All users": "所有用户",
+                "Anyone can create an issue": "任何人都可以创建议题",
+                "Collaborators only": "仅限协作者",
+                "Only collaborators can create issues": "仅协作者可以创建议题",
+                "If restricted, issues will still be readable by everyone who can see this repository.": "即使设置了限制，所有能够查看此仓库的人仍然可以阅读议题。",
+            "Wikis": "Wiki",
+            "You must select squashing or rebasing option. This is because linear history is required on at least one protected branch.": "您必须选择压缩或变基选项。因为至少一个受保护分支要求线性历史记录。",
+            "Learn about dealing with special characters on the command line.": "了解如何在命令行中处理特殊字符。",
+            "Effects of making this repository public": "将此仓库设为公开的影响",
+            "Effects of deleting this repository": "删除此仓库的影响",
+
 
             "Allow forking": "允许复刻", // 组织仓库
             "If disabled, existing forks will be unaffected.": "如果禁用，现有复刻将不受影响。", // 组织仓库
@@ -17675,6 +17821,7 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
 
             "Disable branch protection rules": "禁用分支保护规则",
                 "Disable branch protection rules enforcement and APIs": "禁用分支保护规则执行和 API",
+                "Branch protection API": "分支保护 API",
 
                 // 顶部提醒
                     "Branch protection settings saved.": "分支保护设置已保存。",
@@ -17789,11 +17936,18 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
         [/Default branch changed to ([^ ])/, "默认分支更改为 $1"],
         // 离开复刻网络
         [/Forked from ([^ ])/, "复刻自 $1"],
+        [/Settings: ([^/]+)\/([^ ]+)/, "设置：$1/$2"],
+        [/Delete ([^/]+)\/([^ ]+)/, "删除 $1/$2"],
+        [/Make ([^/]+)\/([^ ]+) public/, "将 $1/$2 设为公开"],
+        [/Make ([^/]+)\/([^ ]+) private/, "将 $1/$2 设为私有"],
     ],
     "title": {
         "static": {
             "General": "常规",
         },
+        "regexp": [
+            [/Settings: ([^/]+)\/([^ ]+)/, "设置：$1/$2"],
+        ],
     },
 };
 
@@ -18277,6 +18431,12 @@ I18N["zh-CN"]["repository/settings/rules"] = { // 仓库设置 - 规则 - 规则
         // 仓库规则集页面 /<user-name>/<repo-name>/rules
         // 规则集 页面 /<user-name>/<repo-name>/settings/rules
             "Your rulesets won't be enforced on this private repository until you upgrade this organization account to GitHub Team.": "在您将此组织账户升级到 GitHub Team 之前，您的规则集不会在此私有仓库上强制执行。", // 组织 私有仓库
+
+            // 用户私有仓库：原文拆成两段，中间为链接
+            "Your rulesets won't be enforced on this private repository until you": "在您",
+            "move to GitHub Team organization account.": "迁移到 GitHub Team 组织账户之前，规则集不会在此私有仓库上强制执行。",
+            "rulesets": "规则集",
+
 
             "Organization rulesets won't be enforced": "在您将该组织账户升级到 GitHub 企业版之前，", // 组织设置
             "until you upgrade this organization account to GitHub Enterprise.": "组织规则集将不会强制执行。", // 组织设置
@@ -18781,6 +18941,20 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
                 "Allow actions by Marketplace": "允许来自市场的操作，",
                 "verified creators": "由经验证的创建者创建",
                 "Allow specified actions and reusable workflows": "允许指定的操作和可复用的工作流程",
+
+                "Allow or block specified actions and reusable workflows": "允许或阻止指定的操作和可复用的工作流程",
+                "Wildcards, tags, and SHAs are allowed. Use": "允许使用通配符、标签和 SHA。使用",
+                "Wildcards, tags, 和 SHAs are allowed. Use": "允许使用通配符、标签和 SHA。使用",
+                "prefix to block.": "前缀表示阻止。",
+                "Your list contains a": "您的列表包含",
+                "wildcard pattern, which will": "通配符模式，这将",
+                "allow all actions and reusable workflows": "允许所有操作和可复用的工作流程",
+                "except those that are explicitly blocked.": "，明确阻止的除外。",
+                "Your list contains": "您的列表",
+                "only blocked patterns": "仅包含阻止模式",
+                ". By default, only allowed patterns specified in the list can be used. To allow all actions and reusable workflows except those that are explicitly blocked, add a": "。默认情况下，只能使用列表中指定的允许模式。若要允许除明确阻止之外的所有操作和可复用工作流程，请添加",
+                "wildcard pattern.": "通配符模式。",
+
                 "Enter a comma-separated list of actions and reusable workflows": "输入以逗号分隔的操作和可复用的工作流程列表",
                 "Wildcards, tags, and SHAs are allowed.": "允许使用通配符、标签和 SHA。",
                 "Action examples:": "操作示例：",
@@ -18793,14 +18967,13 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
 
             "Artifact and log retention": "工件和日志保留",
                 "Choose the repository settings for artifacts and logs.": "选择工件和日志的仓库设置。",
-                "There is a maximum limit of": "最大限制为",
+                "There is a maximum limit of": "最多",
                 "Your organization has set a maximum limit of": "您的组织已将上限设置为", //组织仓库
                 "Learn more about the artifact and log retention policy.": "了解更多关于工件和日志保留政策的信息。",
 
                 // 输入框提示
                 "Duration must be 1 or more.": "不能小于 1",
                 "Duration must be 90 or less": "不能大于 90",
-                "There is a maximum limit of": "最多",
 
                 "days": "天",
 
@@ -18814,14 +18987,25 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
 
             "Fork pull request workflows": "复刻拉取请求工作流程",
                 "Run workflows from fork pull requests": "从复刻拉取请求运行工作流程",
-                    "This tells Actions to run workflows from pull requests originating from repository forks. Note that doing so will give maintainers of those forks the ability to use tokens with read permissions on the source repository.": "这告诉 Actions 运行工作流程，来自仓库复刻的拉取请求。请注意，这样做将使这些复刻的维护者有能力在源码库上使用具有读取权限的令牌。",
+                    "This tells Actions to run workflows from pull requests originating from repository forks. Note that doing so will give maintainers of those forks the ability to use tokens with read permissions on the source repository.": "这告诉 Actions 运行来自仓库复刻的拉取请求中的工作流程。请注意，这样做将使这些复刻的维护者能够在源仓库上使用具有读取权限的令牌。",
                 "Send write tokens to workflows from fork pull requests.": "从复刻拉取请求，发送可写令牌到工作流程",
                     "This tells Actions to send tokens with": "这告诉 Actions 发送令牌",
                     "write": "写入",
                     "permissions to workflows from pull requests originating from repository forks. Note that doing so will give maintainers of those forks": "权限到工作流程，来自仓库复刻的拉取请求。请注意，这样做将授予这些复刻的维护者",
                     "permissions against the source repository.": "权限，针对源仓库。",
                 "Send secrets to workflows from fork pull requests.": "从复刻拉取请求，发送机密到工作流程",
-                    "This tells Actions to send repository secrets to workflows from pull requests originating from repository forks.": "这告诉 Actions 发送仓库机密到工作流程，来自仓库复刻的拉取请求。",
+
+                "Send secrets and variables to workflows from fork pull requests.": "向来自复刻拉取请求的工作流程发送机密和变量。",
+                "This tells Actions to send repository secrets and variables to workflows from pull requests originating from repository forks.": "这告诉 Actions 将仓库机密和变量发送到来自仓库复刻的拉取请求所触发的工作流程。",
+                "Require approval for fork pull request workflows.": "要求对复刻拉取请求工作流程进行批准。",
+                "Fork pull requests from users without write access will require approval to run workflows.": "来自无写入权限用户的复刻拉取请求在运行工作流程前需要批准。",
+                "Save fork pull request workflows settings": "保存复刻拉取请求工作流程设置",
+                "Save artifact and log retention setting": "保存工件和日志保留设置",
+                "Save workflow permissions settings": "保存工作流程权限设置",
+                "Duration must be 400 or less": "时长不得超过 400",
+                "days.": " 天。",
+
+                    "This tells Actions to send repository secrets to workflows from pull requests originating from repository forks.": "这告诉 Actions 将仓库机密发送到来自仓库复刻的拉取请求所触发的工作流程。",
 
             "Approval for running fork pull request workflows from contributors": "允许贡献者运行复刻拉取请求工作流",
                 "Choose which subset of users will require approval before running workflows on their pull requests. Both the pull request author and the actor of the pull request event triggering the workflow will be checked to determine if approval is required. If approval is required, a user with write access to the repository must": "选择在拉取请求上运行工作流之前需要批准的用户子集。将检查拉取请求作者和触发工作流的拉取请求事件的行为者，以确定是否需要批准。如果需要批准，则必须由具有写权限的用户",
@@ -18834,7 +19018,7 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
                 "Only users who are both new on GitHub and who have never had a commit or pull request merged into this repository will require approval to run workflows.": "只有新加入 GitHub 和从未有提交或拉取请求合并到该仓库的用户才需要批准运行工作流。",
             "Require approval for first-time contributors": "要求对首次贡献者进行批准审查",
                 "Only first-time contributors will require approval to run workflows.": "只有首次贡献者才需要获得批准才能运行工作流程。",
-                "Only users who have never had a commit or pull request merged into this repository will require approval to run workflows.": "只有从未有提交或拉动请求合并到该仓库的用户才需要批准运行工作流。",
+                "Only users who have never had a commit or pull request merged into this repository will require approval to run workflows.": "只有从未有提交或拉取请求合并到该仓库的用户才需要批准运行工作流。",
             "Require approval for all outside collaborators": "要求对所有外部协作者进行批准审查",
                 "All outside collaborators will always require approval to run workflows on their pull requests.": "所有外部协作者将始终需要批准才能在他们的拉取请求上运行工作流程。",
             "Require approval for all external contributors": "要求对所有外部贡献者进行批准审查",
@@ -18853,6 +19037,36 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
 
                 // 顶部提醒
                     "Default workflow permissions settings saved.": "已保存默认工作流程权限设置。",
+
+            "Access": "访问",
+                "Control how this repository is used by GitHub Actions workflows in other repositories.": "控制其他仓库中的 GitHub Actions 工作流程如何使用此仓库。",
+                "Learn more about allowing other repositories to access to Actions components in this repository.": "了解更多关于允许其他仓库访问此仓库中 Actions 组件的信息。",
+                "Not accessible": "不可访问",
+                "Workflows in other repositories cannot access this repository.": "其他仓库中的工作流程无法访问此仓库。",
+                "Save access setting": "保存访问设置",
+
+            // Actions policies /settings/actions/rules
+            "Actions policies": "操作策略",
+            "You haven't created any policies": "您尚未创建任何策略",
+            "Define whether actions can run in specific contexts.": "定义操作是否可以在特定上下文中运行。",
+            "policies": "策略",
+            "New policy": "新建策略",
+
+            // OIDC /settings/actions/oidc-configuration
+            "OIDC configuration": "OIDC 配置",
+            "Customize claims included in the OIDC token.": "自定义 OIDC 令牌中包含的声明。",
+            "Learn more about OIDC tokens.": "了解更多关于 OIDC 令牌的信息。",
+            "Subject claim": "主题声明",
+            "Customize the subject (sub) claim in the OIDC token, used to identify the workflow run context.": "自定义 OIDC 令牌中的主题（sub）声明，用于标识工作流程运行上下文。",
+            "Use default template": "使用默认模板",
+            "When selected, use upstream template for the subject claim. Unselect to set a custom template.": "选中时，对主题声明使用上游模板。取消选中以设置自定义模板。",
+            "Use immutable subject claim": "使用不可变主题声明",
+            "Learn more about immutable subject claims.": "了解更多关于不可变主题声明的信息。",
+            "Default subject claim prefix": "默认主题声明前缀",
+            "Copy subject claim prefix": "复制主题声明前缀",
+            "Use this prefix when configuring trust policies in your cloud provider.": "在云提供商中配置信任策略时使用此前缀。",
+            "Save subject claim": "保存主题声明",
+
 
         // 运行器页面 /<user-name>/<repo-name>/settings/actions/runners
             "New self-hosted runner": "新建自托管运行器",
@@ -18909,11 +19123,17 @@ I18N["zh-CN"]["repository/settings/actions"] = { // 仓库设置 - 操作 /<user
         [/Any action or reusable workflow that matches the specified criteria, plus those defined in a repository within ([^ ]+), can be used./, "可以使用符合指定条件的操作或工作流程，以及在 $1 的仓库中定义的操作或可复用的工作流程。"], // 操作页面
         [/All users that are not a member or owner of this repository and not a member of the ([^ ]+) organization will require approval to run workflows./, "所有不是该仓库成员或所有者，且未加入 $1 组织的用户，均需获得批准才能运行工作流。"], // 组织
         [/Add new self-hosted runner · (.+)/, "添加自托管运行器 · $1"],
+        [/Accessible from repositories owned by the user '([^']+)'/, "可从用户“$1”拥有的仓库访问"],
+        [/Workflows in other repositories that are owned by the user '([^']+)' can access the actions and reusable workflows in this repository\. Access is allowed only from private repositories\./, "由用户“$1”拥有的其他仓库中的工作流程可以访问此仓库中的操作和可复用工作流程。仅允许来自私有仓库的访问。"],
+        [/Automatically enabled for this repository\. Repositories created or renamed after\s*(.+) use immutable subject claims\./, "已为此仓库自动启用。在 $1 之后创建或重命名的仓库使用不可变主题声明。"],
         ...I18N["zh-CN"]["repository-public"]["regexp"],
     ],
     "title": {
         "regexp": [
             [/Actions settings/, "操作设置"],
+            [/Actions policies/, "操作策略"],
+            [/OIDC Configuration/, "OIDC 配置"],
+            [/OIDC configuration/, "OIDC 配置"],
             [/Runners/, "运行器"],
             [/Add new self-hosted runner/, "添加自托管运行器"],
         ],
@@ -19257,10 +19477,21 @@ I18N["zh-CN"]["repository/settings/copilot/coding_agent"] = {
                 // 保存
                     "Allowlist settings saved successfully!": "白名单设置保存成功！",
 
+        "No Copilot cloud agent access": "无 Copilot 云端智能体访问权限",
+        "Learn more about customizing network access.": "了解更多关于自定义网络访问的信息。",
+        "Allow access to locations frequently used to install tools, packages, and dependencies.": "允许访问常用于安装工具、软件包和依赖项的位置。",
+        "Learn more about the recommended allowlist": "了解更多关于推荐白名单的信息",
+
         "Policy": "策略",
             "Require approval for workflow runs": "要求审批工作流运行",
                 "When Copilot pushes changes, require approval from a maintainer with write access before Actions workflows are run.": "当 Copilot 推送更改时，要求具有写入权限的维护者批准后再运行 Actions 工作流。",
+                "When Copilot pushes changes, require approval from a maintainer with write access before Actions workflows are run. When this policy is disabled, Actions workflows run automatically when Copilot pushes, except when the push comes from an automation.": "当 Copilot 推送更改时，要求具有写入权限的维护者批准后再运行 Actions 工作流。禁用此策略后，Copilot 推送时 Actions 工作流将自动运行，除非推送来自自动化。",
                 "Allowing GitHub Actions workflows to run without approval may allow unreviewed code written by Copilot to gain write access to your repository or access your GitHub Actions secrets.": "允许 GitHub Actions 工作流未经审批即运行，可能会让 Copilot 编写的未经审查代码获得仓库写入权限，或访问您的 GitHub Actions 机密。",
+            "Allow automations": "允许自动化",
+                "When enabled, users with write access can create automations that automatically run agents on a schedule or in response to events like new issues or updated pull requests.": "启用后，具有写入权限的用户可以创建自动化，按计划或响应新议题、更新的拉取请求等事件自动运行智能体。",
+            "Only allow automations to be triggered by users with write access": "仅允许具有写入权限的用户触发自动化",
+                "When enabled, automations will only run if the user triggering the event has write access to the repository. When disabled, users can create automations that listen for events triggered by users without write access.": "启用后，仅当触发事件的用户对该仓库具有写入权限时，自动化才会运行。禁用后，用户可以创建监听无写入权限用户所触发事件的自动化。",
+                "Allowing automations to be triggered by users without write access to the repository increases risk of prompt injection attacks, where an untrusted user can cause an agent to take actions in the repository using the agent's permissions.": "允许无仓库写入权限的用户触发自动化会增加提示注入攻击风险：不受信任的用户可能利用智能体的权限在仓库中执行操作。",
 
         "Validation tools": "验证工具",
             "Configure which tools Copilot cloud agent uses to validate its work and iterate before requesting human review.": "配置 Copilot 云端智能体在请求人工审查前用于验证工作并迭代的工具。",
@@ -19279,7 +19510,9 @@ I18N["zh-CN"]["repository/settings/copilot/coding_agent"] = {
             "With MCP, you can extend the capabilities of Copilot cloud agent by connecting it to other tools and services. The": "借助 MCP，您可以将 Copilot 云端智能体连接到其他工具和服务，从而扩展其能力。",
             "With MCP, you can extend the capabilities of": "借助 MCP，您可以扩展",
             "by connecting it to other tools and services. The": "的能力，将其连接到其他工具和服务。",
-            "MCP servers are enabled by default.": "MCP 服务器默认启用。",
+            "MCP servers are enabled by default.": "的能力。MCP 服务器默认启用。",
+            "You can configure your own MCP servers by adding JSON configuration below. MCP servers can optionally access secrets defined in the repository's": "您可以在下方添加 JSON 配置来配置自己的 MCP 服务器。MCP 服务器可选择访问仓库",
+            "environment.": "环境中定义的机密。",
             "You can configure your own MCP servers by adding JSON configuration below. MCP servers can optionally access secrets defined in the repository's .copilot environment.": "您可以在下方添加 JSON 配置来配置自己的 MCP 服务器。MCP 服务器可选择访问仓库 .copilot 环境中定义的机密。",
             "You can configure your own MCP servers by adding JSON configuration below. MCP servers can optionally access secrets defined in the repository's .copilot environment. Learn more about configuring MCP servers.": "您可以在下方添加 JSON 配置来配置自己的 MCP 服务器。MCP 服务器可选择访问仓库 .copilot 环境中定义的机密。了解更多关于配置 MCP 服务器的信息。",
             "You can configure your own MCP servers by adding JSON configuration below. MCP servers can optionally access secrets defined in the repository's copilot environment.": "您可以在下方添加 JSON 配置来配置自己的 MCP 服务器。MCP 服务器可选择访问仓库 copilot 环境中定义的机密。",
@@ -20864,38 +21097,12 @@ I18N["zh-CN"]["session-authentication"] = { // 登录页 包含(/login, /session
             "Check your email for a link to reset your password. If it doesn’t appear within a few minutes, check your spam folder.": "检查您的电子邮件以获取重置密码的链接。如果它在几分钟内没有出现，请检查您的垃圾邮件文件夹。",
             "Return to Sign in": "返回登录",
 
-        // ...I18N["zh-CN"]["confirm-access"]["static"], // [留待后期合并] 授权访问 sudo 模式身份验证
-            "Confirm access": "授权访问",
-            "Signed in as": "登录身份为",
-            "Authentication code": "验证码",
-                "More information about sudo mode authentication": "更多关于 sudo 模式身份验证的信息",
-            "Open your two-factor authenticator (TOTP) app or browser extension to view your authentication code.": "打开您的双因素身份验证器 (TOTP) 应用或浏览器扩展以查看您的身份验证码。",
-            "Verify": "验证",
-            "Verify": "验证",
-            "Your authentication code has been sent.": "您的验证码已发送。",
-
-            "Having problems?": "有问题吗？",
-            "Use GitHub Mobile": "使用 GitHub Mobile",
-            "Use your authenticator app": "使用您的身份验证器应用",
-            "Send a code via email": "通过电子邮件发送验证码",
+        // 授权访问 sudo 模式身份验证（确认访问页 body.session-authentication）
+            ...I18N["zh-CN"]["confirm-access"]["static"],
+            // 以下为 confirm-access 未覆盖或需覆盖的词条
             "Send a code via SMS": "通过短信发送验证码",
             "Resend SMS": "重新发送短信",
-            "Use your password": "使用您的密码",
-
-            "GitHub Mobile": "GitHub 移动端",
-            "Creating a verification request for your GitHub Mobile app.": "为您的 GitHub Mobile 应用创建验证请求。",
-            "When your phone is ready, click the button below.": "当您的手机准备就绪时，请点击下面的按钮。",
-            "We sent you a verification request on your GitHub Mobile app. Enter the digits shown below to enter sudo mode.": "我们向您的 GitHub Mobile 应用发送了一个验证请求。输入下面显示的数字以进入 sudo 模式。",
-            "We could not verify your identity": "我们无法核实您的身份",
-            "Retry": "重试",
-
             "We just sent you a message via SMS with your authentication code. Enter the code in the form above to verify your identity.": "我们刚刚通过短信向您发送了一条消息，其中包含您的验证码。在上面的表格中输入验证码以验证您的身份。",
-
-            // "Password": "密码",
-            // "Forgot password?": "忘记密码？",
-            "Confirm": "确认",
-
-            "You are entering": "您正在进入",
             "sudo mode": "Sudo 模式",
             ". After you've performed a sudo-protected action, you'll only be asked to re-authenticate again after a few hours of inactivity.": "。在您执行了受 sudo 保护的操作后，在几个小时不活动后才会要求您重新进行身份验证。",
 
@@ -21037,6 +21244,7 @@ I18N["zh-CN"]["session-authentication"] = { // 登录页 包含(/login, /session
 
         // 设备验证 https://github.com/sessions/verified-device
         [/We just sent your authentication code via email to (.*)\. The code will expire at (.*)\./, "我们刚刚通过电子邮件将您的验证码发送给 $1。验证码将于 $2 过期。"],
+        ...I18N["zh-CN"]["confirm-access"]["regexp"],
     ],
     "title": {
         "static": {
@@ -29688,6 +29896,27 @@ I18N["zh-CN"]["repository/agents"] = {
         // 左侧Tab
         "Created by me": "由我创建的",
         "All sessions": "所有任务",
+
+        "Agent navigation": "智能体导航",
+        "Session filters": "会话筛选",
+        "Needs attention": "需要关注",
+        "Automations": "自动化",
+        "Start agent sessions automatically on a schedule or in response to events like new issues or updated pull requests.": "按计划或响应新议题、更新的拉取请求等事件自动启动智能体会话。",
+        "Dismiss banner": "关闭横幅",
+        "Cycle through tips": "循环浏览提示",
+        "Previous tip": "上一条提示",
+        "Next tip": "下一条提示",
+        "Agent management": "智能体管理",
+        "Toggle sidebar": "切换侧边栏",
+        "Filter sessions": "筛选会话",
+        "Filter by status": "按状态筛选",
+        "Task filters": "任务筛选",
+        "Search or filter": "搜索或筛选",
+        "Suggestions": "建议",
+        "Agent": "智能体",
+        "Newest": "最新",
+        "uses AI. Check for mistakes.": "使用 AI。请检查错误。",
+        "使用 AI。请检查错误。": "使用 AI。请检查错误。",
 
         // 任务列表
         "Sessions": "会话",
