@@ -55,7 +55,14 @@ const {
   shouldSkipReadmeByLanguage,
   mapTargetLangForDeepL,
   mapTargetLangForAzure,
+  isObjectObjectArtifact,
+  normalizeTranslationText,
+  parseOpenAiArray,
+  stripOpenAiReasoningBlocks,
+  normalizeRuntimeErrorMessage,
 } = loadFunctions([
+  'isExtensionContextInvalidatedError',
+  'normalizeRuntimeErrorMessage',
   'buildRepoCacheKey',
   'buildRepoIdentifierFromPath',
   'getReadmeUsageTokens',
@@ -66,6 +73,11 @@ const {
   'shouldSkipReadmeByLanguage',
   'mapTargetLangForDeepL',
   'mapTargetLangForAzure',
+  'isObjectObjectArtifact',
+  'normalizeTranslationText',
+  'createRecoverableTranslationError',
+  'parseOpenAiArray',
+  'stripOpenAiReasoningBlocks',
 ]);
 
 function normalize(value) {
@@ -157,6 +169,78 @@ assert.strictEqual(
   mapTargetLangForAzure('zh-TW'),
   'zh-Hans',
   'Azure 目标语言应固定为简体中文',
+);
+
+assert.strictEqual(
+  normalizeTranslationText({ text: '你好世界' }),
+  '你好世界',
+  '对象条目应提取 text 字段',
+);
+
+assert.strictEqual(
+  normalizeTranslationText({ translation: '分段翻译' }),
+  '分段翻译',
+  '对象条目应提取 translation 字段',
+);
+
+assert.strictEqual(
+  normalizeTranslationText([{ type: 'text', text: '多模态' }, { type: 'text', text: '内容' }]),
+  '多模态内容',
+  '多模态 content 数组应拼接 text',
+);
+
+assert.deepStrictEqual(
+  normalize(parseOpenAiArray(JSON.stringify([
+    { text: '第一段' },
+    { translatedText: '第二段' },
+    '第三段',
+  ]), 3)),
+  ['第一段', '第二段', '第三段'],
+  'OpenAI 数组中的对象条目应规范化为字符串',
+);
+
+assert.throws(
+  () => parseOpenAiArray(JSON.stringify([{ foo: {} }, 'ok']), 2),
+  /无法解析的对象条目|无效/,
+  '无法提取文本的对象条目应失败而不是写成 [object Object]',
+);
+
+assert.strictEqual(
+  normalizeTranslationText({}),
+  '',
+  '空对象不应落到 [object Object]',
+);
+
+// 部分模型镜像请求结构，把译文包进 texts/translations 返回，需能解析而非降级漏译
+assert.strictEqual(
+  normalizeTranslationText({ texts: ['译文'] }),
+  '译文',
+  'texts 数组包裹的译文应被提取',
+);
+
+assert.deepStrictEqual(
+  normalize(parseOpenAiArray(JSON.stringify([{ texts: ['译文'] }]), 1)),
+  ['译文'],
+  '数组中每项为 {texts:[...]} 的返回应正确解析',
+);
+
+assert.deepStrictEqual(
+  normalize(parseOpenAiArray(JSON.stringify({ texts: ['甲', '乙'] }), 2)),
+  ['甲', '乙'],
+  '顶层 {texts:[...]} 包裹的整批译文应解包',
+);
+
+// chrome.runtime.lastError 等普通对象错误必须取出可读 message，不能落成 "[object Object]"
+assert.strictEqual(
+  normalizeRuntimeErrorMessage({ message: 'Could not establish connection.' }),
+  'Could not establish connection.',
+  '普通对象错误应提取 message 而非 [object Object]',
+);
+
+assert.strictEqual(
+  normalizeRuntimeErrorMessage(new Error('边界超时')),
+  '边界超时',
+  'Error 实例应返回其 message',
 );
 
 console.log('PASS');

@@ -57,7 +57,10 @@
         ROOT_SELECTORS: [
             '#readme article.markdown-body',
             '[data-testid="readme"] article.markdown-body',
-            'article.markdown-body.entry-content.container-lg'
+            '[class*="DirectoryRichtextContent"] article.markdown-body',
+            'article.markdown-body.entry-content.container-lg[itemprop="text"]',
+            'article.markdown-body.entry-content.container-lg',
+            'article.markdown-body[itemprop="text"]'
         ],
         SKIP_PARENT_SELECTOR: [
             'pre',
@@ -139,6 +142,7 @@
         rerunRequested: false,
         stateByElement: new WeakMap(),
         isApplyingTranslation: false,
+        domMutationGuardDepth: 0,
         translationCache: new Map(),
         repoCacheMap: new Map(),
         repoCacheLoaded: false,
@@ -1067,19 +1071,65 @@
         return typeof pageConfig.currentPageType === 'string' && pageConfig.currentPageType.startsWith('repository');
     }
 
+    function isReadmePage() {
+        const pageType = pageConfig.currentPageType;
+        return pageType === 'repository'
+            || pageType === 'repository/tree'
+            || pageType === 'repository/blob';
+    }
+
     function isReadmeTranslationEnabled() {
-        return FeatureSet.enable_extension && FeatureSet.enable_readme_translation && isRepositoryPage();
+        return FeatureSet.enable_extension && FeatureSet.enable_readme_translation && isReadmePage();
     }
 
     function getReadmeRootElement() {
         for (const selector of README_CONFIG.ROOT_SELECTORS) {
             const element = document.querySelector(selector);
             if (!element) continue;
+            // 避免在议题/PR 等页面误选普通 markdown 正文
+            if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) {
+                continue;
+            }
 
             return element;
         }
 
         return null;
+    }
+
+    // 仓库侧栏 About 描述（React 组件，CSS-module 哈希类，用子串匹配抗哈希后缀）。
+    // 属仓库主自定义的自由文本，静态词库无法收录，故与 README 一样走 AI 内容翻译、就地替换。
+    function getRepoAboutElement() {
+        const element = document.querySelector('p[class*="SidebarAbout-module__description"]');
+        if (!element) return null;
+        if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) return null;
+        return element;
+    }
+
+    async function translateRepoAboutDescription() {
+        const aboutEl = getRepoAboutElement();
+        if (!aboutEl) return 0;
+
+        // 逐文本节点收集：已是中文/纯符号/无字母会被 collectReadmeTextTasks 跳过，
+        // 因此翻译后再次运行会自然短路，配合变更守卫不会自触发循环。
+        const tasks = collectReadmeTextTasks(aboutEl);
+        if (!tasks.length) return 0;
+
+        const providerConfig = getProviderConfig();
+        if (!providerConfig.ok) return 0;
+
+        const uniqueTexts = [...new Set(tasks.map((task) => task.normalizedText))];
+        const tasksByText = new Map();
+        tasks.forEach((task) => {
+            if (!tasksByText.has(task.normalizedText)) {
+                tasksByText.set(task.normalizedText, []);
+            }
+            tasksByText.get(task.normalizedText).push(task);
+        });
+
+        const { translatedMap } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+        return withReadmeDomMutationGuard(() =>
+            applyTextGroupTranslations(aboutEl, tasksByText, uniqueTexts, translatedMap));
     }
 
     function getReadmeElementState(readmeEl) {
@@ -1224,14 +1274,29 @@
             return '插件上下文已失效，请刷新当前 GitHub 页面后重试。';
         }
 
-        return error instanceof Error ? error.message : String(error || '翻译失败');
+        if (error instanceof Error) return error.message;
+
+        // chrome.runtime.lastError 及后台回传的错误常是带 message 的普通对象，
+        // 直接 String() 会得到无意义的 "[object Object]"，需先取出可读信息。
+        if (error && typeof error === 'object') {
+            if (typeof error.message === 'string' && error.message.trim()) return error.message;
+            try {
+                const json = JSON.stringify(error);
+                if (json && json !== '{}') return json;
+            } catch { /* 循环引用等，退回下方兜底 */ }
+        }
+
+        return String(error || '翻译失败');
     }
 
     function normalizeRepoCacheEntries(entries) {
         const list = Array.isArray(entries) ? entries : [];
 
         return list
-            .filter((item) => item && typeof item.key === 'string' && typeof item.translatedHtml === 'string')
+            .filter((item) => item
+                && typeof item.key === 'string'
+                && typeof item.translatedHtml === 'string'
+                && !containsObjectObjectArtifact(item.translatedHtml))
             .map((item) => ({
                 key: item.key,
                 repo: item.repo || '',
@@ -1291,6 +1356,7 @@
     async function upsertRepoCachedTranslation(cacheKey, value) {
         if (!FeatureSet.readme_enable_repo_cache || !cacheKey) return;
         if (!value?.translatedHtml || value.translatedHtml.length > README_CONFIG.MAX_CACHE_HTML_CHARS) return;
+        if (containsObjectObjectArtifact(value.translatedHtml)) return;
 
         await ensureRepoCacheLoaded();
 
@@ -1336,32 +1402,88 @@
         await setLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, trimmed);
     }
 
-    function applyTextGroupTranslations(tasksByText, texts, translatedMap) {
+    function pushReadmeDomMutationGuard() {
+        readmeRuntime.domMutationGuardDepth += 1;
+        readmeRuntime.isApplyingTranslation = true;
+    }
+
+    function popReadmeDomMutationGuard() {
+        readmeRuntime.domMutationGuardDepth = Math.max(0, readmeRuntime.domMutationGuardDepth - 1);
+        if (readmeRuntime.domMutationGuardDepth === 0) {
+            window.setTimeout(() => {
+                if (readmeRuntime.domMutationGuardDepth === 0) {
+                    readmeRuntime.isApplyingTranslation = false;
+                }
+            }, 0);
+        }
+    }
+
+    function withReadmeDomMutationGuard(callback) {
+        pushReadmeDomMutationGuard();
+        try {
+            return callback();
+        } finally {
+            popReadmeDomMutationGuard();
+        }
+    }
+
+    function refreshReadmeTextTaskNodes(rootEl, tasks) {
+        if (!rootEl || !tasks.length) return tasks;
+
+        const liveTasks = collectReadmeTextTasks(rootEl);
+        const liveByText = new Map();
+        liveTasks.forEach((task) => {
+            if (!liveByText.has(task.normalizedText)) {
+                liveByText.set(task.normalizedText, []);
+            }
+            liveByText.get(task.normalizedText).push(task);
+        });
+
+        const usedNodes = new Set();
+        const refreshed = [];
+
+        tasks.forEach((task) => {
+            const candidates = liveByText.get(task.normalizedText) || [];
+            const replacement = candidates.find((candidate) => !usedNodes.has(candidate.node))
+                || (task.node?.isConnected ? task : null);
+
+            if (replacement?.node) {
+                usedNodes.add(replacement.node);
+                refreshed.push(replacement);
+            }
+        });
+
+        return refreshed;
+    }
+
+    function needsReadmeTranslation(text) {
+        return !shouldSkipReadmeText(text);
+    }
+
+    function isUsableTranslation(sourceText, translatedText) {
+        const translated = normalizeTranslationText(translatedText);
+        return !!translated
+            && !isObjectObjectArtifact(translated)
+            && translated !== sourceText
+            && needsReadmeTranslation(sourceText);
+    }
+
+    function applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
         let translatedCount = 0;
 
         texts.forEach((text) => {
-            const translated = translatedMap.get(text);
-            if (!translated || translated === text) return;
+            const translated = normalizeTranslationText(translatedMap.get(text));
+            if (!isUsableTranslation(text, translated)) return;
 
-            const tasks = tasksByText.get(text) || [];
+            const tasks = refreshReadmeTextTaskNodes(rootEl, tasksByText.get(text) || []);
             tasks.forEach((task) => {
+                if (!task.node?.isConnected) return;
                 task.node.data = task.rawText.replace(task.trimmedText, translated);
                 translatedCount += 1;
             });
         });
 
         return translatedCount;
-    }
-
-    function withReadmeDomMutationGuard(callback) {
-        readmeRuntime.isApplyingTranslation = true;
-        try {
-            return callback();
-        } finally {
-            window.setTimeout(() => {
-                readmeRuntime.isApplyingTranslation = false;
-            }, 0);
-        }
     }
 
     function replaceElementChildrenFromHtml(element, html) {
@@ -1376,16 +1498,17 @@
         });
     }
 
-    function applyReadmeTextGroupTranslations(tasksByText, texts, translatedMap) {
-        return withReadmeDomMutationGuard(() => applyTextGroupTranslations(tasksByText, texts, translatedMap));
+    function applyReadmeTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
+        return applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap);
     }
 
-    function applyTaskTranslations(tasks, translatedMap) {
+    function applyTaskTranslations(rootEl, tasks, translatedMap) {
         let translatedCount = 0;
 
-        tasks.forEach((task) => {
-            const translated = translatedMap.get(task.normalizedText);
-            if (!translated || translated === task.normalizedText) return;
+        refreshReadmeTextTaskNodes(rootEl, tasks).forEach((task) => {
+            const translated = normalizeTranslationText(translatedMap.get(task.normalizedText));
+            if (!isUsableTranslation(task.normalizedText, translated)) return;
+            if (!task.node?.isConnected) return;
 
             task.node.data = task.rawText.replace(task.trimmedText, translated);
             translatedCount += 1;
@@ -1394,8 +1517,8 @@
         return translatedCount;
     }
 
-    function applyReadmeTaskTranslations(tasks, translatedMap) {
-        return withReadmeDomMutationGuard(() => applyTaskTranslations(tasks, translatedMap));
+    function applyReadmeTaskTranslations(rootEl, tasks, translatedMap) {
+        return applyTaskTranslations(rootEl, tasks, translatedMap);
     }
 
     async function waitForNextPaint() {
@@ -1444,13 +1567,20 @@
         }
 
         const readmeEl = getReadmeRootElement();
-        if (!readmeEl) return;
+        if (!readmeEl && !getRepoAboutElement()) return;
 
         readmeRuntime.inFlight = true;
         const startAt = performance.now();
 
         try {
-            await translateReadmeElement(readmeEl, reason);
+            // 仓库 About 描述：独立于 README 是否存在，就地 AI 翻译；失败仅告警，不影响 README。
+            await translateRepoAboutDescription().catch((error) => {
+                console.warn('[About翻译] 执行失败:', error);
+            });
+
+            if (readmeEl) {
+                await translateReadmeElement(readmeEl, reason);
+            }
         } catch (error) {
             const sourceHash = createHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '');
             await appendReadmeTranslationRecord({
@@ -1519,70 +1649,119 @@
         });
 
         if (cacheHit?.translatedHtml) {
-            applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
-            state.translatedSignature = signature;
-            state.translatedHash = createHash(readmeEl.innerHTML);
+            if (containsObjectObjectArtifact(cacheHit.translatedHtml)) {
+                console.warn('[README翻译] 忽略含有 [object Object] 的损坏仓库缓存');
+            } else {
+                applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
+                state.translatedSignature = signature;
+                state.translatedHash = createHash(readmeEl.innerHTML);
 
-            await appendReadmeTranslationRecord({
-                sourceType: 'readme',
-                status: 'cache_hit',
-                tokens: 0,
-                durationMs: performance.now() - startAt,
-                sourceHash,
-                detail: `cache_reason=${reason || 'unknown'}`,
-            }).catch((error) => {
-                console.warn('[README翻译] 写入缓存命中记录失败:', error);
-            });
-            return;
+                await appendReadmeTranslationRecord({
+                    sourceType: 'readme',
+                    status: 'cache_hit',
+                    tokens: 0,
+                    durationMs: performance.now() - startAt,
+                    sourceHash,
+                    detail: `cache_reason=${reason || 'unknown'}`,
+                }).catch((error) => {
+                    console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                });
+                return;
+            }
         }
 
+        // 这三个计数在 finally 之后写翻译记录时仍要用，必须声明在 try 块外的函数作用域。
+        let translatedCount = 0;
+        let totalTokens = 0;
+        let retryMissedCount = 0;
+
+        pushReadmeDomMutationGuard();
+        try {
         if (readmeEl.innerHTML !== state.originalHtml) {
             applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
-        const tasks = collectReadmeTextTasks(readmeEl);
-        if (!tasks.length) {
+        const runTranslationPass = async () => {
+            const tasks = collectReadmeTextTasks(readmeEl);
+            if (!tasks.length) return { translatedCount: 0, totalTokens: 0 };
+
+            const uniqueTexts = [...new Set(tasks.map(task => task.normalizedText))];
+            const tasksByText = new Map();
+            tasks.forEach((task) => {
+                if (!tasksByText.has(task.normalizedText)) {
+                    tasksByText.set(task.normalizedText, []);
+                }
+                tasksByText.get(task.normalizedText).push(task);
+            });
+
+            let passTranslatedCount = 0;
+            let passTokens = 0;
+
+            if (FeatureSet.readme_enable_progressive) {
+                const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+                const groupSize = usesAiBatchLimits
+                    ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
+                    : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
+                const groups = buildProgressiveTaskGroups(readmeEl, tasks, groupSize);
+
+                for (let index = 0; index < groups.length; index += 1) {
+                    const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
+                    const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
+                    passTokens += groupTokens;
+                    passTranslatedCount += applyReadmeTaskTranslations(readmeEl, groups[index], translatedMap);
+
+                    if (index < groups.length - 1) {
+                        await waitForNextPaint();
+                    }
+                }
+            } else {
+                const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+                passTokens += tokens;
+                passTranslatedCount += applyReadmeTextGroupTranslations(readmeEl, tasksByText, uniqueTexts, translatedMap);
+            }
+
+            return { translatedCount: passTranslatedCount, totalTokens: passTokens };
+        };
+
+        const firstPass = await runTranslationPass();
+        translatedCount += firstPass.translatedCount;
+        totalTokens += firstPass.totalTokens;
+
+        // 补翻译：首轮后仍有未翻句子（渐进翻译期间 DOM 被 React 重渲染、或个别条目内容降级为原文），
+        // 逐条重试收尾。以“无进展即停止 + 最多 maxRetryPasses 轮”双重保险避免空转。
+        const maxRetryPasses = 2;
+        for (let attempt = 0; attempt < maxRetryPasses; attempt += 1) {
+            const remainingTasks = collectReadmeTextTasks(readmeEl)
+                .filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText));
+            if (!remainingTasks.length) break;
+            if (attempt === 0) retryMissedCount = remainingTasks.length;
+
+            const retryTexts = [...new Set(remainingTasks.map((task) => task.normalizedText))];
+            const retryTasksByText = new Map();
+            remainingTasks.forEach((task) => {
+                if (!retryTasksByText.has(task.normalizedText)) {
+                    retryTasksByText.set(task.normalizedText, []);
+                }
+                retryTasksByText.get(task.normalizedText).push(task);
+            });
+
+            const { translatedMap, totalTokens: retryTokens } = await translateTextsWithProvider(retryTexts, providerConfig, { preferSingleItem: true });
+            totalTokens += retryTokens;
+            const applied = applyReadmeTextGroupTranslations(readmeEl, retryTasksByText, retryTexts, translatedMap);
+            translatedCount += applied;
+            if (!applied) break;
+        }
+
+        if (!translatedCount && !collectReadmeTextTasks(readmeEl).some((task) => needsReadmeTranslation(task.normalizedText))) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
             return;
         }
-
-        const uniqueTexts = [...new Set(tasks.map(task => task.normalizedText))];
-        const tasksByText = new Map();
-        tasks.forEach((task) => {
-            if (!tasksByText.has(task.normalizedText)) {
-                tasksByText.set(task.normalizedText, []);
-            }
-            tasksByText.get(task.normalizedText).push(task);
-        });
-
-        let translatedCount = 0;
-        let totalTokens = 0;
-
-        if (FeatureSet.readme_enable_progressive) {
-            const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
-            const groupSize = usesAiBatchLimits
-                ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
-                : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
-            const groups = buildProgressiveTaskGroups(readmeEl, tasks, groupSize);
-
-            for (let index = 0; index < groups.length; index += 1) {
-                const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
-                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
-                totalTokens += groupTokens;
-                translatedCount += applyReadmeTaskTranslations(groups[index], translatedMap);
-
-                if (index < groups.length - 1) {
-                    await waitForNextPaint();
-                }
-            }
-        } else {
-            const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
-            totalTokens += tokens;
-            translatedCount += applyReadmeTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
+        } finally {
+            popReadmeDomMutationGuard();
         }
 
-
+        const stillMissed = collectReadmeTextTasks(readmeEl).filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText)).length;
         state.translatedSignature = signature;
         state.translatedHash = createHash(readmeEl.innerHTML);
 
@@ -1596,11 +1775,11 @@
 
         await appendReadmeTranslationRecord({
             sourceType: 'readme',
-            status: 'success',
+            status: stillMissed ? 'partial' : 'success',
             tokens: totalTokens,
             durationMs: performance.now() - startAt,
             sourceHash,
-            detail: `translated_nodes=${translatedCount}`,
+            detail: `translated_nodes=${translatedCount};retry_missed=${retryMissedCount};remaining=${stillMissed}`,
         }).catch((error) => {
             console.warn('[README翻译] 写入翻译记录失败:', error);
         });
@@ -2122,27 +2301,31 @@
         });
 
         if (cacheHit?.translatedHtml) {
-            const translatedEl = createTranslatedClone(markdownEl);
-            replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
-            state.translatedEl?.remove();
-            state.translatedEl = translatedEl;
-            markdownEl.insertAdjacentElement('afterend', translatedEl);
-            state.translatedSignature = signature;
-            state.translatedHash = createHash(markdownEl.innerHTML);
-            state.sourceHash = sourceHash;
-            state.errorMessage = '';
+            if (containsObjectObjectArtifact(cacheHit.translatedHtml)) {
+                console.warn('[Issue/PR翻译] 忽略含有 [object Object] 的损坏仓库缓存');
+            } else {
+                const translatedEl = createTranslatedClone(markdownEl);
+                replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
+                state.translatedEl?.remove();
+                state.translatedEl = translatedEl;
+                markdownEl.insertAdjacentElement('afterend', translatedEl);
+                state.translatedSignature = signature;
+                state.translatedHash = createHash(markdownEl.innerHTML);
+                state.sourceHash = sourceHash;
+                state.errorMessage = '';
 
-            await appendReadmeTranslationRecord({
-                sourceType: getDiscussionRecordSourceType(item),
-                status: 'cache_hit',
-                tokens: 0,
-                durationMs: performance.now() - startAt,
-                sourceHash,
-                detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
-            }).catch((error) => {
-                console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
-            });
-            return;
+                await appendReadmeTranslationRecord({
+                    sourceType: getDiscussionRecordSourceType(item),
+                    status: 'cache_hit',
+                    tokens: 0,
+                    durationMs: performance.now() - startAt,
+                    sourceHash,
+                    detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
+                }).catch((error) => {
+                    console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                });
+                return;
+            }
         }
 
         const translatedEl = createTranslatedClone(markdownEl);
@@ -2181,7 +2364,7 @@
                 const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
                 const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
                 totalTokens += groupTokens;
-                translatedCount += applyTaskTranslations(groups[index], translatedMap);
+                translatedCount += applyTaskTranslations(translatedEl, groups[index], translatedMap);
 
                 if (index < groups.length - 1) {
                     await waitForNextPaint();
@@ -2190,7 +2373,7 @@
         } else {
             const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
             totalTokens += tokens;
-            translatedCount += applyTextGroupTranslations(tasksByText, uniqueTexts, translatedMap);
+            translatedCount += applyTextGroupTranslations(translatedEl, tasksByText, uniqueTexts, translatedMap);
         }
 
         state.translatedSignature = signature;
@@ -2400,48 +2583,74 @@
         }
     }
 
-    async function translateTextsWithProvider(texts, providerConfig) {
+    async function translateTextsWithProvider(texts, providerConfig, options = {}) {
         const translatedMap = new Map();
         const uncached = [];
         let totalTokens = 0;
+        const preferSingleItem = !!options.preferSingleItem;
 
         texts.forEach(text => {
             const cacheKey = `${providerConfig.signature}|${text}`;
-            const cached = readmeRuntime.translationCache.get(cacheKey);
+            const cached = normalizeTranslationText(readmeRuntime.translationCache.get(cacheKey));
 
-            if (cached) {
+            if (!preferSingleItem && isUsableTranslation(text, cached)) {
                 translatedMap.set(text, cached);
             } else {
+                if (cached && isObjectObjectArtifact(cached)) {
+                    readmeRuntime.translationCache.delete(cacheKey);
+                }
                 uncached.push(text);
             }
         });
 
         const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
-        const maxBatchItems = usesAiBatchLimits
-            ? README_CONFIG.OPENAI_MAX_BATCH_ITEMS
-            : README_CONFIG.MAX_BATCH_ITEMS;
-        const maxBatchChars = usesAiBatchLimits
-            ? README_CONFIG.OPENAI_MAX_BATCH_CHARS
-            : README_CONFIG.MAX_BATCH_CHARS;
+        const maxBatchItems = preferSingleItem
+            ? 1
+            : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_ITEMS : README_CONFIG.MAX_BATCH_ITEMS);
+        const maxBatchChars = preferSingleItem
+            ? Number.MAX_SAFE_INTEGER
+            : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_CHARS : README_CONFIG.MAX_BATCH_CHARS);
         const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
         for (const batch of batches) {
             const batchResult = await translateBatchWithFallback(batch, providerConfig);
             const batchResults = batchResult.translations;
             totalTokens += batchResult.tokens;
 
-            batch.forEach((text, index) => {
-                const translated = (batchResults[index] || '').trim();
-                const fallback = translated || text;
+            for (let index = 0; index < batch.length; index += 1) {
+                const text = batch[index];
+                let translated = normalizeTranslationText(batchResults[index]);
+
+                if (!isUsableTranslation(text, translated)) {
+                    try {
+                        const retry = await translateBatchWithFallback([text], providerConfig);
+                        translated = normalizeTranslationText(retry.translations[0]);
+                    } catch (error) {
+                        console.warn('[README翻译] 单条重试失败:', error);
+                    }
+                }
+
                 const cacheKey = `${providerConfig.signature}|${text}`;
-                readmeRuntime.translationCache.set(cacheKey, fallback);
-                translatedMap.set(text, fallback);
-            });
+                if (isUsableTranslation(text, translated)) {
+                    readmeRuntime.translationCache.set(cacheKey, translated);
+                    translatedMap.set(text, translated);
+                } else {
+                    translatedMap.set(text, text);
+                }
+            }
         }
 
         return {
             translatedMap,
             totalTokens,
         };
+    }
+
+    // 内容/解析类错误：HTTP 已成功，只是返回体不可解析，可降级为原文而不必中断整篇翻译。
+    // 传输/鉴权/配置类错误不带此标记，仍会照常上抛以便向用户报错。
+    function createRecoverableTranslationError(message) {
+        const error = new Error(message);
+        error.recoverable = true;
+        return error;
     }
 
     async function translateBatchWithFallback(batch, providerConfig) {
@@ -2451,18 +2660,28 @@
             const tokens = Math.max(0, Number(result?.tokens) || 0);
 
             if (!Array.isArray(translations) || translations.length !== batch.length) {
-                throw new Error('翻译结果数量与请求数量不一致，请检查接口配置。');
+                throw createRecoverableTranslationError('翻译结果数量与请求数量不一致，请检查接口配置。');
             }
             return {
                 translations,
                 tokens,
             };
         } catch (error) {
-            // OpenAI 兼容接口在部分平台上会因 JSON 输出不稳定导致整批失败，此时退化为更小批次重试。
-            if ((!AI_CHAT_PROVIDERS.includes(providerConfig.provider) && providerConfig.provider !== 'qwen_mt') || batch.length <= 1) {
+            const isAiProvider = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+
+            // 仅对 AI 接口的“内容/解析类”错误做降级；网络/鉴权/配置等错误继续上抛，
+            // 避免把整篇静默留成英文、且能向用户报错。
+            if (!isAiProvider || !error?.recoverable) {
                 throw error;
             }
 
+            // 单条仍失败：降级为原文占位（交由上层单条重试与补翻译 pass 处理），
+            // 关键是让二分中已翻好的兄弟条目不再被一条坏内容连坐丢失。
+            if (batch.length <= 1) {
+                return { translations: batch.slice(), tokens: 0 };
+            }
+
+            // OpenAI 兼容接口在部分平台上会因 JSON 输出不稳定导致整批失败，二分缩小坏条目的影响范围。
             const midpoint = Math.ceil(batch.length / 2);
             const left = await translateBatchWithFallback(batch.slice(0, midpoint), providerConfig);
             const right = await translateBatchWithFallback(batch.slice(midpoint), providerConfig);
@@ -2542,7 +2761,7 @@
         });
 
         return {
-            translations: (data?.translations || []).map(item => (item?.text || '').trim()),
+            translations: (data?.translations || []).map(item => normalizeTranslationText(item?.text ?? item)),
             tokens: 0,
         };
     }
@@ -2566,7 +2785,7 @@
         });
 
         return {
-            translations: (data?.data?.translations || []).map(item => decodeHtmlEntities(item?.translatedText || '')),
+            translations: (data?.data?.translations || []).map(item => decodeHtmlEntities(normalizeTranslationText(item?.translatedText ?? item))),
             tokens: 0,
         };
     }
@@ -2589,7 +2808,7 @@
         });
 
         return {
-            translations: (data || []).map(item => (item?.translations?.[0]?.text || '').trim()),
+            translations: (data || []).map(item => normalizeTranslationText(item?.translations?.[0]?.text ?? item)),
             tokens: 0,
         };
     }
@@ -2617,10 +2836,7 @@
             });
 
             const firstChoice = data?.choices?.[0] || {};
-            const content = firstChoice?.message?.content ?? firstChoice?.text;
-            const translated = Array.isArray(content)
-                ? content.map(part => part?.text || '').join('')
-                : String(content || '').trim();
+            const translated = extractChatMessageContent(firstChoice);
 
             translations.push(translated);
             tokens += getReadmeUsageTokens(data);
@@ -2662,10 +2878,7 @@
         });
 
         const firstChoice = data?.choices?.[0] || {};
-        const content = firstChoice?.message?.content ?? firstChoice?.text;
-        const raw = Array.isArray(content)
-            ? content.map(part => part?.text || '').join('')
-            : String(content || '').trim();
+        const raw = extractChatMessageContent(firstChoice);
 
         return {
             translations: parseOpenAiArray(raw, texts.length),
@@ -2673,10 +2886,73 @@
         };
     }
 
+    function isObjectObjectArtifact(value) {
+        return /\[object Object\]/i.test(String(value || ''));
+    }
+
+    function containsObjectObjectArtifact(value) {
+        return isObjectObjectArtifact(value);
+    }
+
+    function normalizeTranslationText(value, depth = 0) {
+        if (value == null) return '';
+        if (typeof value === 'string') return value.trim();
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+        if (depth > 4) return '';
+
+        if (Array.isArray(value)) {
+            return value
+                .map(item => normalizeTranslationText(item, depth + 1))
+                .filter(Boolean)
+                .join('');
+        }
+
+        if (typeof value === 'object') {
+            const preferredKeys = [
+                'text',
+                'translatedText',
+                'translation',
+                'translated',
+                'content',
+                'value',
+                'result',
+                'output_text',
+                'outputText',
+                // 部分模型会镜像请求结构，把译文包进 texts/translations 数组里返回
+                'texts',
+                'translations',
+            ];
+
+            for (const key of preferredKeys) {
+                if (value[key] != null) {
+                    const normalized = normalizeTranslationText(value[key], depth + 1);
+                    if (normalized && !isObjectObjectArtifact(normalized)) {
+                        return normalized;
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        return '';
+    }
+
+    function extractChatMessageContent(messageOrChoice) {
+        const firstChoice = messageOrChoice?.message ? messageOrChoice : { message: messageOrChoice };
+        const content = firstChoice?.message?.content ?? firstChoice?.message?.text ?? firstChoice?.text;
+        return normalizeTranslationText(content);
+    }
+
     function parseOpenAiArray(rawText, expectedLength) {
-        let text = (rawText || '').trim();
+        let text = normalizeTranslationText(rawText);
         text = stripOpenAiReasoningBlocks(text);
         text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        if (!text || isObjectObjectArtifact(text)) {
+            throw createRecoverableTranslationError('OpenAI 兼容接口返回内容无效。');
+        }
 
         const start = text.indexOf('[');
         const end = text.lastIndexOf(']');
@@ -2688,32 +2964,42 @@
         try {
             parsed = JSON.parse(text);
         } catch {
-            throw new Error('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+            throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
         }
 
         if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
             if (Array.isArray(parsed.translations)) parsed = parsed.translations;
             else if (Array.isArray(parsed.data)) parsed = parsed.data;
             else if (Array.isArray(parsed.results)) parsed = parsed.results;
+            else if (Array.isArray(parsed.texts)) parsed = parsed.texts;
         }
 
         if (!Array.isArray(parsed)) {
-            throw new Error('OpenAI 兼容接口返回内容不是数组（或未包含 translations/data/results 数组字段）。');
+            throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是数组（或未包含 translations/data/results 数组字段）。');
         }
 
         if (parsed.length !== expectedLength) {
-            throw new Error(`OpenAI 兼容接口返回数量不匹配，期望 ${expectedLength}，实际 ${parsed.length}`);
+            throw createRecoverableTranslationError(`OpenAI 兼容接口返回数量不匹配，期望 ${expectedLength}，实际 ${parsed.length}`);
         }
 
-        return parsed.map(item => String(item ?? '').trim());
+        return parsed.map((item) => {
+            const normalized = normalizeTranslationText(item);
+            if (isObjectObjectArtifact(normalized)) {
+                throw createRecoverableTranslationError('OpenAI 兼容接口返回了无法解析的对象条目。');
+            }
+            if (item && typeof item === 'object' && !Array.isArray(item) && !normalized) {
+                throw createRecoverableTranslationError('OpenAI 兼容接口返回了无法解析的对象条目。');
+            }
+            return normalized;
+        });
     }
 
     function stripOpenAiReasoningBlocks(text) {
         return String(text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     }
 
-    async function proxyFetchJson(request) {
-        const response = await new Promise((resolve, reject) => {
+    function sendProxyMessageOnce(request) {
+        return new Promise((resolve, reject) => {
             chrome.runtime.sendMessage({
                 type: 'ghcn-proxy-fetch',
                 payload: request,
@@ -2726,6 +3012,25 @@
                 resolve(message);
             });
         });
+    }
+
+    async function proxyFetchJson(request) {
+        // MV3 后台 service worker 可能处于空闲/重启中，首个消息偶发
+        // “Could not establish connection / message channel closed”，短暂退避后重试。
+        // 注意：仅对“消息未送达后台”的瞬时失败重试；上下文失效需刷新页面，不重试。
+        const maxAttempts = 3;
+        let response;
+        for (let attempt = 1; ; attempt += 1) {
+            try {
+                response = await sendProxyMessageOnce(request);
+                break;
+            } catch (error) {
+                if (isExtensionContextInvalidatedError(error) || attempt >= maxAttempts) {
+                    throw error;
+                }
+                await new Promise((resolve) => window.setTimeout(resolve, 150 * attempt));
+            }
+        }
 
         if (!response) {
             throw new Error('翻译请求失败：后台未返回响应。');

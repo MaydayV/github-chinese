@@ -113,6 +113,14 @@
 
 ## 🔄 更新日志
 
+### v2.4.6 (2026-07-31)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.6`
+1. 支持仓库侧栏 About 描述的 AI 内容翻译，并适配新版 README DOM 选择器
+1. 增强 OpenAI 兼容接口返回解析，避免 `[object Object]` 污染译文与缓存
+1. 改进 README 渐进翻译的补翻重试、DOM 变更守卫，以及后台消息通道瞬时失败重试
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.4.3 (2026-07-22)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.3`
