@@ -31,7 +31,7 @@
     "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome, Edge, Firefox",
-    "softwareVersion": "2.4.7",
+    "softwareVersion": "2.4.8",
     "url": "https://maydayv.github.io/github-chinese/",
     "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
     "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
@@ -903,9 +903,142 @@
       color: var(--text);
     }
 
+    .changelog-list {
+      list-style: none;
+      display: grid;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .changelog-item {
+      display: grid;
+      grid-template-columns: 168px 1fr;
+      gap: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      scroll-margin-top: 96px;
+    }
+
+    .changelog-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .changelog-version {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      min-height: 28px;
+      border: 1px solid #bfd2ee;
+      border-radius: 999px;
+      padding: 3px 12px;
+      color: #2f4d7a;
+      background: #edf4ff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .changelog-date {
+      color: var(--muted);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .changelog-points {
+      list-style: none;
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .changelog-points li {
+      position: relative;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .changelog-points li::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .changelog-points code {
+      border-radius: 6px;
+      padding: 1px 6px;
+      background: #edf4ff;
+      color: #2f4d7a;
+      font-size: 13px;
+    }
+
+    .changelog-more {
+      margin-top: 14px;
+    }
+
+    .changelog-more > summary {
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 20px;
+      cursor: pointer;
+      color: var(--muted);
+      background: var(--card);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .changelog-more > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .changelog-more > summary::after {
+      content: "▾";
+      font-size: 12px;
+    }
+
+    .changelog-more[open] > summary::after {
+      content: "▴";
+    }
+
+    .changelog-more > summary:hover {
+      color: var(--text);
+      border-color: #b7cbe8;
+    }
+
+    .changelog-more[open] > summary {
+      margin-bottom: 14px;
+    }
+
     @media (max-width: 900px) {
       .nav-links {
         display: none;
+      }
+
+      .changelog-item {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .changelog-meta {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
       }
 
       .product-view,
@@ -979,8 +1112,14 @@
       }
 
       .card,
-      .install-card {
+      .install-card,
+      .changelog-item {
         padding: 18px;
+      }
+
+      .changelog-more > summary {
+        width: 100%;
+        justify-content: center;
       }
 
       .footer-inner {
@@ -1000,6 +1139,7 @@
       <ul class="nav-links">
         <li><a href="#features">功能</a></li>
         <li><a href="#install">安装</a></li>
+        <li><a href="#changelog">更新日志</a></li>
         <li><a href="#privacy">隐私</a></li>
         <li><a href="https://github.com/MaydayV/github-chinese" rel="noopener">源码</a></li>
       </ul>
@@ -1011,7 +1151,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
-        <p class="eyebrow">GitHub Chinese · v2.4.7</p>
+        <p class="eyebrow">GitHub Chinese · v2.4.8</p>
         <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
         <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、Issue、Pull Request 和 Release 正文。</p>
         <div class="hero-actions" aria-label="主要操作">
@@ -1024,7 +1164,7 @@
           <span class="developer-dot" aria-hidden="true"></span>
           <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
         </div>
-        <p class="hero-note">v2.4.7 补齐 Copilot 用量、仓库标星/复刻列表与 Issues 侧栏等界面词条；此前已增强 README / About 内容翻译并修复 Turbo 软导航漏译。</p>
+        <p class="hero-note">v2.4.8 同步上游 122 条词条并新增云沙盒设置页，修复文本域内输入被翻译、时间元素残留 on，新增代码块与免翻标记的全局跳过。</p>
       </div>
     </section>
 
@@ -1145,6 +1285,273 @@
       </div>
     </section>
 
+    <section id="changelog" aria-labelledby="changelog-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Changelog</p>
+          <h2 id="changelog-title">每个版本改了什么。</h2>
+          <p>三端同步发布。从商店安装的版本由浏览器自动更新，手动安装的可在此对照版本号。</p>
+        </div>
+        <!-- CHANGELOG:START -->
+        <ol class="changelog-list">
+          <li class="changelog-item" id="v2-4-8">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.4.8</span>
+              <time class="changelog-date" datetime="2026-08-17">2026-08-17</time>
+            </div>
+            <ul class="changelog-points">
+              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.8</code></li>
+              <li>同步上游一个月内新增的 122 条词条，覆盖拉取请求仪表板自定义版块、组织成员权限与应用访问请求、Copilot AI 额度、议题反馈弹窗等</li>
+              <li>新增组织云沙盒设置页翻译，并补上 <code>orgs/settings/sandboxes</code> 页面匹配规则</li>
+              <li>新增全局免翻区域：<code>.highlight</code> 语法高亮代码块、<code>.notranslate</code> 与 <code>[translate="no"]</code> 显式标记、<code>contenteditable</code> 可编辑区</li>
+              <li>修复文本域内用户正在输入的内容被翻译的问题，同时保留输入框占位符与按钮文案翻译</li>
+              <li>修复时间元素翻译后残留 <code>on</code>（如「打开于 on 7月15日」），并避免赋值时抹掉同级节点</li>
+              <li>新增顶栏搜索框占位文案翻译，混排在文字中的 <code>&lt;kbd&gt;</code> 按键不再被拆碎</li>
+              <li>插件主页地址更正为官网，新增官网入口与版本更新提示</li>
+              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+            </ul>
+          </li>
+          <li class="changelog-item" id="v2-4-7">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.4.7</span>
+              <time class="changelog-date" datetime="2026-08-13">2026-08-13</time>
+            </div>
+            <ul class="changelog-points">
+              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.7</code></li>
+              <li>补齐 Copilot 套内/超套用量、仓库复刻与标星列表、Issues 侧栏与子议题等界面词条</li>
+              <li>补充仓库页 <code>Star</code> / <code>Unstar</code> 动态文案正则翻译</li>
+              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+            </ul>
+          </li>
+          <li class="changelog-item" id="v2-4-6">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.4.6</span>
+              <time class="changelog-date" datetime="2026-07-31">2026-07-31</time>
+            </div>
+            <ul class="changelog-points">
+              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.6</code></li>
+              <li>支持仓库侧栏 About 描述的 AI 内容翻译，并适配新版 README DOM 选择器</li>
+              <li>增强 OpenAI 兼容接口返回解析，避免 <code>[object Object]</code> 污染译文与缓存</li>
+              <li>改进 README 渐进翻译的补翻重试、DOM 变更守卫，以及后台消息通道瞬时失败重试</li>
+              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+            </ul>
+          </li>
+          <li class="changelog-item" id="v2-4-3">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.4.3</span>
+              <time class="changelog-date" datetime="2026-07-22">2026-07-22</time>
+            </div>
+            <ul class="changelog-points">
+              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.3</code></li>
+              <li>修复 Turbo 软导航（返回 / 切页）后仓库顶栏等界面漏译，需硬刷新才完整翻译的问题</li>
+              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+            </ul>
+          </li>
+        </ol>
+        <details class="changelog-more">
+          <summary>查看更早的 16 个版本</summary>
+          <ol class="changelog-list">
+            <li class="changelog-item" id="v2-4-2">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.4.2</span>
+                <time class="changelog-date" datetime="2026-07-22">2026-07-22</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.2</code></li>
+                <li>补齐仓库设置（常规、规则集、Actions、OIDC、Copilot 云端智能体）、确认访问、Projects、Agents、Issues 等页面词条</li>
+                <li>校正规则集升级提示、Actions 白名单横幅、OIDC 主题声明、MCP 拆句等翻译语义</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-4-1">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.4.1</span>
+                <time class="changelog-date" datetime="2026-07-16">2026-07-16</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.1</code></li>
+                <li>补齐 GitHub Sponsors 仪表板个人资料上线、赞助按钮、推广、嵌入与完成状态词条</li>
+                <li>修复 Sponsors 操作按钮动态 <code>Sponsor @用户名</code> 无障碍标签翻译</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-4-0">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.4.0</span>
+                <time class="changelog-date" datetime="2026-07-10">2026-07-10</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.0</code></li>
+                <li>补充 GitHub Sponsors 仪表板、账单与 Copilot 用量页面的本地化词条</li>
+                <li>按页面功能语义修正成就、排序、设置开关、拉取请求和 Sponsors 操作文本</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-3-5">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.3.5</span>
+                <time class="changelog-date" datetime="2026-07-06">2026-07-06</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.3.5</code></li>
+                <li>补充 GitHub Sponsors 账户页、注册页、身份确认和账单信息表单相关词条</li>
+                <li>新增 <code>settings/credentials</code> 凭据设置页翻译，覆盖访问令牌、OAuth 应用、GitHub Apps 和 SSH 密钥条目</li>
+                <li>补齐新版全局搜索 <code>aria-label</code>、设置导航和数量统计文本翻译</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-3-4">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.3.4</span>
+                <time class="changelog-date" datetime="2026-06-28">2026-06-28</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.3.4</code></li>
+                <li>修复 GitHub 新版快速搜索弹窗展开后 <code>Recent</code>、<code>Repositories</code>、<code>Suggestions</code>、<code>Jump to</code> 等内容漏译</li>
+                <li>优化左上角菜单与右上角头像菜单的 React Portal 弹窗翻译速度，减少展开后的英文闪现</li>
+                <li>补充快速搜索、搜索建议与 Copilot 入口相关词条</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-3-3">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.3.3</span>
+                <time class="changelog-date" datetime="2026-06-23">2026-06-23</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.3.3</code></li>
+                <li>手动同步上游 React 全局导航、搜索弹层与 Primer Portal 弹层兼容修复，减少新版 GitHub 顶栏漏译和交互异常</li>
+                <li>同步上游导航标签、组织被标记提示及 <code>Pricing</code>、<code>Healthcare</code>、<code>Nonprofits</code> 等词条修正</li>
+                <li>修复 Firefox 第三方 API 翻译接口授权流程，点击“测试连通性”可正常触发域名授权弹窗</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-3-1">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.3.1</span>
+                <time class="changelog-date" datetime="2026-06-14">2026-06-14</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.3.1</code></li>
+                <li>适配 GitHub 最新 React 全局导航，等待组件 hydration 完成后再翻译</li>
+                <li>修复开启插件后点击右上角搜索按钮无法打开搜索弹层的问题</li>
+                <li>保留新版搜索按钮中文翻译，并避免破坏 GitHub 原生交互</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-3-0">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.3.0</span>
+                <time class="changelog-date" datetime="2026-06-05">2026-06-05</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.3.0</code></li>
+                <li>README 完整说明内容翻译能力，明确翻译接口同时用于 README、Issue、Pull Request 和 Release 正文翻译</li>
+                <li>设置页标题与提示文案改为“内容翻译设置 / 翻译接口”，避免误解为仅支持 README 或 AI 翻译</li>
+                <li>连通性测试请求文本改为中文，三端设置脚本保持一致</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-5">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.5</span>
+                <time class="changelog-date" datetime="2026-06-05">2026-06-05</time>
+              </div>
+              <ul class="changelog-points">
+                <li>新增 Edge 插件目录，可通过 <code>edge/</code> 在 Edge 开发者模式加载</li>
+                <li>新增 Firefox 插件目录，适配 Firefox 扩展后台脚本与 Gecko 配置</li>
+                <li>更新插件图标资源与弹窗入口文件</li>
+                <li>补充后台代理请求脚本，支持扩展内可选翻译接口请求</li>
+                <li>同步 Chrome manifest 版本至 <code>2.2.5</code>，并更新版本检查脚本</li>
+                <li>更新设置页和 README 文案，明确翻译接口同时服务 README、Issue、Pull Request 和 Release 正文翻译</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-4">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.4</span>
+                <time class="changelog-date" datetime="2026-05-26">2026-05-26</time>
+              </div>
+              <ul class="changelog-points">
+                <li>新增 Issue / Pull Request / Release 正文翻译，可手动翻译正文与单条评论</li>
+                <li>支持原文、译文、双语三种视图切换</li>
+                <li>复用 README 翻译的分段渐进翻译、缓存复用与翻译记录能力</li>
+                <li>翻译记录新增来源标签，区分 README、Issue、Pull Request 与 Release</li>
+                <li>优化翻译按钮位置与 GitHub 绿色按钮样式</li>
+                <li>修复插件上下文失效时的错误提示与重试状态</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-3">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.3</span>
+                <time class="changelog-date" datetime="2026-05-26">2026-05-26</time>
+              </div>
+              <ul class="changelog-points">
+                <li>同步上游词条并补回 Chrome 插件本地补充词条</li>
+                <li>清理重复翻译词条，减少词库冗余</li>
+                <li>优化内容翻译设置页结构与交互文案</li>
+                <li>改进翻译记录、缓存与高级功能开关的设置体验</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-2">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.2</span>
+                <time class="changelog-date" datetime="2026-05-26">2026-05-26</time>
+              </div>
+              <ul class="changelog-points">
+                <li>README 翻译支持多厂商翻译接口</li>
+                <li>新增 OpenAI 兼容接口配置，支持自定义 API 地址与模型</li>
+                <li>增加 DeepL、Google、Azure、Qwen-MT 等翻译服务配置入口</li>
+                <li>优化 API 权限申请与连通性配置流程</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-1">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.1</span>
+                <time class="changelog-date" datetime="2026-05-05">2026-05-05</time>
+              </div>
+              <ul class="changelog-points">
+                <li>同步 Chrome 插件上游词条</li>
+                <li>增加页面文本翻译缓存，减少重复匹配与替换开销</li>
+                <li>更新版本号并修正弹窗版本测试</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-2-0">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.2.0</span>
+                <time class="changelog-date" datetime="2026-04-07">2026-04-07</time>
+              </div>
+              <ul class="changelog-points">
+                <li>同步上游新增词条（约 25 条）</li>
+                <li>修正多处翻译一致性</li>
+                <li>新增 Copilot 学生帐户、模型原生搜索、新版 PR 仪表板等词条</li>
+                <li>修复 tooltip 悬浮翻译缺失</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-1-2">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.1.2</span>
+                <time class="changelog-date" datetime="2026-04-02">2026-04-02</time>
+              </div>
+              <ul class="changelog-points">
+                <li>翻译 copilot/agents 试用按钮与能力链接</li>
+                <li>修复 agents 页面分段漏翻与 trial 混排</li>
+              </ul>
+            </li>
+            <li class="changelog-item" id="v2-0-0">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.0.0</span>
+                <time class="changelog-date" datetime="2026-03-11">2026-03-11</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome 扩展首个正式版本发布</li>
+                <li>收敛主机权限并改为 API 域名按需授权</li>
+                <li>完善 README 翻译体验并固定简体中文</li>
+              </ul>
+            </li>
+          </ol>
+        </details>
+        <!-- CHANGELOG:END -->
+      </div>
+    </section>
+
     <section id="privacy" aria-labelledby="privacy-title">
       <div class="container">
         <div class="section-head">
@@ -1224,5 +1631,28 @@
       </ul>
     </div>
   </footer>
+
+  <script>
+    // 插件更新提示会直接跳到 #v2-4-7 这类版本锚点，命中折叠区时先展开再定位
+    (function () {
+      function revealHash() {
+        if (location.hash.length < 2) return;
+
+        var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (!target) return;
+
+        var box = target.closest('details');
+        while (box) {
+          box.open = true;
+          box = box.parentElement ? box.parentElement.closest('details') : null;
+        }
+
+        target.scrollIntoView();
+      }
+
+      window.addEventListener('hashchange', revealHash);
+      revealHash();
+    })();
+  </script>
 </body>
 </html>

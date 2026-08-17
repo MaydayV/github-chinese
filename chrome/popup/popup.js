@@ -4,6 +4,9 @@ const defaults = {
   enable_extension: true
 };
 
+const HOMEPAGE_URL = 'https://maydayv.github.io/github-chinese/';
+const CHANGELOG_URL = `${HOMEPAGE_URL}#changelog`;
+
 function byId(id) {
   return document.getElementById(id);
 }
@@ -29,6 +32,41 @@ async function refreshActiveGithubPage() {
   }
 }
 
+async function openTab(url) {
+  await chrome.tabs.create({ url });
+  window.close();
+}
+
+async function clearUpdateNotice() {
+  await chrome.storage.local.remove('update_notice');
+}
+
+// 更新提示由 background 在版本更新后写入。打开 popup 即视为已看到，先摘掉角标；
+// 横幅本身留到用户点开更新日志或手动忽略为止。
+async function initUpdateNotice() {
+  const notice = byId('updateNotice');
+  if (!notice) return;
+
+  const { update_notice: pending } = await chrome.storage.local.get('update_notice');
+  if (!pending?.version) return;
+
+  await chrome.action.setBadgeText({ text: '' });
+
+  const text = byId('updateNoticeText');
+  if (text) text.textContent = `已更新到 v${pending.version} · 看看改了什么`;
+  notice.hidden = false;
+
+  byId('updateNoticeOpen')?.addEventListener('click', async () => {
+    await clearUpdateNotice();
+    openTab(pending.url || CHANGELOG_URL);
+  });
+
+  byId('updateNoticeClose')?.addEventListener('click', async () => {
+    await clearUpdateNotice();
+    notice.hidden = true;
+  });
+}
+
 async function init() {
   const settings = await chrome.storage.sync.get(defaults);
 
@@ -49,6 +87,12 @@ async function init() {
   byId('openOptions')?.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
+
+  byId('openHomepage')?.addEventListener('click', () => {
+    openTab(CHANGELOG_URL);
+  });
+
+  await initUpdateNotice();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

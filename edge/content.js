@@ -528,6 +528,60 @@
             }
         }
 
+        // 顶部搜索按钮的占位文本把 <kbd> 混排在文字中间（Type <kbd>/</kbd> to search），
+        // 逐个文本节点翻译会把词条拆碎，所以整体取译文后再按受保护片段回填。
+        function translateReactGlobalNavSearchPlaceholder() {
+            const placeholder = document.querySelector('header.GlobalNav [class*="Search-module__placeholder__"]');
+            if (!placeholder) return;
+
+            const label = translateReactGlobalNavText(placeholder.textContent);
+            if (!label || normalizeReactGlobalNavText(placeholder.textContent) === label) return;
+
+            const textNodeGroups = [[]];
+            const protectedTexts = [];
+
+            const collectNodes = node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    textNodeGroups[textNodeGroups.length - 1].push(node);
+                    return;
+                }
+                if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+                // 遇到 kbd 之类不可改写的元素，另起一段
+                if (node.matches?.(unsafeTextSelector)) {
+                    const protectedText = normalizeReactGlobalNavText(node.textContent);
+                    if (protectedText) {
+                        protectedTexts.push(protectedText);
+                        textNodeGroups.push([]);
+                    }
+                    return;
+                }
+                node.childNodes.forEach(collectNodes);
+            };
+            placeholder.childNodes.forEach(collectNodes);
+
+            // 用受保护片段把译文切段；切不出来说明词条和 DOM 对不上，直接放弃，别改坏
+            const segments = [];
+            let remaining = label;
+            for (const protectedText of protectedTexts) {
+                const index = remaining.indexOf(protectedText);
+                if (index === -1) return;
+                segments.push(remaining.slice(0, index));
+                remaining = remaining.slice(index + protectedText.length);
+            }
+            segments.push(remaining);
+
+            const hasNowhereToPut = segments.some((segment, index) =>
+                normalizeReactGlobalNavText(segment) && !textNodeGroups[index]?.length);
+            if (hasNowhereToPut) return;
+
+            textNodeGroups.forEach((nodes, segmentIndex) => {
+                nodes.forEach((node, nodeIndex) => {
+                    node.data = nodeIndex === 0 ? segments[segmentIndex] : '';
+                });
+            });
+        }
+
         function translateReactGlobalNavHeader() {
             const header = document.querySelector('header.GlobalNav');
             if (!header) return true;
@@ -539,6 +593,7 @@
                 }
             });
             translateReactGlobalNavSurface(header);
+            translateReactGlobalNavSearchPlaceholder();
 
             return true;
         }
@@ -768,20 +823,32 @@
             transElement(node, 'data');
         }
 
+        // textarea 的文本子节点就是用户正在输入的内容，翻译它会直接篡改输入。
+        // 这里单独拦文本节点，而不是把 textarea 放进 ignoreSelectors，
+        // 否则 handleElement 里的 placeholder / value 属性翻译会被一并跳过。
+        const isUserInputText = node => node.parentElement?.tagName === 'TEXTAREA';
+
         // 如果 rootNode 是文本节点，直接处理
         if (rootNode.nodeType === Node.TEXT_NODE) {
-            handleTextNode(rootNode);
+            if (!isUserInputText(rootNode)) handleTextNode(rootNode);
             return; // 文本节点没有子节点，直接返回
         }
 
         const treeWalker = document.createTreeWalker(
             rootNode,
             NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-            node =>
+            node => {
+                // 跳过用户输入内容
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return isUserInputText(node)
+                        ? NodeFilter.FILTER_REJECT
+                        : NodeFilter.FILTER_ACCEPT;
+                }
                 // 跳过忽略的节点
-                node.matches?.(pageConfig.ignoreSelectors)
-                ? NodeFilter.FILTER_REJECT
-                : NodeFilter.FILTER_ACCEPT,
+                return node.matches?.(pageConfig.ignoreSelectors)
+                    ? NodeFilter.FILTER_REJECT
+                    : NodeFilter.FILTER_ACCEPT;
+            },
         );
 
         const handleElement = node => {
@@ -936,10 +1003,17 @@
      */
     function transTimeElement(el) {
         if (!FeatureSet.enable_extension || !el) return;
-        const text = el.childNodes.length > 0 ? el.lastChild.textContent : el.textContent;
-        const translatedText = text.replace(/^on/, '');
+
+        // 时间文本形如 "on Jul 15"，中文语序里不需要这个 on。
+        // 前面可能带空白，所以不能只匹配 /^on/，否则会残留成「打开于 on 7月15日」。
+        // 同时只改承载文本的那个节点，避免用 el.textContent 赋值抹掉同级节点。
+        const target = el.childNodes.length > 0 ? el.lastChild : el;
+        const text = target.textContent;
+        if (!text) return;
+
+        const translatedText = text.replace(/^(\s*)on\b\s*/, '$1');
         if (translatedText !== text) {
-            el.textContent = translatedText;
+            target.textContent = translatedText;
         }
     }
 

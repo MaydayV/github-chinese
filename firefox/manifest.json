@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "GitHub 中文汉化翻译插件",
-  "version": "2.4.7",
+  "version": "2.4.8",
   "description": "GitHub 中文汉化翻译插件用于将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。",
-  "homepage_url": "https://star.caodan.io",
+  "homepage_url": "https://maydayv.github.io/github-chinese/",
   "icons": {
     "16": "assets/icons/icon16.png",
     "32": "assets/icons/icon32.png",

@@ -8,6 +8,14 @@
 </head>
 <body>
   <main class="panel">
+    <div id="updateNotice" class="update-notice" hidden>
+      <button id="updateNoticeOpen" class="update-notice-main" type="button">
+        <span class="update-dot" aria-hidden="true"></span>
+        <span id="updateNoticeText">已更新到新版本</span>
+      </button>
+      <button id="updateNoticeClose" class="update-notice-close" type="button" aria-label="忽略本次更新提示">×</button>
+    </div>
+
     <h1>GitHub 中文汉化翻译插件</h1>
     <p id="featureDescription" class="feature-description">将 GitHub 页面英文自动翻译为中文</p>
 
@@ -22,6 +30,7 @@
     <p id="status" class="status" aria-live="polite"></p>
     <p class="usage-note">若当前是 GitHub 页面，会立即生效并自动刷新。</p>
     <button id="openOptions" class="options-btn" type="button">README 翻译设置</button>
+    <button id="openHomepage" class="site-btn" type="button">官网 · 更新日志</button>
   </main>
   <script src="popup.js"></script>
 </body>

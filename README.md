@@ -111,7 +111,28 @@
 1. Firefox 在 `about:debugging#/runtime/this-firefox` 中临时载入 `firefox/manifest.json`
 1. 修改对应浏览器目录下的 `locals.js` 后，在扩展管理页点击刷新按钮即可生效
 
+发版时在更新下方「更新日志」后执行以下命令，把内容同步到官网 `index.html` 并自检：
+
+```bash
+node script/build-changelog.js
+node script/test-update-entry.js
+```
+
+官网更新日志板块由 README 生成，请勿直接编辑 `index.html` 中 `<!-- CHANGELOG:START -->` 与 `<!-- CHANGELOG:END -->` 之间的内容。
+
 ## 🔄 更新日志
+
+### v2.4.8 (2026-08-17)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.8`
+1. 同步上游一个月内新增的 122 条词条，覆盖拉取请求仪表板自定义版块、组织成员权限与应用访问请求、Copilot AI 额度、议题反馈弹窗等
+1. 新增组织云沙盒设置页翻译，并补上 `orgs/settings/sandboxes` 页面匹配规则
+1. 新增全局免翻区域：`.highlight` 语法高亮代码块、`.notranslate` 与 `[translate="no"]` 显式标记、`contenteditable` 可编辑区
+1. 修复文本域内用户正在输入的内容被翻译的问题，同时保留输入框占位符与按钮文案翻译
+1. 修复时间元素翻译后残留 `on`（如「打开于 on 7月15日」），并避免赋值时抹掉同级节点
+1. 新增顶栏搜索框占位文案翻译，混排在文字中的 `<kbd>` 按键不再被拆碎
+1. 插件主页地址更正为官网，新增官网入口与版本更新提示
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
 
 ### v2.4.7 (2026-08-13)
 
