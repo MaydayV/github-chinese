@@ -88,10 +88,6 @@ async function init() {
     chrome.runtime.openOptionsPage();
   });
 
-  byId('openHomepage')?.addEventListener('click', () => {
-    openTab(CHANGELOG_URL);
-  });
-
   await initUpdateNotice();
 }
 

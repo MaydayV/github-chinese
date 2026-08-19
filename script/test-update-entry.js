@@ -31,6 +31,7 @@ assert.ok(
 const baseBackground = read('chrome', 'background.js');
 const basePopupJs = read('chrome', 'popup', 'popup.js');
 const basePopupHtml = read('chrome', 'popup', 'popup.html');
+const basePopupCss = read('chrome', 'popup', 'popup.css');
 
 for (const browser of BROWSERS) {
   const manifest = JSON.parse(read(browser, 'manifest.json'));
@@ -57,7 +58,11 @@ assert.ok(/update_notice/.test(baseBackground), 'background.js 应写入 update_
 assert.ok(/setBadgeText/.test(baseBackground), 'background.js 应设置角标');
 
 assert.ok(basePopupHtml.includes('id="updateNotice"'), 'popup 应包含更新提示横幅');
-assert.ok(basePopupHtml.includes('id="openHomepage"'), 'popup 应包含官网入口按钮');
+assert.ok(!basePopupHtml.includes('id="openHomepage"'), 'popup 不应再有常驻官网按钮');
+assert.ok(
+  /\.update-notice\[hidden\]\s*\{\s*display:\s*none/.test(basePopupCss),
+  'popup.css 需要 [hidden] 守卫，否则 display:flex 会盖掉 hidden 属性',
+);
 assert.ok(basePopupJs.includes(HOMEPAGE_URL), 'popup.js 应引用官网地址');
 assert.ok(/update_notice/.test(basePopupJs), 'popup.js 应读取 update_notice 状态');
 assert.ok(/storage\.local\.remove\('update_notice'\)/.test(basePopupJs), 'popup.js 应在点击后清除提示');

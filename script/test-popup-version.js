@@ -6,7 +6,7 @@ const path = require('path');
 const assert = require('assert');
 
 const popupCss = fs.readFileSync(path.resolve(__dirname, '../chrome/popup/popup.css'), 'utf8');
-const expectedVersion = '2.4.8';
+const expectedVersion = '2.4.9';
 const manifests = ['chrome', 'edge', 'firefox'].map((browser) => ({
   browser,
   manifest: JSON.parse(fs.readFileSync(path.resolve(__dirname, `../${browser}/manifest.json`), 'utf8')),
