@@ -1027,13 +1027,25 @@ function bindEvents() {
       }
 
       applyValues(ruled.values);
-      setStatus('README 翻译已开启。高级功能默认关闭，可按需手动开启。');
+      await savePartialValues({
+        enable_readme_translation: true,
+        readme_enable_token_record: false,
+        readme_enable_repo_cache: false,
+        readme_enable_progressive: false,
+      });
+      setStatus('README 翻译已开启。高级功能默认关闭，可按需手动开启。', 'success');
       return;
     }
 
     const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: false });
     applyValues(ruled.values);
-    setStatus('README 翻译已关闭，相关高级开关已自动关闭。');
+    await savePartialValues({
+      enable_readme_translation: false,
+      readme_enable_token_record: false,
+      readme_enable_repo_cache: false,
+      readme_enable_progressive: false,
+    });
+    setStatus('README 翻译已关闭，相关高级开关已自动关闭。', 'success');
   });
 
   const issuePrSwitch = byId('enable_issue_pr_translation');
@@ -1099,7 +1111,8 @@ function bindEvents() {
         return;
       }
 
-      if (isAnyAiTranslationEnabled(ruled.values)) {
+      const providerConfig = getProviderConfig(ruled.values);
+      if (providerConfig.ok) {
         const permission = await ensureProviderHostPermission(ruled.values, { request: true });
         if (!permission.ok) {
           setStatus(permission.message, 'error');
@@ -1110,7 +1123,7 @@ function bindEvents() {
       applyValues(ruled.values);
       await saveValues(ruled.values);
       setStatus(
-        isAnyAiTranslationEnabled(ruled.values)
+        providerConfig.ok
           ? '设置已保存。接口域名权限已就绪，可点击“测试连通性”进一步验证。'
           : '设置已保存。',
         'success',

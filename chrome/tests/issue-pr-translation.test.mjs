@@ -6,6 +6,11 @@ const content = readFileSync(new URL('../content.js', import.meta.url), 'utf8');
 const locals = readFileSync(new URL('../locals.js', import.meta.url), 'utf8');
 const optionsHtml = readFileSync(new URL('../options/options.html', import.meta.url), 'utf8');
 const optionsJs = readFileSync(new URL('../options/options.js', import.meta.url), 'utf8');
+const browserOptions = ['chrome', 'edge', 'firefox'].map((browser) => ({
+  browser,
+  html: readFileSync(new URL(`../../${browser}/options/options.html`, import.meta.url), 'utf8'),
+  js: readFileSync(new URL(`../../${browser}/options/options.js`, import.meta.url), 'utf8'),
+}));
 
 test('discussion body translation setting is exposed in storage and options UI', () => {
   assert.match(optionsJs, /enable_issue_pr_translation:\s*false/);
@@ -66,6 +71,54 @@ test('translated clone does not inherit extension marker that skips text collect
 test('Issue and PR translation switch persists when toggled', () => {
   assert.match(optionsJs, /function savePartialValues\(/);
   assert.match(optionsJs, /savePartialValues\(\{\s*enable_issue_pr_translation:/);
+});
+
+test('translation connection test is visible for every provider', () => {
+  browserOptions.forEach(({ browser, html }) => {
+    assert.match(html, /<section class="card connection-test">[\s\S]*id="testConnection"/, `${browser} 应显示连通性测试区域`);
+    const providerSections = html.match(/<section class="card provider"[\s\S]*?<\/section>/g) || [];
+    assert.equal(
+      providerSections.some((section) => section.includes('id="testConnection"')),
+      false,
+      `${browser} 的连通性测试按钮不应嵌套在单个服务面板中`,
+    );
+  });
+});
+
+test('saving a valid provider config requests host access before features are enabled', () => {
+  browserOptions.forEach(({ browser, js }) => {
+    assert.match(
+      js,
+      /const providerConfig = getProviderConfig\(ruled\.values\);\s*if \(providerConfig\.ok\) \{\s*const permission = await ensureProviderHostPermission\(ruled\.values, \{ request: true \}\)/,
+      `${browser} 保存有效接口配置时应主动申请主机权限`,
+    );
+
+    const permissionStart = js.indexOf('async function ensureProviderHostPermission');
+    const permissionEnd = js.indexOf('function enforceFeatureSwitchRules', permissionStart);
+    const permissionFlow = permissionStart >= 0 && permissionEnd > permissionStart
+      ? js.slice(permissionStart, permissionEnd)
+      : '';
+    assert.ok(permissionFlow, `${browser} 应包含主机权限处理函数`);
+    assert.ok(
+      permissionFlow.indexOf('if (request)') < permissionFlow.indexOf('const alreadyGranted = await permissionsContains(origins)'),
+      `${browser} 应在用户手势中直接申请权限，再处理只读权限检查`,
+    );
+  });
+});
+
+test('README translation switch persists both enabled and disabled states', () => {
+  browserOptions.forEach(({ browser, js }) => {
+    assert.match(
+      js,
+      /savePartialValues\(\{\s*enable_readme_translation: true,/,
+      `${browser} 应持久化 README 翻译开启状态`,
+    );
+    assert.match(
+      js,
+      /savePartialValues\(\{\s*enable_readme_translation: false,/,
+      `${browser} 应持久化 README 翻译关闭状态`,
+    );
+  });
 });
 
 test('Issue and PR translation follows README progressive cache and record settings', () => {
