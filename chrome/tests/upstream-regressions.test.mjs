@@ -73,3 +73,33 @@ test('Sponsors dashboard onboarding terms and action label are translated', () =
     assert.equal(translate(sponsors.regexp, 'Sponsor @MaydayV'), '赞助 @MaydayV', browser);
   }
 });
+
+test('upstream editable-content and notification fixes are present in every browser build', () => {
+  for (const [browser, file] of locales) {
+    const localeData = loadLocale(file);
+    const config = localeData.conf;
+    for (const selector of ['input', 'textarea', '[contenteditable="true"]']) {
+      assert.ok(config.ignoreMutationSelectorPage['*'].includes(selector), `${browser}: mutation ${selector}`);
+      assert.ok(config.ignoreSelectorPage['*'].includes(selector), `${browser}: initial ${selector}`);
+    }
+    assert.equal(localeData['zh-CN'].notifications.static['Filter by…'], '筛选…', browser);
+    assert.ok(config.ignoreSelectorPage['repository/pull'].includes('span.ActionList-item-label'), browser);
+    assert.ok(config.ignoreSelectorPage['repository/pull'].includes('div[class^="CommitHeader-module__commitMessageContainer"]'), browser);
+    assert.ok(config.ignoreMutationSelectorPage['repository/pull'].includes('div[class^="CommitHeader-module__commitMessageContainer"]'), browser);
+  }
+});
+
+test('two-factor authentication deadline accepts joined and spaced dates', () => {
+  for (const [browser, file] of locales) {
+    const publicLocale = loadLocale(file)['zh-CN'].public;
+    const rule = publicLocale.regexp.find(([pattern]) => pattern.source.includes('to enable two-factor authentication'));
+    assert.ok(rule, browser);
+    for (const source of [
+      'to enable two-factor authentication as an additional security measure. Your activity on GitHub includes you in this requirement. You will need to enable two-factor authentication on your account before2026年9月14日, or be restricted from account actions.',
+      'to enable two-factor authentication as an additional security measure. Your activity on GitHub includes you in this requirement. You will need to enable two-factor authentication on your account before 2026年9月14日, or be restricted from account actions.',
+    ]) {
+      assert.match(translate([rule], source), /^启用双因素身份验证（2FA）/, `${browser}: ${source}`);
+      assert.doesNotMatch(translate([rule], source), /to enable two-factor authentication/);
+    }
+  }
+});

@@ -122,6 +122,13 @@ node script/test-update-entry.js
 
 ## 🔄 更新日志
 
+### v2.5.0 (2026-08-28)
+
+1. Chrome、Edge、Firefox 三端插件版本同步至 `2.5.0`
+1. 同步上游编辑区域保护、双因素认证截止日期和 PR 提交消息误翻译修复
+1. 补充通知页 `Filter by…` 词条，并新增对应回归测试
+1. 重新打包 Chrome、Edge、Firefox 三端发布压缩包
+
 ### v2.4.9 (2026-08-19)
 
 1. Chrome、Edge、Firefox 三端插件版本同步至 `2.4.9`

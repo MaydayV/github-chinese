@@ -64,12 +64,19 @@ I18N.conf = {
             "td.blob-code", // 代码差异 分屏/同屏
             '.js-full-logs-container', // 工作流运行日志
             'span.PRIVATE_TreeView-item-content-text', // PR 变更文件树中的文件夹和文件名
+            'span.ActionList-item-label', // PR 文件树文件夹/文件名
+            'div.commit-title', // 提交标题（经典 UI）
+            'div.commit-desc', // 提交说明（经典 UI）
+            'span.ws-pre-wrap', // 提交说明
+            "h4[class^='Title-module__heading']", // 提交标题
+            'div[class^="CommitHeader-module__commitMessageContainer"]', // PR changes 页提交消息容器
         ],
         'repository/compare': [
             "tbody", // 代码差异
             ".js-preview-body", // 新建拉取请求 - 正文编辑器预览
+            'span.PRIVATE_TreeView-item-content-text', // 文件树文件夹/文件名
         ],
-        'repository/commit': ["td.blob-code", "div.diff-text-inner"], // 代码差异 分屏/同屏
+        'repository/commit': ["td.blob-code", "div.diff-text-inner", 'span.PRIVATE_TreeView-item-content-text'], // 代码差异 分屏/同屏
         'repository/blob': [
             "#highlighted-line-menu-positioner", // 代码视图 存在
             "#repos-sticky-header", // 代码视图 置顶标题
@@ -117,6 +124,8 @@ I18N.conf = {
             '.highlight', // 语法高亮代码块
             '.notranslate', // 显式标记免翻译
             '[translate="no"]', // 同上，HTML 标准写法
+            'input',
+            'textarea',
             '[contenteditable=""]', // 可编辑区域，避免翻译用户正在输入的内容
             '[contenteditable="true"]',
             '[contenteditable="plaintext-only"]',
@@ -179,14 +188,22 @@ I18N.conf = {
             'td.blob-code', // 代码差异 分屏/同屏
             'span.ws-pre-wrap', // 提交说明
             "h4[class^='Title-module__heading']", // 提交标题
+            'span.PRIVATE_TreeView-item-content-text', // 文件树文件夹/文件名
         ],
         'repository/pull': [
             'td.blob-code', // 代码差异 分屏/同屏
             '.js-full-logs-container', // 工作流运行日志
             'span.PRIVATE_TreeView-item-content-text', // PR 变更文件树中的文件夹和文件名
+            'span.ActionList-item-label', // PR 文件树文件夹/文件名
+            'div.commit-title', // 提交标题（经典 UI）
+            'div.commit-desc', // 提交说明（经典 UI）
+            'span.ws-pre-wrap', // 提交说明
+            "h4[class^='Title-module__heading']", // 提交标题
+            'div[class^="CommitHeader-module__commitMessageContainer"]', // PR changes 页提交消息容器
         ],
         'repository/compare': [
             'td.blob-code', // 代码差异 分屏/同屏
+            'span.PRIVATE_TreeView-item-content-text', // 文件树文件夹/文件名
         ],
         'repository/edit': [
             '.cm-scroller', // 代码编辑器
@@ -256,6 +273,8 @@ I18N.conf = {
             '.highlight', // 语法高亮代码块
             '.notranslate', // 显式标记免翻译
             '[translate="no"]', // 同上，HTML 标准写法
+            'input',
+            'textarea',
             '[contenteditable=""]', // 可编辑区域，避免翻译用户正在输入的内容
             '[contenteditable="true"]',
             '[contenteditable="plaintext-only"]',
@@ -2088,7 +2107,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
         }],
 
         // 其他翻译
-        [/to enable two-factor authentication as an additional security measure. Your activity on GitHub includes you in this requirement. You will need to enable two-factor authentication on your account before ([^ ]+), or be restricted from account actions./, "启用双因素身份验证（2FA）作为额外安全措施。您在 GitHub 上的活动让您接收到此要求。您将需要在 $1 前启用双因素身份验证，否则会被限制账户操作。"],
+        [/to enable two-factor authentication as an additional security measure. Your activity on GitHub includes you in this requirement. You will need to enable two-factor authentication on your account before ?(.+?), or be restricted from account actions./, "启用双因素身份验证（2FA）作为额外安全措施。您在 GitHub 上的活动让您接收到此要求。您将需要在 $1 前启用双因素身份验证，否则会被限制账户操作。"],
     ],
     "time-regexp": [ // 时间正则翻译专项
         /**
@@ -21438,6 +21457,7 @@ I18N["zh-CN"]["notifications"] = { // 通知页面
         "Save": "保存",
         "Done": "已完成",
         "Filters": "筛选",
+        "Filter by…": "筛选…",
         "Dismiss": "关闭",
         "get started": "开始",
         "Subscribe": "订阅",
