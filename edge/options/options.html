@@ -223,12 +223,13 @@
             <input id="readme_openai_model" type="text" placeholder="gpt-4.1-mini / deepseek-v4-flash / qwen-flash / MiniMax-M2.7-highspeed">
             <p class="hint">填接口实际可用的模型名，大小写请与平台要求一致。</p>
           </div>
-          <div class="connection-test">
-            <button id="testConnection" type="button" class="btn btn-test btn-inline">测试连通性</button>
-            <p id="testStatus" class="status status-context" aria-live="polite"></p>
-            <p class="hint">点击后会用当前表单配置发送一次最小测试请求，不会修改页面内容。首次测试某个 API 域名时，浏览器会弹出域名访问授权提示。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
-          </div>
           <p class="hint">对话模型翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>
+        </section>
+
+        <section class="card connection-test">
+          <button id="testConnection" type="button" class="btn btn-test btn-inline">测试连通性</button>
+          <p id="testStatus" class="status status-context" aria-live="polite"></p>
+          <p class="hint">点击后会用当前表单配置发送一次最小测试请求，不会修改页面内容。首次测试某个 API 域名时，浏览器会弹出域名访问授权提示。若返回 401/403/429，请先检查 API Key 权限、额度和模型名。</p>
         </section>
 
         <div class="panel-actions">
