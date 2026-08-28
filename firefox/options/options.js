@@ -1026,26 +1026,40 @@ function bindEvents() {
         return;
       }
 
-      applyValues(ruled.values);
-      await savePartialValues({
-        enable_readme_translation: true,
-        readme_enable_token_record: false,
-        readme_enable_repo_cache: false,
-        readme_enable_progressive: false,
-      });
-      setStatus('README 翻译已开启。高级功能默认关闭，可按需手动开启。', 'success');
+      try {
+        applyValues(ruled.values);
+        await savePartialValues({
+          enable_readme_translation: true,
+          readme_enable_token_record: false,
+          readme_enable_repo_cache: false,
+          readme_enable_progressive: false,
+        });
+        setStatus('README 翻译已开启。高级功能默认关闭，可按需手动开启。', 'success');
+      } catch (error) {
+        console.error(error);
+        applyValues(LAST_SAVED_VALUES);
+        updateAdvancedSwitchUi(Boolean(LAST_SAVED_VALUES.enable_readme_translation));
+        setStatus('保存 README 翻译设置失败，请重试。', 'error');
+      }
       return;
     }
 
     const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: false });
-    applyValues(ruled.values);
-    await savePartialValues({
-      enable_readme_translation: false,
-      readme_enable_token_record: false,
-      readme_enable_repo_cache: false,
-      readme_enable_progressive: false,
-    });
-    setStatus('README 翻译已关闭，相关高级开关已自动关闭。', 'success');
+    try {
+      applyValues(ruled.values);
+      await savePartialValues({
+        enable_readme_translation: false,
+        readme_enable_token_record: false,
+        readme_enable_repo_cache: false,
+        readme_enable_progressive: false,
+      });
+      setStatus('README 翻译已关闭，相关高级开关已自动关闭。', 'success');
+    } catch (error) {
+      console.error(error);
+      applyValues(LAST_SAVED_VALUES);
+      updateAdvancedSwitchUi(Boolean(LAST_SAVED_VALUES.enable_readme_translation));
+      setStatus('保存 README 翻译设置失败，请重试。', 'error');
+    }
   });
 
   const issuePrSwitch = byId('enable_issue_pr_translation');

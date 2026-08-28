@@ -121,6 +121,17 @@ test('README translation switch persists both enabled and disabled states', () =
   });
 });
 
+test('README translation switch rolls back the UI when persistence fails', () => {
+  browserOptions.forEach(({ browser, js }) => {
+    const handlerStart = js.indexOf("mainSwitch?.addEventListener('change', async () =>");
+    const handlerEnd = js.indexOf("const issuePrSwitch", handlerStart);
+    const handler = handlerStart >= 0 && handlerEnd > handlerStart
+      ? js.slice(handlerStart, handlerEnd)
+      : '';
+    assert.match(handler, /catch \(error\) \{[\s\S]*applyValues\(LAST_SAVED_VALUES\);[\s\S]*setStatus\('保存 README 翻译设置失败，请重试。', 'error'\)/, `${browser} 持久化失败时应恢复界面状态`);
+  });
+});
+
 test('Issue and PR translation follows README progressive cache and record settings', () => {
   assert.match(content, /function buildDiscussionCacheKey\(/);
   assert.match(content, /function getIssuePrRecordSourceType\(/);
