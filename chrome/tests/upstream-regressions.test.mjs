@@ -78,9 +78,13 @@ test('upstream editable-content and notification fixes are present in every brow
   for (const [browser, file] of locales) {
     const localeData = loadLocale(file);
     const config = localeData.conf;
-    for (const selector of ['input', 'textarea', '[contenteditable="true"]']) {
-      assert.ok(config.ignoreMutationSelectorPage['*'].includes(selector), `${browser}: mutation ${selector}`);
-      assert.ok(config.ignoreSelectorPage['*'].includes(selector), `${browser}: initial ${selector}`);
+    for (const [name, list] of Object.entries({
+      mutation: config.ignoreMutationSelectorPage['*'],
+      initial: config.ignoreSelectorPage['*'],
+    })) {
+      assert.ok(!list.includes('input'), `${browser}: ${name} 规则不能跳过 input，否则顶部搜索占位符无法翻译`);
+      assert.ok(!list.includes('textarea'), `${browser}: ${name} 规则不能跳过 textarea 的属性处理`);
+      assert.ok(list.includes('[contenteditable="true"]'), `${browser}: ${name} 应忽略可编辑区域`);
     }
     assert.equal(localeData['zh-CN'].notifications.static['Filter by…'], '筛选…', browser);
     assert.ok(config.ignoreSelectorPage['repository/pull'].includes('span.ActionList-item-label'), browser);

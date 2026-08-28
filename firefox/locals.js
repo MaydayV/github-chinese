@@ -124,8 +124,6 @@ I18N.conf = {
             '.highlight', // 语法高亮代码块
             '.notranslate', // 显式标记免翻译
             '[translate="no"]', // 同上，HTML 标准写法
-            'input',
-            'textarea',
             '[contenteditable=""]', // 可编辑区域，避免翻译用户正在输入的内容
             '[contenteditable="true"]',
             '[contenteditable="plaintext-only"]',
@@ -273,8 +271,6 @@ I18N.conf = {
             '.highlight', // 语法高亮代码块
             '.notranslate', // 显式标记免翻译
             '[translate="no"]', // 同上，HTML 标准写法
-            'input',
-            'textarea',
             '[contenteditable=""]', // 可编辑区域，避免翻译用户正在输入的内容
             '[contenteditable="true"]',
             '[contenteditable="plaintext-only"]',
