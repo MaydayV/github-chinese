@@ -93,6 +93,23 @@ test('upstream editable-content and notification fixes are present in every brow
   }
 });
 
+test('recent upstream Copilot, fork, and repository settings terms are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const i18n = loadLocale(file)['zh-CN'];
+    assert.equal(i18n.public.static['View token usage'], '查看令牌用量', browser);
+    assert.equal(translate(i18n['settings/copilot'].regexp, '3 / 10 AI credits'), '3 / 10 AI 额度', browser);
+    assert.equal(translate(i18n['settings/copilot'].regexp, '$5 / $20 budget'), '$5 / $20 预算', browser);
+    assert.equal(i18n['page-new-repo'].static["You can't fork this repository at this time."], '您此时不能复刻此仓库。', browser);
+    const repositorySettings = i18n['repository/settings'].static;
+    assert.equal(repositorySettings['Security features will be interrupted:'], '安全功能将停止', browser);
+    assert.equal(repositorySettings['Code scanning will be paused'], '代码扫描将暂停', browser);
+    const copilot = i18n.copilot.static;
+    assert.equal(copilot['View message token usage'], '查看此消息令牌用量', browser);
+    assert.equal(copilot['Message token usage'], '此消息令牌用量', browser);
+    assert.equal(copilot['New topic? A fresh chat keeps your usage lower.'], '新话题？新聊天有助于降低使用量。', browser);
+  }
+});
+
 test('two-factor authentication deadline accepts joined and spaced dates', () => {
   for (const [browser, file] of locales) {
     const publicLocale = loadLocale(file)['zh-CN'].public;

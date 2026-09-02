@@ -1819,6 +1819,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Please don’t include sensitive, confidential, or personal data. Your anonymous feedback helps us improve our services in line with our": "请不要包含敏感、机密或个人数据。您的匿名反馈有助于我们改进服务，根据",
             "Privacy Policy": "隐私政策",
             "Send": "发送",
+            "View token usage": "查看令牌用量",
             "Task": "任务",
             "Create task": "创建任务",
             "uses AI. Check for mistakes.": "使用 AI。请检查错误。",
@@ -6758,6 +6759,8 @@ I18N["zh-CN"]["settings/copilot"] = { // 设置 - GitHub Copilot
         [/Free responses reset (\d+) 天之内\. Plan upgrades are temporarily unavailable\. Read more。?/, "免费响应额度将在 $1 天后重置。计划升级暂时不可用。了解更多。"],
         [/Free responses reset in (\d+) days?\. Plan upgrades are temporarily unavailable\./, "免费响应额度将在 $1 天后重置。计划升级暂时不可用。"],
         [/Free responses reset in (\d+) days?\. Plan upgrades are temporarily unavailable\. Read more\.?/, "免费响应额度将在 $1 天后重置。计划升级暂时不可用。了解更多。"],
+        [/((\d+) \/ (\d+)) AI credits/, "$1 AI 额度"],
+        [/((\$\d+(\.\d+)?) \/ (\$\d+(\.\d+)?)) budget/, "$1 预算"],
         [/(\d+)% used/, "$1% 已使用"],
     ],
     "title": {
@@ -9033,6 +9036,7 @@ I18N["zh-CN"]["page-new-repo"] = {// 仓库 - 新建/导入/复刻仓库
             "is ready.": "已准备就绪。",
 
         // 复刻仓库 /<user-name>/<repo-name>/fork
+            "You can't fork this repository at this time.": "您此时不能复刻此仓库。",
             "Create a new fork": "创建新复刻",
                 "A": " ",
                 "fork": "复刻",
@@ -17964,6 +17968,8 @@ I18N["zh-CN"]["repository/settings"] = { // 仓库设置 - 通常 /<user-name>/<
             "Unexpected bad things will happen if you don’t read this!": "如果您不阅读此说明，将会发生意想不到的事情！",
             "All scheduled workflows will stop running.": "所有预定的工作流程将停止运行。",
             "Security features will be unavailable:": "安全功能将无法使用：",
+            "Security features will be interrupted:": "安全功能将停止",
+            "Code scanning will be paused": "代码扫描将暂停",
             "Code scanning": "代码扫描",
             "Before you archive, please consider:": "在您存档之前，请考虑：",
             "Updating any repository settings": "更新仓库设置",
@@ -29031,6 +29037,8 @@ I18N["zh-CN"]["copilot"] = {
             // 无对话
             "No conversations yet": "还没有对话",
             "Ask Copilot anything on the right to start your first conversation.": "向 Copilot 提出任何问题，开始第一次对话。",
+            "New topic? A fresh chat keeps your usage lower.": "新话题？新聊天有助于降低使用量。",
+                "Start new chat": "开始新聊天",
 
             // 某条对话
                 "Manage chat": "管理",
@@ -29066,6 +29074,12 @@ I18N["zh-CN"]["copilot"] = {
             "Good response": "点赞",
             "Bad response": "点踩",
             "Retry with…": "重试…",
+
+            "View message token usage": "查看此消息令牌用量",
+                "Message token usage": "此消息令牌用量",
+                    "Input:": "输入：",
+                    "Output:": "输出：",
+                    "tokens": "令牌",
 
             "Scroll to bottom": "滚动至底部",
 
