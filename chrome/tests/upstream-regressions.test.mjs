@@ -110,6 +110,33 @@ test('recent upstream Copilot, fork, and repository settings terms are synchroni
   }
 });
 
+test('dashboard onboarding terms are synchronized without changing search protections', () => {
+  for (const [browser, file] of locales) {
+    const localeData = loadLocale(file);
+    const dashboard = localeData['zh-CN']['page-dashboard'];
+    for (const [source, expected] of Object.entries({
+      'Start with GitHub Docs': '从 GitHub 文档开始',
+      'GitHub Documentation': 'GitHub 文档',
+      'Create your first code project': '创建您的第一个代码项目',
+      'It’s your own space to experiment, learn, and share code with the world.': '这是您自己的空间，可以在这里实验、学习并与全世界分享代码。',
+      'Start a Copilot chat': '开始 Copilot 聊天',
+      'GitHub for beginners on YouTube': 'GitHub 初学者系列（YouTube）',
+      'Watch video': '观看视频',
+      'Open Copilot chat': '打开 Copilot 聊天',
+      'Remove section': '移除该板块',
+    })) {
+      assert.equal(dashboard.static[source], expected, `${browser}: ${source}`);
+    }
+    assert.equal(translate(dashboard.regexp, 'Read · Est. 5m'), '阅读 · 预计 5 分钟', browser);
+
+    const globalIgnore = localeData.conf.ignoreMutationSelectorPage['*'];
+    assert.ok(globalIgnore.includes('header.GlobalNav [class*="Search-module__"]'), `${browser}: 顶部搜索框保护规则缺失`);
+    assert.ok(globalIgnore.includes('qbsearch-input'), `${browser}: 快速搜索组件保护规则缺失`);
+    assert.ok(!globalIgnore.includes('input'), `${browser}: 不能通过全局规则跳过 input 属性翻译`);
+    assert.ok(!globalIgnore.includes('textarea'), `${browser}: 不能通过全局规则跳过 textarea 属性翻译`);
+  }
+});
+
 test('two-factor authentication deadline accepts joined and spaced dates', () => {
   for (const [browser, file] of locales) {
     const publicLocale = loadLocale(file)['zh-CN'].public;

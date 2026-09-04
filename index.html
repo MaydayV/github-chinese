@@ -31,7 +31,7 @@
     "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome, Edge, Firefox",
-    "softwareVersion": "2.4.9",
+    "softwareVersion": "2.5.3",
     "url": "https://maydayv.github.io/github-chinese/",
     "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
     "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
@@ -1151,7 +1151,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
-        <p class="eyebrow">GitHub Chinese · v2.4.9</p>
+        <p class="eyebrow">GitHub Chinese · v2.5.3</p>
         <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
         <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、Issue、Pull Request 和 Release 正文。</p>
         <div class="hero-actions" aria-label="主要操作">
@@ -1164,7 +1164,7 @@
           <span class="developer-dot" aria-hidden="true"></span>
           <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
         </div>
-        <p class="hero-note">v2.4.9 修复更新提示横幅关闭无响应并精简弹窗入口；v2.4.8 同步上游 122 条词条、新增云沙盒设置页与代码块免翻区域。</p>
+        <p class="hero-note">v2.5.3 同步上游 Dashboard 新手帮助、Copilot 聊天命令和推荐内容词条，并加强顶部搜索框翻译保护；v2.5.2 同步 Copilot 用量与仓库安全设置词条。</p>
       </div>
     </section>
 
@@ -1294,6 +1294,17 @@
         </div>
         <!-- CHANGELOG:START -->
         <ol class="changelog-list">
+          <li class="changelog-item" id="v2-5-3">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.5.3</span>
+              <time class="changelog-date" datetime="2026-09-04">2026-09-04</time>
+            </div>
+            <ul class="changelog-points">
+              <li>同步上游 Dashboard 新手帮助、Copilot 聊天命令和推荐内容词条</li>
+              <li>保留顶部搜索框专用翻译与展开保护，补充搜索组件回归校验</li>
+              <li>Chrome、Edge、Firefox 三端同步版本并重新生成发布压缩包</li>
+            </ul>
+          </li>
           <li class="changelog-item" id="v2-5-2">
             <div class="changelog-meta">
               <span class="changelog-version">v2.5.2</span>
@@ -1326,22 +1337,22 @@
               <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
             </ul>
           </li>
-          <li class="changelog-item" id="v2-4-9">
-            <div class="changelog-meta">
-              <span class="changelog-version">v2.4.9</span>
-              <time class="changelog-date" datetime="2026-08-19">2026-08-19</time>
-            </div>
-            <ul class="changelog-points">
-              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.9</code></li>
-              <li>修复更新提示横幅的关闭按钮点击无响应：横幅样式中的 <code>display: flex</code> 会覆盖浏览器默认的 <code>[hidden]</code> 规则，导致没有更新记录时横幅仍常驻显示，且关闭事件未绑定</li>
-              <li>移除弹窗底部的「官网 · 更新日志」按钮，官网入口保留在更新提示横幅与插件主页链接中</li>
-              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
-            </ul>
-          </li>
         </ol>
         <details class="changelog-more">
-          <summary>查看更早的 20 个版本</summary>
+          <summary>查看更早的 21 个版本</summary>
           <ol class="changelog-list">
+            <li class="changelog-item" id="v2-4-9">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.4.9</span>
+                <time class="changelog-date" datetime="2026-08-19">2026-08-19</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.4.9</code></li>
+                <li>修复更新提示横幅的关闭按钮点击无响应：横幅样式中的 <code>display: flex</code> 会覆盖浏览器默认的 <code>[hidden]</code> 规则，导致没有更新记录时横幅仍常驻显示，且关闭事件未绑定</li>
+                <li>移除弹窗底部的「官网 · 更新日志」按钮，官网入口保留在更新提示横幅与插件主页链接中</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
             <li class="changelog-item" id="v2-4-8">
               <div class="changelog-meta">
                 <span class="changelog-version">v2.4.8</span>

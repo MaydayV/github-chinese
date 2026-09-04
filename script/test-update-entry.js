@@ -19,9 +19,13 @@ const page = read('index.html');
 const readme = read('README.md');
 const latest = readme.match(/^###\s+v([\d.]+)\s*\(/m);
 assert.ok(latest, 'README.md 中应存在版本条目');
+const chromeVersion = JSON.parse(read('chrome', 'manifest.json')).version;
+assert.strictEqual(chromeVersion, latest[1], 'README 最新版本应与 Chrome manifest 一致');
 
 assert.ok(page.includes('<section id="changelog"'), '官网应包含更新日志板块');
 assert.ok(page.includes('<a href="#changelog">更新日志</a>'), '官网导航应包含更新日志入口');
+assert.ok(page.includes(`"softwareVersion": "${latest[1]}"`), '官网结构化数据应使用最新版本');
+assert.ok(page.includes(`GitHub Chinese · v${latest[1]}`), '官网首屏版本号应使用最新版本');
 assert.ok(
   page.includes(`id="v${latest[1].replace(/\./g, '-')}"`),
   `官网应包含最新版本锚点 v${latest[1]}`,
