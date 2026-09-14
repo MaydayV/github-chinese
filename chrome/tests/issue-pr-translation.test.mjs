@@ -179,6 +179,23 @@ test('global navigation translation handles React portals without breaking hydra
   assert.doesNotMatch(content, /closest\?\.\(searchSurfaceSelector\)/);
 });
 
+test('history navigation refreshes the current body and keeps the observer attached', () => {
+  assert.match(content, /function refreshAfterHistoryNavigation\(/);
+  assert.match(content, /function scheduleHistoryRefresh\(/);
+  assert.match(content, /window\.addEventListener\('popstate', scheduleHistoryRefresh\)/);
+  assert.match(content, /window\.addEventListener\('pageshow', event =>/);
+  assert.match(content, /document\.addEventListener\('turbo:render', \(\) => refreshAfterHistoryNavigation/);
+  assert.match(content, /refreshPageObserver\(\)/);
+  assert.match(content, /updatePageConfig\(trigger, true\)/);
+  assert.match(content, /refreshPageObserver = \(\) =>/);
+});
+
+test('Copilot textarea aria labels are translated without touching user-entered text', () => {
+  assert.match(content, /case 'TEXTAREA':[\s\S]*transElement\(node, 'placeholder'\)[\s\S]*transElement\(node, 'ariaLabel'\)/);
+  assert.match(locals, /"Ask anything or type @ to add context": "询问任何问题或键入@以添加上下文"/);
+  assert.match(locals, /"Ask anything or type @ to add context with Copilot": "询问任何问题或键入@以添加上下文"/);
+});
+
 test('latest upstream navigation labels and flagged organization terms are present', () => {
   assert.match(locals, /reactGlobalNavLabels/);
   assert.match(locals, /"To see all available qualifiers, see our documentation\.": "要查看全部可用限定符，请参阅文档。"/);

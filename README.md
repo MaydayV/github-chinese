@@ -122,6 +122,12 @@ node script/test-update-entry.js
 
 ## 🔄 更新日志
 
+### v2.5.4 (2026-09-14)
+
+1. 合并上游历史导航修复，浏览器前进后退和 Turbo 页面恢复后重新翻译当前内容
+1. 补充 Dashboard Copilot 搜索框 `aria-label` 翻译，并保留输入内容与顶部搜索框保护
+1. Chrome、Edge、Firefox 三端同步版本并重新生成发布压缩包
+
 ### v2.5.3 (2026-09-04)
 
 1. 同步上游 Dashboard 新手帮助、Copilot 聊天命令和推荐内容词条

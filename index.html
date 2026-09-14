@@ -31,7 +31,7 @@
     "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome, Edge, Firefox",
-    "softwareVersion": "2.5.3",
+    "softwareVersion": "2.5.4",
     "url": "https://maydayv.github.io/github-chinese/",
     "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
     "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
@@ -1151,7 +1151,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
-        <p class="eyebrow">GitHub Chinese · v2.5.3</p>
+        <p class="eyebrow">GitHub Chinese · v2.5.4</p>
         <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
         <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、Issue、Pull Request 和 Release 正文。</p>
         <div class="hero-actions" aria-label="主要操作">
@@ -1164,7 +1164,7 @@
           <span class="developer-dot" aria-hidden="true"></span>
           <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
         </div>
-        <p class="hero-note">v2.5.3 同步上游 Dashboard 新手帮助、Copilot 聊天命令和推荐内容词条，并加强顶部搜索框翻译保护；v2.5.2 同步 Copilot 用量与仓库安全设置词条。</p>
+        <p class="hero-note">v2.5.4 修复历史导航后的页面翻译恢复，并补充 Dashboard Copilot 搜索框标签；v2.5.3 同步 Dashboard 新手帮助和推荐内容词条。</p>
       </div>
     </section>
 
@@ -1294,6 +1294,17 @@
         </div>
         <!-- CHANGELOG:START -->
         <ol class="changelog-list">
+          <li class="changelog-item" id="v2-5-4">
+            <div class="changelog-meta">
+              <span class="changelog-version">v2.5.4</span>
+              <time class="changelog-date" datetime="2026-09-14">2026-09-14</time>
+            </div>
+            <ul class="changelog-points">
+              <li>合并上游历史导航修复，浏览器前进后退和 Turbo 页面恢复后重新翻译当前内容</li>
+              <li>补充 Dashboard Copilot 搜索框 <code>aria-label</code> 翻译，并保留输入内容与顶部搜索框保护</li>
+              <li>Chrome、Edge、Firefox 三端同步版本并重新生成发布压缩包</li>
+            </ul>
+          </li>
           <li class="changelog-item" id="v2-5-3">
             <div class="changelog-meta">
               <span class="changelog-version">v2.5.3</span>
@@ -1325,22 +1336,22 @@
               <li>三端同步版本并重新生成发布压缩包</li>
             </ul>
           </li>
-          <li class="changelog-item" id="v2-5-0">
-            <div class="changelog-meta">
-              <span class="changelog-version">v2.5.0</span>
-              <time class="changelog-date" datetime="2026-08-28">2026-08-28</time>
-            </div>
-            <ul class="changelog-points">
-              <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.5.0</code></li>
-              <li>同步上游编辑区域保护、双因素认证截止日期和 PR 提交消息误翻译修复</li>
-              <li>补充通知页 <code>Filter by…</code> 词条，并新增对应回归测试</li>
-              <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
-            </ul>
-          </li>
         </ol>
         <details class="changelog-more">
-          <summary>查看更早的 21 个版本</summary>
+          <summary>查看更早的 22 个版本</summary>
           <ol class="changelog-list">
+            <li class="changelog-item" id="v2-5-0">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.5.0</span>
+                <time class="changelog-date" datetime="2026-08-28">2026-08-28</time>
+              </div>
+              <ul class="changelog-points">
+                <li>Chrome、Edge、Firefox 三端插件版本同步至 <code>2.5.0</code></li>
+                <li>同步上游编辑区域保护、双因素认证截止日期和 PR 提交消息误翻译修复</li>
+                <li>补充通知页 <code>Filter by…</code> 词条，并新增对应回归测试</li>
+                <li>重新打包 Chrome、Edge、Firefox 三端发布压缩包</li>
+              </ul>
+            </li>
             <li class="changelog-item" id="v2-4-9">
               <div class="changelog-meta">
                 <span class="changelog-version">v2.4.9</span>

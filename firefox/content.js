@@ -161,6 +161,8 @@
 
     let pageConfig = {};
     let scheduleReactGlobalNavRefresh = () => {};
+    let refreshPageObserver = () => {};
+    let historyRefreshTimer = null;
 
     // 初始化
     init().catch(err => {
@@ -258,13 +260,31 @@
     }
 
     // 更新页面设置
-    function updatePageConfig(currentPageChangeTrigger) {
+    function updatePageConfig(currentPageChangeTrigger, force = false) {
         const newType = detectPageType();
-        if (newType && newType !== pageConfig.currentPageType) {
+        if (newType && (force || newType !== pageConfig.currentPageType)) {
             pageConfig = buildPageConfig(newType);
             scheduleReadmeTranslation(`${currentPageChangeTrigger}:pageTypeChanged`);
             scheduleIssuePrTranslationControls(`${currentPageChangeTrigger}:pageTypeChanged`);
         }
+    }
+
+    function refreshAfterHistoryNavigation(trigger = '历史导航') {
+        if (!FeatureSet.enable_extension || !document.body) return;
+
+        updatePageConfig(trigger, true);
+        refreshPageObserver();
+        scheduleTurboPageTranslation();
+        scheduleReadmeTranslation(trigger);
+        scheduleIssuePrTranslationControls(trigger);
+    }
+
+    function scheduleHistoryRefresh(event) {
+        if (historyRefreshTimer !== null) window.clearTimeout(historyRefreshTimer);
+        historyRefreshTimer = window.setTimeout(() => {
+            historyRefreshTimer = null;
+            refreshAfterHistoryNavigation(event?.type || '历史导航');
+        }, 0);
     }
 
     // 构建页面设置 pageConfig 对象
@@ -723,6 +743,8 @@
     function watchUpdate() {
         // 缓存当前页面的 URL
         let previousURL = window.location.href;
+        let observer = null;
+        let observedBody = null;
 
         const handleUrlChange = () => {
             const currentURL = window.location.href;
@@ -764,7 +786,7 @@
         }
 
         // 监听 document.body 下 DOM 变化，用于处理节点变化
-        new MutationObserver(mutations => {
+        const processMutationBatch = mutations => {
             if (!FeatureSet.enable_extension) return;
             handleUrlChange();
             if (readmeRuntime.isApplyingTranslation) return;
@@ -775,7 +797,19 @@
             if (FeatureSet.enable_issue_pr_translation) {
                 scheduleIssuePrTranslationControls('mutation');
             }
-        }).observe(document.body, CONFIG.OBSERVER_CONFIG);
+        };
+
+        const observeCurrentBody = () => {
+            if (observer) observer.disconnect();
+            observedBody = document.body;
+            if (observedBody) observer.observe(observedBody, CONFIG.OBSERVER_CONFIG);
+        };
+
+        observer = new MutationObserver(processMutationBatch);
+        observeCurrentBody();
+        refreshPageObserver = () => {
+            if (document.body !== observedBody) observeCurrentBody();
+        };
     }
 
     /**
@@ -866,6 +900,7 @@
                     } else {
                         transElement(node, 'placeholder');
                     }
+                    transElement(node, 'ariaLabel');
                     break;
 
                 case 'OPTGROUP':
@@ -3278,6 +3313,11 @@
 
             // 软导航后必须全量扫描；仅靠 title/selector 会漏掉仓库顶栏等 React 文案
             scheduleTurboPageTranslation();
+        });
+        document.addEventListener('turbo:render', () => refreshAfterHistoryNavigation('turbo:render'));
+        window.addEventListener('popstate', scheduleHistoryRefresh);
+        window.addEventListener('pageshow', event => {
+            if (event.persisted) scheduleHistoryRefresh(event);
         });
 
         // 首次页面翻译
