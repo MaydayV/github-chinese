@@ -110,6 +110,21 @@ test('recent upstream Copilot, fork, and repository settings terms are synchroni
   }
 });
 
+test('selected PR #800 additions are synchronized without replacing existing labels', () => {
+  for (const [browser, file] of locales) {
+    const i18n = loadLocale(file)['zh-CN'];
+    assert.equal(i18n.public.static['GitHub Copilot app'], 'GitHub Copilot 应用', browser);
+    assert.equal(i18n.public.static['Refresh for latest usage'], '刷新以获取最新用量', browser);
+    assert.equal(i18n['page-dashboard'].static['Optimized for:'], '优化方向：', browser);
+    assert.equal(i18n['repository/actions'].static['Upcoming change to GitHub App installation token format'], 'GitHub 应用安装令牌格式即将变更', browser);
+    assert.equal(i18n['session-authentication'].static['Continue with passkey'], '使用通行密钥继续', browser);
+    assert.equal(i18n.notifications.static['Review requested'], '请求审查', browser);
+    assert.equal(i18n.issues.static['Mentioning me'], '提及我', browser);
+    assert.equal(i18n.pulls.static['About the “Needs your review” section'], '关于“需要您的审查”版块', browser);
+    assert.equal(i18n.orgs.static['GitHub Copilot billing for'], 'GitHub Copilot 计费：', browser);
+  }
+});
+
 test('dashboard onboarding terms are synchronized without changing search protections', () => {
   for (const [browser, file] of locales) {
     const localeData = loadLocale(file);
