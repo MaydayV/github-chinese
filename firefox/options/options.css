@@ -470,6 +470,12 @@ select:focus {
   background: #fff1f3;
 }
 
+.history-status.is-partial {
+  color: #7a4b00;
+  border-color: #e7c36a;
+  background: #fff8df;
+}
+
 .history-meta {
   display: flex;
   flex-wrap: wrap;

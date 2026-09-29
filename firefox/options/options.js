@@ -37,6 +37,7 @@ const RECORD_STATUS_META = {
   success: { label: '翻译成功', className: 'is-success' },
   cache_hit: { label: '缓存命中', className: 'is-cache' },
   failed: { label: '翻译失败', className: 'is-failed' },
+  partial: { label: '部分完成', className: 'is-partial' },
 };
 
 const RECORDS_STATE = {
@@ -765,16 +766,47 @@ function formatRecordDetail(detail) {
   const text = String(detail || '').trim();
   if (!text) return '';
 
-  let match = text.match(/^(?:nodes|translated_nodes|discussion_translated_nodes|issue_translated_nodes|pull_translated_nodes|release_translated_nodes)=(\d+)$/i);
-  if (match) return `翻译文本节点：${match[1]}`;
+  const formatPart = (part) => {
+    const value = String(part || '').trim();
+    if (!value) return '';
 
-  if (text === 'discussion_cache_hit') return '命中讨论内容缓存';
-  if (/^(?:issue|pull|release)_cache_hit$/i.test(text)) return '命中正文缓存';
+    let match = value.match(/^(?:nodes|translated_nodes|discussion_translated_nodes|issue_translated_nodes|pull_translated_nodes|release_translated_nodes)=(\d+)$/i);
+    if (match) return `已翻译节点：${match[1]}`;
 
-  match = text.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
-  if (match) return `触发来源：${match[1]}`;
+    match = value.match(/^retry_missed=(\d+)$/i);
+    if (match) return `重试未翻译：${match[1]}`;
 
-  return text;
+    match = value.match(/^remaining=(\d+)$/i);
+    if (match) return `剩余未翻译：${match[1]}`;
+
+    if (value === 'discussion_cache_hit') return '命中讨论内容缓存';
+    if (/^(?:issue|pull|release)_cache_hit$/i.test(value)) return '命中正文缓存';
+
+    match = value.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
+    if (match) {
+      const reasonLabels = {
+        manual: '手动触发',
+        observer: '页面变化',
+        mutation: '页面内容变化',
+        navigation: '页面导航',
+        turbo: '页面导航',
+        storage: '设置更新',
+        unknown: '未知来源',
+      };
+      const reason = match[1];
+      const label = reasonLabels[reason]
+        || (reason.startsWith('setting:') ? '设置更新' : '')
+        || (reason.endsWith(':pageTypeChanged') ? '页面切换' : '')
+        || (reason === 'turbo:load' ? '页面导航' : '')
+        || (reason === 'DOMContentLoaded' ? '页面加载' : '')
+        || reason;
+      return `触发来源：${label}`;
+    }
+
+    return value;
+  };
+
+  return text.split(';').map(formatPart).filter(Boolean).join('；');
 }
 
 function normalizeRecordSourceType(sourceType) {
@@ -786,10 +818,10 @@ function normalizeRecordSourceType(sourceType) {
 function getRecordSourceMeta(sourceType) {
   const value = normalizeRecordSourceType(sourceType);
   const map = {
-    readme: { label: 'README', className: 'is-readme' },
-    issue: { label: 'Issue', className: 'is-issue' },
-    pull: { label: 'Pull Request', className: 'is-pull' },
-    release: { label: 'Release', className: 'is-release' },
+    readme: { label: '说明文档', className: 'is-readme' },
+    issue: { label: '议题', className: 'is-issue' },
+    pull: { label: '拉取请求', className: 'is-pull' },
+    release: { label: '发行版', className: 'is-release' },
   };
   return map[value];
 }
@@ -818,7 +850,7 @@ function normalizeCacheEntries(cacheEntries) {
 }
 
 function getStatusMeta(status) {
-  return RECORD_STATUS_META[status] || { label: status || '未知状态', className: '' };
+  return RECORD_STATUS_META[status] || { label: '未知状态', className: '' };
 }
 
 function getRecordsPageCount() {
@@ -877,9 +909,9 @@ function createRecordListItem(item) {
   const metaEl = document.createElement('div');
   metaEl.className = 'history-meta';
   metaEl.append(
-    createRecordSpan(`Tokens：${formatNumber(item.tokens)}`),
+    createRecordSpan(`令牌：${formatNumber(item.tokens)}`),
     createRecordSpan(`时间：${formatTime(item.createdAt)}`),
-    createRecordSpan(`服务：${item.provider || '-'}`)
+    createRecordSpan(`服务：${item.provider || '未知'}`)
   );
   if (detailText) metaEl.append(createRecordSpan(detailText));
 
@@ -922,7 +954,7 @@ function renderRecords() {
   }
 
   const tokenTotal = allRecords.reduce((sum, item) => sum + (Number.isFinite(item.tokens) ? item.tokens : 0), 0);
-  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计 tokens：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}`;
+  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计令牌：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}`;
 
   const start = (currentPage - 1) * RECORDS_STATE.pageSize;
   const end = start + RECORDS_STATE.pageSize;

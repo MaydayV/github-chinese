@@ -144,7 +144,7 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /sourceType:\s*record\?\.sourceType \|\| 'readme'/);
   assert.match(optionsJs, /sourceType:\s*normalizeRecordSourceType\(item\.sourceType\)/);
   assert.match(optionsJs, /getRecordSourceMeta\(item\.sourceType\)/);
-  assert.match(optionsJs, /release:\s*\{\s*label:\s*'Release'/);
+  assert.match(optionsJs, /release:\s*\{\s*label:\s*'发行版'/);
   assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
 });
 
