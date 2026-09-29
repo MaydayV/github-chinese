@@ -909,7 +909,7 @@ function createRecordListItem(item) {
   const metaEl = document.createElement('div');
   metaEl.className = 'history-meta';
   metaEl.append(
-    createRecordSpan(`令牌：${formatNumber(item.tokens)}`),
+    createRecordSpan(`Tokens：${formatNumber(item.tokens)}`),
     createRecordSpan(`时间：${formatTime(item.createdAt)}`),
     createRecordSpan(`服务：${item.provider || '未知'}`)
   );
@@ -954,7 +954,7 @@ function renderRecords() {
   }
 
   const tokenTotal = allRecords.reduce((sum, item) => sum + (Number.isFinite(item.tokens) ? item.tokens : 0), 0);
-  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计令牌：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}`;
+  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计 Tokens：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}`;
 
   const start = (currentPage - 1) * RECORDS_STATE.pageSize;
   const end = start + RECORDS_STATE.pageSize;
