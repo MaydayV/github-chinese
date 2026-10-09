@@ -179,6 +179,14 @@ test('global navigation translation handles React portals without breaking hydra
   assert.doesNotMatch(content, /closest\?\.\(searchSurfaceSelector\)/);
 });
 
+test('Copilot textarea chrome is translated even inside ignored global navigation surfaces', () => {
+  assert.match(content, /function translateReactGlobalNavSurface\([\s\S]*?tagName === 'TEXTAREA'[\s\S]*?translateReactGlobalNavAttributes\(surface\)/);
+  assert.match(content, /tagName === 'TEXTAREA'[\s\S]*?translateReactGlobalNavAttributes\(node\)[\s\S]*?NodeFilter\.FILTER_REJECT/);
+  assert.match(content, /const shouldTranslateTextareaChrome = \(node, type, attributeName\)/);
+  assert.match(content, /shouldTranslateTextareaChrome\(node, type, attributeName\) \|\|/);
+  assert.match(content, /rootNode\.tagName === 'TEXTAREA'[\s\S]*?handleElement\(rootNode\)/);
+});
+
 test('history navigation refreshes the current body and keeps the observer attached', () => {
   assert.match(content, /function refreshAfterHistoryNavigation\(/);
   assert.match(content, /function scheduleHistoryRefresh\(/);
@@ -193,7 +201,7 @@ test('history navigation refreshes the current body and keeps the observer attac
 test('Copilot textarea aria labels are translated without touching user-entered text', () => {
   assert.match(content, /case 'TEXTAREA':[\s\S]*transElement\(node, 'placeholder'\)[\s\S]*transElement\(node, 'ariaLabel'\)/);
   assert.match(locals, /"Ask anything or type @ to add context": "询问任何问题或键入@以添加上下文"/);
-  assert.match(locals, /"Ask anything or type @ to add context with Copilot": "询问任何问题或键入@以添加上下文"/);
+  assert.match(locals, /"Ask anything or type @ to add context with Copilot": "使用 Copilot 询问任何问题或输入 @ 来添加上下文"/);
 });
 
 test('latest upstream navigation labels and flagged organization terms are present', () => {

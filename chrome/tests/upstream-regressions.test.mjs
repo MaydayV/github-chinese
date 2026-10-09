@@ -125,6 +125,23 @@ test('selected PR #800 additions are synchronized without replacing existing lab
   }
 });
 
+test('selected PR #801 Copilot textarea label is synchronized without changing search protections', () => {
+  for (const [browser, file] of locales) {
+    const localeData = loadLocale(file);
+    const dashboard = localeData['zh-CN']['page-dashboard'].static;
+    assert.equal(
+      dashboard['Ask anything or type @ to add context with Copilot'],
+      '使用 Copilot 询问任何问题或输入 @ 来添加上下文',
+      browser,
+    );
+    const globalIgnore = localeData.conf.ignoreMutationSelectorPage['*'];
+    assert.ok(globalIgnore.includes('header.GlobalNav [class*="Search-module__"]'), `${browser}: 顶部搜索框保护规则缺失`);
+    assert.ok(globalIgnore.includes('qbsearch-input'), `${browser}: 快速搜索组件保护规则缺失`);
+    assert.ok(!globalIgnore.includes('input'), `${browser}: 不能通过全局规则跳过 input 属性翻译`);
+    assert.ok(!globalIgnore.includes('textarea'), `${browser}: 不能通过全局规则跳过 textarea 属性翻译`);
+  }
+});
+
 test('dashboard onboarding terms are synchronized without changing search protections', () => {
   for (const [browser, file] of locales) {
     const localeData = loadLocale(file);

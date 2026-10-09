@@ -520,7 +520,15 @@
         }
 
         function translateReactGlobalNavSurface(surface) {
-            if (!FeatureSet.enable_extension || !surface || shouldSkipReactGlobalNavNode(surface)) return;
+            if (!FeatureSet.enable_extension || !surface) return;
+
+            // textarea 只翻译控件文案，拒绝遍历子节点，避免改写用户输入内容。
+            if (surface.nodeType === Node.ELEMENT_NODE && surface.tagName === 'TEXTAREA') {
+                translateReactGlobalNavAttributes(surface);
+                return;
+            }
+
+            if (shouldSkipReactGlobalNavNode(surface)) return;
 
             if (surface.nodeType === Node.ELEMENT_NODE) {
                 translateReactGlobalNavAttributes(surface);
@@ -531,6 +539,10 @@
                 NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
                 {
                     acceptNode(node) {
+                        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'TEXTAREA') {
+                            translateReactGlobalNavAttributes(node);
+                            return NodeFilter.FILTER_REJECT;
+                        }
                         return shouldSkipReactGlobalNavNode(node)
                             ? NodeFilter.FILTER_REJECT
                             : NodeFilter.FILTER_ACCEPT;
@@ -755,31 +767,40 @@
             }
         }
 
+        // textarea 可能位于 header.GlobalNav 等忽略祖先下，但其 placeholder 和 aria-label
+        // 仍是控件文案；value、子文本和 contenteditable 内容继续保持不翻译。
+        const shouldTranslateTextareaChrome = (node, type, attributeName) => {
+            if (node?.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'TEXTAREA') return false;
+            if (type === 'childList') return true;
+            return type === 'attributes'
+                && (attributeName === 'placeholder' || attributeName === 'aria-label');
+        };
+
         const processMutations = mutations => {
             // 平铺突变记录并过滤需要处理的节点（链式操作）
             // 使用 mutations.flatMap 进行筛选突变:
             //   1. 针对`节点增加`突变，后期迭代翻译的对象调整为`addedNodes`中记录的新增节点，而不是`target`，此举大幅减少重复迭代翻译
             //   2. 对于其它`属性`和特定页面`文本节点`突变，仍旧直接处理`target`
             //   3. 使用`.filter()`筛选丢弃特定页面`特定忽略元素`内突变的节点
-            mutations.flatMap(({ target, addedNodes, type }) => {
+            mutations.flatMap(({ target, addedNodes, type, attributeName }) => {
                 // 处理子节点添加的情况
                 if (type === 'childList' && addedNodes.length > 0) {
-                    return [...addedNodes]; // 将新增节点转换为数组
+                    return [...addedNodes].map(node => ({ node, type, attributeName })); // 将新增节点转换为数组
                 }
                 // 处理属性和文本内容变更的情况
                 return (type === 'attributes' || (type === 'characterData' && pageConfig.characterData))
-                    ? [target] // 否则，仅处理目标节点
+                    ? [{ node: target, type, attributeName }] // 否则，仅处理目标节点
                     : [];
             })
             // 过滤需要忽略的突变节点
-            .filter(node => {
+            .filter(({ node, type, attributeName }) => {
                 const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-                return element
+                return shouldTranslateTextareaChrome(node, type, attributeName) || (element
                     && !element.closest?.(pageConfig.ignoreMutationSelectors)
-                    && !isReactGlobalNavPortalNode(element);
+                    && !isReactGlobalNavPortalNode(element));
             })
             // 处理每个变化
-            .forEach(node =>
+            .forEach(({ node }) =>
                 // 递归遍历节点树进行处理
                 traverseNode(node)
             );
@@ -924,6 +945,12 @@
                     // 仅当 元素存在'tooltipped'样式 aria-label 才起效果
                     if (/tooltipped/.test(node.className)) transElement(node, 'ariaLabel'); // 带提示的元素，类似 tooltip 效果的
             }
+        }
+
+        // TreeWalker 不会访问根节点；textarea 根节点仍需翻译控件文案，但不遍历输入内容。
+        if (rootNode.nodeType === Node.ELEMENT_NODE && rootNode.tagName === 'TEXTAREA') {
+            handleElement(rootNode);
+            return;
         }
 
         // 预绑定处理函数提升性能
