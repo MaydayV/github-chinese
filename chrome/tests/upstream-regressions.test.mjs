@@ -142,6 +142,29 @@ test('selected PR #801 Copilot textarea label is synchronized without changing s
   }
 });
 
+test('selected PR #808 organization settings routes and labels are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const localeData = loadLocale(file);
+    const zh = localeData['zh-CN'];
+    assert.ok(localeData.conf.rePagePathOrg.test('/orgs/acme/settings/custom-properties'), `${browser}: 自定义属性组织设置路由缺失`);
+    assert.ok(localeData.conf.rePagePathOrg.test('/orgs/acme/settings/issue-fields'), `${browser}: 议题字段组织设置路由缺失`);
+    assert.equal(zh['orgs/settings/custom-properties'].title.static['Custom properties'], '自定义属性', browser);
+    assert.equal(zh['orgs/settings/issue-fields'].static['Manage issue fields for an organization.'], '管理组织的议题字段。', browser);
+    assert.equal(zh['orgs/settings/copilot'].static['Internet access'], '访问互联网', browser);
+    assert.equal(zh['settings/blocked_users'].static['For 30 days'], '30 天', browser);
+  }
+});
+
+test('selected PR #668 review terminology improvements are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    assert.equal(zh['repository/pull'].static['Add your review'], '添加您的审查意见', browser);
+    assert.equal(zh['repository/pull'].static['Submit review'], '发表审查意见', browser);
+    assert.equal(zh['repository/compare'].static['Re-request review'], '重新请求审查', browser);
+    assert.equal(zh['session-authentication'].static['When you are ready, authenticate using the button below.'], '就绪后，请使用下面的按钮进行身份验证。', browser);
+  }
+});
+
 test('dashboard onboarding terms are synchronized without changing search protections', () => {
   for (const [browser, file] of locales) {
     const localeData = loadLocale(file);
