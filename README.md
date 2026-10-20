@@ -125,6 +125,8 @@ node script/test-update-entry.js
 ### v2.5.8 (2026-10-20)
 
 1. 修复 Turbo 软导航后仓库首页因临时 analytics 元数据缺失而整页跳过翻译的问题，增加仓库元数据与 URL 结构兜底
+1. 修复新版 GitHub 仓库侧栏 About 描述选择器，设置页明确说明与 README 共用翻译开关和接口
+1. 补齐 Dashboard 预览菜单的 `Try the new dashboard` 与 `Switch to classic dashboard` 词条
 1. 保留顶部搜索框翻译、展开保护和 `Tokens` 术语，三端同步并重新生成插件包
 
 ### v2.5.7 (2026-10-20)
