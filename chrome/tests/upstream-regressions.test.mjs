@@ -9,6 +9,12 @@ const locales = [
   ['firefox', new URL('../../firefox/locals.js', import.meta.url)],
 ];
 
+const contentScripts = [
+  ['chrome', new URL('../content.js', import.meta.url)],
+  ['edge', new URL('../../edge/content.js', import.meta.url)],
+  ['firefox', new URL('../../firefox/content.js', import.meta.url)],
+];
+
 function loadLocale(file) {
   const context = {};
   createContext(context);
@@ -139,6 +145,18 @@ test('selected PR #801 Copilot textarea label is synchronized without changing s
     assert.ok(globalIgnore.includes('qbsearch-input'), `${browser}: 快速搜索组件保护规则缺失`);
     assert.ok(!globalIgnore.includes('input'), `${browser}: 不能通过全局规则跳过 input 属性翻译`);
     assert.ok(!globalIgnore.includes('textarea'), `${browser}: 不能通过全局规则跳过 textarea 属性翻译`);
+  }
+});
+
+test('repository About descriptions support hashed SidebarAbout CSS-module classes', () => {
+  for (const [browser, file] of contentScripts) {
+    const content = readFileSync(file, 'utf8');
+    assert.match(
+      content,
+      /querySelector\('p\[class\*="SidebarAbout-module"\]\[class\*="description"\]'\)/,
+      `${browser}: About 描述选择器未兼容新版 CSS-module 哈希类`,
+    );
+    assert.match(content, /translateRepoAboutDescription/, `${browser}: About 描述翻译入口缺失`);
   }
 });
 

@@ -1247,10 +1247,11 @@
         return null;
     }
 
-    // 仓库侧栏 About 描述（React 组件，CSS-module 哈希类，用子串匹配抗哈希后缀）。
+    // 仓库侧栏 About 描述（React 组件，CSS-module 哈希类，用模块名和 description 子串匹配
+    // 同时兼容 SidebarAbout-module__description 与 SidebarAbout-module_<hash>_description）。
     // 属仓库主自定义的自由文本，静态词库无法收录，故与 README 一样走 AI 内容翻译、就地替换。
     function getRepoAboutElement() {
-        const element = document.querySelector('p[class*="SidebarAbout-module__description"]');
+        const element = document.querySelector('p[class*="SidebarAbout-module"][class*="description"]');
         if (!element) return null;
         if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) return null;
         return element;
