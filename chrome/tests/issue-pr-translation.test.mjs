@@ -121,6 +121,14 @@ test('README translation switch persists both enabled and disabled states', () =
   });
 });
 
+test('README translation setting explains that repository About descriptions use the same switch', () => {
+  browserOptions.forEach(({ browser, html }) => {
+    assert.match(html, /README \/ About/, `${browser} 设置页应明确包含 About 翻译范围`);
+    assert.match(html, /侧栏 About 描述/, `${browser} 设置页应说明 About 描述会翻译`);
+    assert.match(html, /README 与 About 描述共用此开关和翻译接口/, `${browser} 设置页应说明 About 与 README 共用开关`);
+  });
+});
+
 test('README translation switch rolls back the UI when persistence fails', () => {
   browserOptions.forEach(({ browser, js }) => {
     const handlerStart = js.indexOf("mainSwitch?.addEventListener('change', async () =>");

@@ -2379,6 +2379,8 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
 
         "Try the new experience": "尝试新版",
         "Try the new dashboard experience": "试用新仪表板",
+        "Try the new dashboard": "试用新版仪表板",
+        "Switch to classic dashboard": "切换至经典仪表板",
         "Switch back": "切回旧版",
 
         // 新手帮助

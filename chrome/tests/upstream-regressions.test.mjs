@@ -197,6 +197,8 @@ test('dashboard onboarding terms are synchronized without changing search protec
       'Watch video': '观看视频',
       'Open Copilot chat': '打开 Copilot 聊天',
       'Remove section': '移除该板块',
+      'Try the new dashboard': '试用新版仪表板',
+      'Switch to classic dashboard': '切换至经典仪表板',
     })) {
       assert.equal(dashboard.static[source], expected, `${browser}: ${source}`);
     }

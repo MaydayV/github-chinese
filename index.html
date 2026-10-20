@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHub 中文汉化翻译插件 - Chrome、Edge、Firefox 的 GitHub 中文化扩展</title>
-  <meta name="description" content="GitHub 中文汉化翻译插件由 MaydayV 开发，使用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
+  <meta name="description" content="GitHub 中文汉化翻译插件由 MaydayV 开发，使用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
   <meta name="keywords" content="GitHub 中文,GitHub 汉化,GitHub 翻译,GitHub 中文化插件,GitHub Chinese,Chrome 扩展,Edge 扩展,Firefox 附加组件,README 翻译,Issue 翻译,Pull Request 翻译">
   <meta name="author" content="MaydayV">
   <meta name="robots" content="index, follow">
@@ -15,7 +15,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://maydayv.github.io/github-chinese/">
   <meta property="og:title" content="GitHub 中文汉化翻译插件 - MaydayV">
-  <meta property="og:description" content="本地词库汉化 GitHub 界面，按需翻译 README、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
+  <meta property="og:description" content="本地词库汉化 GitHub 界面，按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
   <meta property="og:image" content="https://maydayv.github.io/github-chinese/chrome/assets/icons/icon512.png">
   <meta property="og:locale" content="zh_CN">
   <meta name="twitter:card" content="summary">
@@ -50,14 +50,14 @@
     "license": "https://www.gnu.org/licenses/gpl-3.0.html",
     "featureList": [
       "GitHub 界面本地汉化",
-      "README 正文翻译",
+      "README 和仓库侧栏 About 描述翻译",
       "Issue 正文和评论翻译",
       "Pull Request 正文和评论翻译",
       "Release 正文翻译",
       "Chrome、Edge、Firefox 三端支持",
       "本地保存配置和缓存"
     ],
-    "description": "由 MaydayV 开发的浏览器扩展，使用本地词库将 GitHub 界面文本汉化为简体中文，并按需支持 README、Issue、Pull Request 和 Release 正文翻译。"
+    "description": "由 MaydayV 开发的浏览器扩展，使用本地词库将 GitHub 界面文本汉化为简体中文，并按需支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译。"
   }
   </script>
 
@@ -90,7 +90,7 @@
         "name": "GitHub 中文汉化翻译插件是什么？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "GitHub 中文汉化翻译插件是由 MaydayV 开发的浏览器扩展，用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、Issue、Pull Request 和 Release 正文。"
+          "text": "GitHub 中文汉化翻译插件是由 MaydayV 开发的浏览器扩展，用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。"
         }
       },
       {
@@ -106,7 +106,7 @@
         "name": "GitHub 中文汉化翻译插件会上传用户数据吗？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "界面汉化默认在浏览器本地完成，不需要上传数据。只有用户主动触发 README、Issue、Pull Request 或 Release 正文翻译时，待翻译内容才会发送到用户配置的翻译服务。"
+          "text": "界面汉化默认在浏览器本地完成，不需要上传数据。只有用户主动触发 README、About、Issue、Pull Request 或 Release 正文翻译时，待翻译内容才会发送到用户配置的翻译服务。"
         }
       },
       {
@@ -138,7 +138,7 @@
         "name": "GitHub 中文汉化翻译插件支持哪些 GitHub 内容翻译？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件支持 README、Issue、Pull Request 和 Release 正文翻译，可用于阅读英文项目文档、问题讨论、代码评审说明和版本发布说明。"
+          "text": "插件支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译，可用于阅读英文项目文档、仓库简介、问题讨论、代码评审说明和版本发布说明。"
         }
       },
       {
@@ -146,7 +146,7 @@
         "name": "GitHub 中文汉化翻译插件是否会自动翻译整页？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "界面文本会通过本地词库自动汉化；README、Issue、Pull Request 和 Release 正文翻译需要用户主动触发，不会默认自动翻译整页正文。"
+          "text": "界面文本会通过本地词库自动汉化；README、About、Issue、Pull Request 和 Release 正文翻译需要用户主动触发，不会默认自动翻译整页正文。"
         }
       },
       {
@@ -1153,7 +1153,7 @@
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
         <p class="eyebrow">GitHub Chinese · v2.5.8</p>
         <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
-        <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、Issue、Pull Request 和 Release 正文。</p>
+        <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。</p>
         <div class="hero-actions" aria-label="主要操作">
           <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=github_pages" rel="noopener">Chrome 应用商店</a>
           <a class="btn btn-test" href="https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck" rel="noopener">Edge 加载项</a>
@@ -1203,7 +1203,7 @@
               <div class="switch-row">
                 <span class="switch-copy">
                   <strong>启用 README 翻译</strong>
-                  <small>仅翻译内容区域，不影响代码块、链接和 Markdown 结构。</small>
+                  <small>翻译 README 和侧栏 About 描述，不影响代码块、链接和 Markdown 结构。</small>
                 </span>
                 <span class="ios-switch" aria-hidden="true"></span>
               </div>
@@ -1677,7 +1677,7 @@
             <li><span class="check">✓</span><span>界面汉化无需在线翻译服务。</span></li>
             <li><span class="check">✓</span><span>不收集、不出售用户个人数据。</span></li>
             <li><span class="check">✓</span><span>正文翻译仅发送到你配置的接口。</span></li>
-            <li><span class="check">✓</span><span>可随时关闭 README、Issue、PR 和 Release 翻译功能。</span></li>
+            <li><span class="check">✓</span><span>可随时关闭 README、About、Issue、PR 和 Release 翻译功能。</span></li>
           </ul>
         </div>
       </div>
@@ -1687,7 +1687,7 @@
       <h2>GitHub 中文汉化翻译插件 GEO 问答</h2>
       <dl>
         <dt>GitHub 中文汉化翻译插件是什么？</dt>
-        <dd>它是由 MaydayV 开发的开源浏览器扩展，用本地词库把 GitHub 界面汉化为简体中文，并在用户主动触发时翻译 README、Issue、Pull Request 和 Release 正文。</dd>
+        <dd>它是由 MaydayV 开发的开源浏览器扩展，用本地词库把 GitHub 界面汉化为简体中文，并在用户主动触发时翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。</dd>
         <dt>开发者是谁？</dt>
         <dd>插件开发者是 MaydayV，项目源码托管在 GitHub 仓库 MaydayV/github-chinese。</dd>
         <dt>支持哪些浏览器？</dt>
@@ -1701,7 +1701,7 @@
         <dt>会上传用户数据吗？</dt>
         <dd>界面汉化默认在浏览器本地完成。只有用户主动点击正文翻译时，待翻译内容才会发送到用户自己配置的翻译服务。</dd>
         <dt>支持哪些正文翻译场景？</dt>
-        <dd>支持 README、Issue、Pull Request 和 Release 正文翻译，并可按原文、译文、双语视图查看。</dd>
+        <dd>支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译，并可按原文、译文、双语视图查看。</dd>
         <dt>支持哪些翻译接口？</dt>
         <dd>支持 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT、OpenAI 官方接口以及 OpenAI 兼容接口等翻译服务配置。</dd>
         <dt>适合哪些用户？</dt>

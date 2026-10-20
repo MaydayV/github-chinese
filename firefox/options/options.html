@@ -11,7 +11,7 @@
     <header class="hero">
       <p class="eyebrow">GitHub 中文汉化翻译插件 · Translation</p>
       <h1>内容翻译设置</h1>
-      <p>配置 README、Issue、Pull Request 和 Release 正文翻译。先保存翻译接口配置，再开启需要的翻译功能。</p>
+      <p>配置 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译。先保存翻译接口配置，再开启需要的翻译功能。</p>
     </header>
 
     <form id="settingsForm" class="form">
@@ -25,18 +25,18 @@
 
       <section class="tab-panel is-active" data-tab-panel="features">
         <section class="card">
-          <h2>README</h2>
+          <h2>README / About</h2>
           <label for="enable_readme_translation" class="switch-row">
             <span class="switch-copy">
               <strong>启用 README 翻译</strong>
-              <small>仅翻译仓库 README 内容区域，不影响代码块、链接、图片路径与 Markdown 结构。</small>
+              <small>翻译仓库 README 内容区域和侧栏 About 描述，不影响代码块、链接、图片路径与 Markdown 结构。</small>
             </span>
             <span class="ios-switch-wrap">
               <input id="enable_readme_translation" type="checkbox" class="ios-switch-input">
               <span class="ios-switch" aria-hidden="true"></span>
             </span>
           </label>
-          <p class="hint">注意：未配置有效 API 并保存前，不能开启此开关。</p>
+          <p class="hint">README 与 About 描述共用此开关和翻译接口；未配置有效 API 并保存前，不能开启此开关。</p>
         </section>
 
         <section class="card">

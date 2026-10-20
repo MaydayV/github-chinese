@@ -41,7 +41,7 @@
 
 - 覆盖 `github.com`、`gist.github.com`、`skills.github.com`、`education.github.com`、`www.githubstatus.com`
 - 使用内置词库与规则在本地执行界面翻译，无需依赖在线翻译服务
-- 支持仓库 README 英文内容翻译（可选）：可配置 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT 或 OpenAI 兼容接口
+- 支持仓库 README 和侧栏 About 描述的英文内容翻译（可选）：可配置 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT 或 OpenAI 兼容接口
 - 支持 Issue / Pull Request / Release 正文翻译（可选）：复用同一套翻译接口配置，可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
 - 弹窗提供总开关；切换后若当前标签页为 GitHub 页面，将自动刷新并立即生效
 - 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue、Pull Request 或 Release
@@ -52,7 +52,7 @@
 - 默认仅进行本地界面翻译
 - 仅本地保存插件配置（如开关状态、API 配置、缓存与记录）
 - 不收集、不出售用户个人数据
-- 当你主动开启 README、Issue、Pull Request 或 Release 正文翻译时，仅会将待翻译内容发送到你所配置的翻译接口
+- 当你主动开启 README、About、Issue、Pull Request 或 Release 正文翻译时，仅会将待翻译内容发送到你所配置的翻译接口
 
 ## 💻 安装指南
 
