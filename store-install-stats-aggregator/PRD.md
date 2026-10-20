@@ -9,15 +9,15 @@
 | 状态 | 待评审 |
 | 目标平台 | Chrome Web Store、Microsoft Edge Add-ons、Firefox Add-ons |
 | 部署原则 | 开源、可配置、无自建服务器优先 |
-| 统计口径 | 商店公开可取得的安装/用户/下载指标，不宣称实时活跃用户 |
+| 统计口径 | 仅展示首次上架以来累计成功安装事件；不以用户数、下载量或活跃用户数替代 |
 
 ## 2. 背景与问题
 
-官网目前只有商店安装入口，没有统一展示 Chrome、Edge、Firefox 三端的安装规模。三个商店的公开数据口径和接口能力不同：
+官网目前只有商店安装入口，没有统一展示 Chrome、Edge、Firefox 三端的累计安装数。三个商店的数据口径和接口能力不同：
 
 - Chrome 的精确安装/卸载分析位于开发者后台；商店详情页会公开展示一个用户数，但它不是安装事件数，页面采集也没有稳定 API 保证。
 - Edge 的安装量和周用户数主要位于 Partner Center Analytics，未提供稳定的公开统计接口。
-- Firefox AMO 提供公开 API，可读取 `average_daily_users` 和 `weekly_downloads`，但这不是累计安装总数。
+- Firefox AMO 公开 API 提供 `average_daily_users` 和 `weekly_downloads`，开发者统计也以用户和下载分析为主；这些都不是累计成功安装事件数。
 
 旧项目 [Chrome-Webstore-Stats-API](https://github.com/navi1995/Chrome-Webstore-Stats-API) 已验证了“服务端抓取 Chrome 商店页面并返回 JSON”的基本思路，但项目较旧，仅支持 Chrome，且依赖页面正则解析，不能直接作为三端生产方案。
 
@@ -25,17 +25,17 @@
 
 ### 3.1 必须实现
 
-1. 统一采集三个商店的可用安装相关指标。
-2. 官网展示分平台数据、总计数据、来源和更新时间。
-3. 单个平台接口失败时不影响其他平台展示。
-4. 数据过期或不可用时明确显示状态，不展示误导性的 `0`。
+1. 采集三个商店从首次上架以来的累计成功安装事件数；无同口径数据时明确不可用。
+2. 官网展示分平台累计安装数、可计算的三端合计、来源和统计时间范围。
+3. 单个平台报表缺失时不影响其他平台分项展示；缺失平台阻止三端合计。
+4. 数据过期或不可用时明确显示状态，不展示误导性的 `0`，也不以用户数、下载量替代安装数。
 5. 官网前端不保存商店账号、Cookie、API 密钥或其他敏感凭据。
 6. 支持后续增加 Opera、Firefox Developer Edition 等平台适配器。
 
 ### 3.2 开源与可配置要求
 
-1. 所有商店 ID、采集开关、同步周期、输出路径和过期策略都通过配置文件管理，不写死在采集器中。
-2. 默认运行不需要自建服务器；GitHub Actions 负责定时采集并生成静态 JSON。
+1. 所有商店 ID、采集开关、输出路径和过期策略都通过配置文件管理，不写死在导入器中。
+2. 默认运行不需要自建服务器；维护者导出官方报表后，通过本地脚本或 GitHub Actions 校验并生成静态 JSON。
 3. 需要公开动态接口时，提供可选的 Cloudflare Worker 部署方式；Worker 只做缓存和接口转发，不保存商店账号凭据。
 4. 提供本地 Node.js 命令用于开发、fixture 测试和手动采集。
 5. 采集器、规范化层、存储层和官网展示层解耦，方便社区贡献新的商店适配器。
@@ -56,18 +56,14 @@
 
 | 类型 | 含义 | 是否可加入总计 |
 | --- | --- | --- |
-| `install_count` | 商店公开显示或后台导出的安装数量 | 仅与同口径数据相加 |
-| `store_listing_users` | 商店详情页公开展示的用户数 | 不能默认等同累计安装量；只有口径明确相同时才比较或合计 |
-| `average_daily_users` | Firefox AMO 平均每日用户数 | 不与累计安装量相加 |
-| `weekly_downloads` | 最近 7 天下载量 | 不与累计安装量相加 |
-| `weekly_users` | 最近 7 天用户数 | 不与累计安装量相加 |
-| `unavailable` | 当前无法取得数据 | 不参与计算 |
+| `cumulative_install_events` | 首次上架以来累计成功安装事件数；按各商店官方报表定义计算 | 只有统计起点一致、历史区间完整时才参与三端合计 |
+| `unavailable` | 当前无法取得上述累计安装事件数 | 不参与计算；只要有平台不可用，就不显示三端合计 |
 
-官网默认展示“各平台统计值”，只有所有参与平台的 `metricType` 相同且数据新鲜时，才展示“同口径合计”。否则显示“平台数据不可直接相加”。
+只展示累计安装事件数。商店页面展示用户数、当前用户数、平均每日用户、周用户、下载量均不能代替安装事件。三端任一平台无完整累计安装数据时，仍可展示有数据的平台累计数，但三端合计显示“暂无法计算”。
 
-### 4.2 “实时”定义
+### 4.2 累计区间定义
 
-产品文案使用“最近更新时间”或“最近同步”，不使用“实时安装量”。默认同步周期为 12 小时，允许后续调整为 6～24 小时。
+“累计安装总数”定义为从商店首次上架日起，官方报表记录的成功安装事件之和；报表明确计入的回访/重装事件也计入总数。它不代表去重用户数或当前仍安装的用户数。页面显示统计起点与报表导出时间，不使用“实时安装量”。
 
 ## 5. 用户与使用场景
 
@@ -77,22 +73,22 @@
 
 ### 5.2 项目维护者
 
-希望新增或替换商店来源时不修改官网展示逻辑，只需增加一个采集适配器。
+希望新增或替换官方报表来源时不修改官网展示逻辑，只需增加一个 CSV 导入器。
 
 ### 5.3 运维人员
 
-希望看到采集失败原因、最后成功数据和过期状态，能够重跑单个平台而不影响其他数据。
+希望看到导入失败原因、最后成功数据和过期状态，能够重导单个平台而不影响其他数据。
 
 ## 6. 推荐技术方案
 
 ### 6.1 总体架构
 
 ```text
-定时任务（GitHub Actions / Cloudflare Worker）
+维护者从商店开发者后台导出官方 CSV
         |
-        +-- Chrome collector
-        +-- Edge collector
-        +-- Firefox AMO collector
+        +-- Chrome CSV importer
+        +-- Edge CSV importer
+        +-- Firefox unavailable（当前无同口径来源）
         |
         +-- 规范化、校验、缓存、失败降级
         |
@@ -101,7 +97,7 @@
                       官网读取
 ```
 
-首期推荐使用 GitHub Actions 定时运行并提交静态 `stats.json`，原因是当前官网部署在 GitHub Pages，不需要新增常驻服务。自动采集只接入字段语义明确的来源：Firefox AMO API，以及经页面验证后可读取的 Chrome 商店展示用户数。Edge 暂用维护者从 Partner Center 导出的汇总 CSV/手工值；拿不到该数据时输出 `unavailable`，不从语义不明的页面字段推算。Cloudflare Worker 仅在确实需要公开动态 API 时再评估，不承担绕过后台登录或代理抓取。
+首期推荐使用维护者从各商店开发者后台导出的安装统计 CSV，经过本地脚本校验并生成静态 `stats.json`，再由 GitHub Pages 发布；不在自动化中保存或使用后台登录凭据。Chrome 和 Edge 的官方报表可用于累计每日成功安装事件；Firefox 当前可验证的公开 API 字段不是安装事件，不能形成三端合计。Firefox 没有可验证的完整累计安装报表/导出前，标记 `unavailable`。Cloudflare Worker 不会补足缺失的官方数据，也不作为后台抓取代理。
 
 ### 6.2 配置与运行模式
 
@@ -113,17 +109,17 @@
     "chrome": {
       "enabled": true,
       "extensionId": "emoeojemgbjcogiodobkpeohoailphgg",
-      "source": "store_listing"
+      "source": "manual_export_csv"
     },
     "edge": {
       "enabled": true,
       "productId": "gafbkmdjmeamppdonbdcoekfcagfpcck",
-      "source": "manual_export"
+      "source": "manual_export_csv"
     },
     "firefox": {
-      "enabled": true,
+      "enabled": false,
       "guid": "github-chinese-localization@caodan.io",
-      "source": "amo_api"
+      "source": "unavailable"
     }
   },
   "output": {
@@ -133,15 +129,15 @@
 }
 ```
 
-支持三种运行模式。`schedule` 属于 GitHub Actions workflow 配置，不放在采集器运行时配置中；运行时配置只包含来源、开关、超时、重试、输出和过期策略。
+支持三种运行模式。运行时配置包含来源、开关、输出和过期策略；不配置自动登录或后台轮询计划。
 
 | 模式 | 用途 | 是否需要服务器 |
 | --- | --- | --- |
-| GitHub Actions | 定时采集 Firefox 与通过稳定性门槛的 Chrome 来源；校验后提交静态 `stats.json`、触发官网部署 | 否 |
-| Cloudflare Worker | 提供 `/api/v1/store-stats`、边缘缓存和按需刷新 | 否，使用 CF 托管 |
-| 本地 Node.js | 开发调试、单个平台重跑、fixture 测试、验证/导入 Edge 汇总值 | 否 |
+| GitHub Actions | 手动触发，校验已提供的官方 CSV/规范化输入后提交静态 `stats.json`、触发官网部署 | 否 |
+| Cloudflare Worker | 仅在需要动态只读 API 时评估；不能获取后台数据或补足缺失平台 | 否，使用 CF 托管 |
+| 本地 Node.js | 校验导出数据、合计完整历史区间、生成静态 JSON、fixture 测试 | 否 |
 
-GitHub Actions 是默认模式；Cloudflare Worker 只在需要公开动态接口、缩短缓存时间或不希望提交统计文件时启用。
+默认由维护者导出数据后运行本地脚本或手动触发 GitHub Actions。不得定时登录后台或将后台 Cookie/令牌放入自动任务。若后续出现官方授权 API，再单独评估自动同步。
 
 ### 6.3 适配器接口
 
@@ -150,52 +146,50 @@ GitHub Actions 是默认模式；Cloudflare Worker 只在需要公开动态接�
 ```ts
 type StoreStats = {
   store: 'chrome' | 'edge' | 'firefox';
-  metricType: 'install_count' | 'store_listing_users' | 'average_daily_users' | 'weekly_downloads' | 'weekly_users' | 'unavailable';
+  metricType: 'cumulative_install_events' | 'unavailable';
   value: number | null;
-  unit: 'users' | 'installs' | 'downloads';
-  dataQuality: 'official_api' | 'store_listing' | 'manual_export' | 'none';
-  fetchedAt: string;
+  unit: 'install_events';
+  periodStart: string | null;
+  periodEnd: string | null;
+  reportedAt: string | null;
+  dataQuality: 'official_dashboard_export' | 'none';
   sourceUrl: string;
   status: 'ok' | 'stale' | 'unavailable';
   error?: string;
 };
 ```
 
-采集器只负责取得原始数据和来源；规范化、缓存、总计和展示逻辑由公共层处理。`metricType` 描述指标含义，`dataQuality` 描述取得途径，两者不可互相替代。公开输出不得包含后台 CSV 原文、Cookie 或其他账号数据。
+导入器只负责解析并校验后台导出的安装报表；公共层验证统计起点、每日数据连续性、非负整数和来源后计算累计值。公开输出不得包含后台 CSV 原文、Cookie 或其他账号数据。
 
 ### 6.4 Chrome 适配器
 
 - 输入：Chrome 扩展 ID `emoeojemgbjcogiodobkpeohoailphgg`。
-- 官方分析数据位于开发者后台；商店公开详情页显示的是用户数，不应改称累计安装数，也不等于新增安装次数。
-- 本次验证中，目标扩展公开详情页返回 HTTP 200，并显示 `20,000 users`。若首期采纳此公开字段，使用 `metricType: store_listing_users`、`dataQuality: store_listing`，官网明确标注“商店展示用户数”。采集器仅提取页面可见标签及其值，保留原始标签供校验；不从压缩脚本或未文档化内部状态猜字段。
-- 页面结构、标签、数值范围校验失败或限流时，失败关闭：保留上次成功值并标记 `stale`；没有历史值时标记 `unavailable`，不能写入 0。
-- 该页面解析属于可选的低稳定性来源；进入定时任务前需固定公开页面 fixture、字段变化测试和人工对照记录。若页面不再稳定展示该字段，关闭自动采集，不改用后台接口绕过登录。
+- 官方分析数据位于开发者后台，包含按日安装/卸载报表，可按日期范围筛选并导出 CSV。商店详情页显示的 `20,000 users` 不是累计成功安装事件数，不得用于本需求。
+- 通过后台导出完整的首次上架日至当前日每日安装报表，求和得到 `cumulative_install_events`。Chrome 报表包含新用户和回访用户，因此结果表示累计安装事件，不代表去重用户数或当前仍安装数量。
+- 只有确认导出覆盖完整历史区间、每日行无缺失且字段语义为 installs 后才发布数值；无法确认时标记 `unavailable`，不以商店页面展示人数代替。
 
 ### 6.5 Edge 适配器
 
 - 输入：Edge 产品 ID `gafbkmdjmeamppdonbdcoekfcagfpcck`。
-- 官方来源：Partner Center 的扩展分析面板，可按时间范围查看指标并导出 CSV。首期由维护者从后台导出后，只录入官网要展示的聚合指标和统计时间，标记 `dataQuality: manual_export`；原始 CSV 留在本地，不提交仓库。
-- 本次验证中，公开详情页返回 HTTP 200，但页面中的 Schema.org `userInteractionCount` 没有可验证的安装/用户定义；不得把它映射为安装量或用户数。
-- 暂无可安全自动读取的官方公开统计 API。未提供有效人工导出值时发布 `unavailable`，而不是用页面元数据填数。
-- 不使用开发者后台 Cookie 写入仓库或前端；未来如评估官方凭据 API，凭据只能放在受保护的 CI Secret 或服务端 Secret 中，并需另行确认官方支持与最小权限。
+- 官方来源：Partner Center Analytics 支持 All time（自扩展上架起）范围，Installs 指标为每日成功安装数，并可导出 CSV。
+- 维护者导出完整 All time 每日安装报表；校验日期连续、指标列明确为成功安装后求和，标记 `dataQuality: official_dashboard_export`。
+- 公开详情页中的 Schema.org `userInteractionCount` 语义未确认，不得映射为安装量；也不使用开发者后台 Cookie 写入仓库或前端。
 
 ### 6.6 Firefox 适配器
 
-- 输入：稳定 GUID `github-chinese-localization@caodan.io`；slug 可从 API 响应读取，不应硬编码易变化的展示 slug。
-- 优先来源：`https://addons.mozilla.org/api/v5/addons/addon/{guid}/`。
-- 保存 `average_daily_users`、`weekly_downloads`、`current_version` 和 `last_updated` 等字段。
-- 官网显示时明确标注“平均每日用户”或“近 7 日下载”，不得标注为累计安装量。
-- 本次验证中，GUID API 返回 HTTP 200，响应字段包含上述指标；页面/API 当前值仅作连通性与字段验证，不写入 PRD 样例作为长期基准。
+- AMO API 返回 `average_daily_users`、`weekly_downloads` 等字段，不提供累计成功安装事件数；下载不等于成功安装。
+- 本次验证的 AMO GUID API 返回 HTTP 200，但不存在本需求所需的累计安装字段。Firefox 暂标 `unavailable`，不以用户数、下载数或页面标签替代。
+- 只有 Mozilla 后续提供明确的安装事件累计字段或官方导出，且可验证自首次上架以来完整区间，才启用 Firefox 数据。
 
 ### 6.7 首期采集范围
 
 | 平台 | 首期数据源 | 自动化 | 对外指标 | 失败时 |
 | --- | --- | --- | --- | --- |
-| Chrome | 商店详情页可见用户数（需通过 fixture 稳定性门槛） | 可选定时采集 | 商店展示用户数 | 保留上次成功值并标记过期；无历史值则不可用 |
-| Edge | Partner Center 汇总 CSV/人工录入 | 手动更新 | CSV 中明确命名的用户/安装指标 | 不可用；不得解析语义不明的公开元数据 |
-| Firefox | AMO 官方 API | 定时采集 | 平均每日用户、近 7 日下载 | 保留上次成功值并标记过期 |
+| Chrome | Developer Dashboard 首次上架日至今每日 Installs CSV | 手动导出并本地求和 | 累计成功安装事件 | 区间不完整或字段不明确时不可用 |
+| Edge | Partner Center All time 每日 Installs CSV | 手动导出并本地求和 | 累计成功安装事件 | 区间不完整或字段不明确时不可用 |
+| Firefox | 当前 AMO API 无累计成功安装字段 | 暂不可采集 | 不展示替代数字 | `unavailable` |
 
-首期不承诺三端同口径总量。即使 Chrome 与 Edge 页面都出现整数，也只有指标定义、时间范围和计量方式一致时才允许求和；Firefox 的平均每日用户和近 7 日下载不得并入累计安装量。
+三端合计只有在 Chrome、Edge、Firefox 都提供首次上架以来完整的成功安装事件数时才显示。当前 Firefox 数据源缺失，因此默认不显示三端合计；可以展示 Chrome 和 Edge 各自的累计数，并将 Firefox 标为不可用。Chrome/Edge 的实际安装事件定义及统计起点需在首次导入时核验一致。
 
 ## 7. 数据文件与接口
 
@@ -214,12 +208,14 @@ type StoreStats = {
   "stores": [
     {
       "store": "chrome",
-      "metricType": "store_listing_users",
-      "value": 20000,
-      "unit": "users",
-      "dataQuality": "store_listing",
-      "fetchedAt": "2026-10-20T11:58:00Z",
-      "sourceUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
+      "metricType": "cumulative_install_events",
+      "value": 25000,
+      "unit": "install_events",
+      "periodStart": "YYYY-MM-DD",
+      "periodEnd": "YYYY-MM-DD",
+      "reportedAt": "2026-10-20T02:40:00Z",
+      "dataQuality": "official_dashboard_export",
+      "sourceUrl": "https://chrome.google.com/webstore/devconsole",
       "status": "ok"
     }
   ]
@@ -232,9 +228,9 @@ type StoreStats = {
 GET /api/v1/store-stats
 ```
 
-响应必须包含 `schemaVersion`、`generatedAt`、各平台 `metricType`、`value`、`unit`、`dataQuality`、`status`、`fetchedAt` 和 `sourceUrl`。接口应支持 `Cache-Control`，默认缓存 10～60 分钟，避免官网访问放大商店请求。
+响应必须包含 `schemaVersion`、`generatedAt`、各平台 `metricType`、`value`、`unit`、`periodStart`、`periodEnd`、`reportedAt`、`dataQuality`、`status` 和 `sourceUrl`。接口应支持 `Cache-Control`，默认缓存 10～60 分钟。示例数字仅用于展示结构，不代表真实商店数据。
 
-Cloudflare Worker 版本必须支持：
+若后续部署 Cloudflare Worker，必须支持：
 
 - `GET /api/v1/store-stats`：读取规范化统计结果；
 - `GET /api/v1/store-stats?store=chrome`：读取单个平台结果；
@@ -250,30 +246,29 @@ Cloudflare Worker 版本必须支持：
 新增“安装量统计”卡片，至少包含：
 
 - Chrome、Edge、Firefox 三个平台行。
-- 数值和指标名称，例如“安装量”“平均每日用户”“近 7 日下载”。
-- 最近同步时间。
+- 各平台累计成功安装事件数和统计起点。
+- 报表导出时间。
 - 数据状态：正常、数据过期、暂不可用。
 - 各平台商店链接。
-- 只有同口径时才显示合计；否则显示“各平台口径不同，暂不合计”。
+- 只有三个平台都有完整、同定义历史区间时才显示合计；否则显示“暂无法计算三端累计安装总数”，并保留有数值的平台分项。
 
 加载失败时保留最后一次成功数据，并显示“数据可能已过期”；没有历史数据时显示“暂无法获取”，不能显示 `0`。
 
 ## 9. 更新与失败策略
 
-1. 定时任务每 12 小时执行一次，并允许手动触发。
-2. 单个平台失败最多重试 2 次，采用指数退避。
-3. 成功后原子写入数据文件，避免官网读取半写入 JSON。
-4. 连续 3 次失败创建 GitHub Actions 告警或维护者通知。
-5. 数据超过 48 小时未更新，状态改为 `stale`。
-6. 新采集值必须通过非负整数、合理范围、字段类型和时间格式校验。
-7. 页面解析器发现结构变化时失败关闭，不写入猜测值。
+1. 不自动登录商店后台；维护者按需导出 All time CSV 并触发校验/发布。
+2. 每个平台导入时验证首次上架日期、最后统计日期、日期连续性、每日值为非负整数及列名含义。
+3. 缺失日期、截断区间、重复行或指标列不明时失败关闭，不能发布部分求和值。
+4. 成功后原子写入数据文件，避免官网读取半写入 JSON。
+5. 导出时间超过 48 小时标记 `stale`；重导出后恢复 `ok`。
+6. 任何平台状态为 `stale` 或 `unavailable` 时不显示三端合计。
 
 ## 10. 安全与合规要求
 
 - 不在 GitHub Pages 前端暴露商店账号、Cookie、Access Token 或 Partner Center 凭据。
 - 不绕过登录、验证码、访问频率限制或反爬机制。
 - 遵守各商店的服务条款、robots 和合理请求频率。
-- 抓取页面仅保存聚合统计，不保存用户个人信息。
+- 导出的报表只输出官网展示所需的聚合安装总数与统计起点，不公开原始明细。
 - 第三方抓取服务若不可验证数据来源、隐私政策或稳定性，不作为生产依赖。
 - 官网文案必须区分“安装量”“用户数”“下载量”，避免营销性误导。
 
@@ -305,82 +300,81 @@ store-install-stats-aggregator/
 - 开源许可证和第三方依赖清单；
 - 示例 API 响应与故障排查说明。
 
-## 11. 公开来源快速验证（2026-10-20）
+## 11. 累计安装数来源验证（2026-10-20）
 
 使用临时 Node.js 普通脚本对 PRD 中配置的三个扩展标识发起一次 HTTPS GET；未登录开发者后台、未使用凭据，也未修改/安装浏览器插件。
 
 | 来源 | 结果 | 方案结论 |
 | --- | --- | --- |
-| Chrome Web Store 详情页 | HTTP 200；可见 `20,000 users` | 可作为商店展示用户数候选；不是累计安装事件，也没有官方公开采集 API 保证页面字段稳定。 |
-| Edge Add-ons 详情页 | HTTP 200；含 Schema.org `userInteractionCount=12262`，但字段语义无法从页面或官方统计文档确认 | 页面可达不代表统计可用；不采纳该字段。用 Partner Center 导出 CSV 或标记不可用。 |
-| AMO API（按 GUID） | HTTP 200；包含 `average_daily_users`、`weekly_downloads`、`current_version`、`last_updated` | 可用于自动采集；前两项保持独立指标，不能冒充累计安装。 |
+| Chrome Web Store 详情页 | HTTP 200；可见 `20,000 users` | 这不是累计安装事件数，不采纳。官方 Developer Dashboard 提供按日 Installs/Uninstalls 报表和 CSV；需由发布者导出完整历史区间。 |
+| Edge Add-ons 详情页 | HTTP 200；含 Schema.org `userInteractionCount=12262`，语义无法确认 | 不采纳。官方 Partner Center Analytics 支持 All time（自上架以来）和每日成功安装数 CSV；这是候选数据源。 |
+| AMO API（按 GUID） | HTTP 200；字段含 `average_daily_users`、`weekly_downloads`，无累计安装事件字段 | 用户数与下载量均不采纳；Firefox 当前标记不可用，因此不能形成三端合计。 |
 
-本次结果只证明验证时点的连通性与字段存在，不证明长期稳定、7 天运行成功率、官网部署效果或商店条款允许的采集频率。实际值随时间变化，因此没有把本次计数写成产品数据。
+本次只验证公开入口和 API 字段，并查阅三家官方统计说明；没有登录后台或取得 Chrome/Edge CSV，也未验证其历史区间完整性。Firefox 缺少目标指标，当前方案不能输出可信的三端累计总数。用户数和下载量不作为替代值。
 
 ## 12. 测试要求
 
 ### 12.1 单元测试
 
-- Chrome 准备正常、字段/标签变化、缺失标签的商店页面 fixture；Firefox 准备正常、空值、异常响应 JSON fixture；Edge 准备有效、列变化、无效值 CSV fixture。fixture 不包含后台凭据或完整分析报表。
-- 验证数字格式化、指标名称、时间转换和过期判断。
-- 验证异常响应、超时、限流、HTML 结构变化不会写入错误的 0。
+- Chrome 与 Edge 准备有效、缺日期、重复日期、无效值/错列名 CSV fixture；Firefox 准备 unavailable 状态 fixture。fixture 不包含后台凭据或完整分析报表。
+- 验证完整历史日期范围求和、安装事件指标名称、统计起点、过期判断和三端汇总门槛。
+- 验证任一日期缺口、无效 CSV、Firefox 不可用均不会发布错误的 0 或三端总计。
 
 ### 12.2 集成测试
 
-- 定时任务可独立重跑单个平台。
-- 三个平台部分失败时仍生成完整 JSON，并正确标记状态。
+- Chrome、Edge 可独立导入并重算单个平台。
+- Firefox 无同口径报表时仍生成完整 JSON，并正确标记 unavailable。
 - 官网可以读取旧数据、处理新字段和处理缺失平台。
 - `stats.json` schema 校验失败时阻止提交。
 
 ### 12.3 验收标准
 
-- 连续 7 天定时运行成功率不低于 95%。
-- 正常数据从采集完成到官网可见不超过一个同步周期。
-- 任意一个平台不可用时，其他平台仍能正常展示。
-- 页面明确展示统计口径和最近更新时间。
+- Chrome、Edge 汇总值与官方 All time 导出报表的每日数据总和一致。
+- 存在日期缺口或无效报表时阻止发布该平台数字。
+- Firefox 不提供累计安装报表时展示 unavailable，不显示三端合计。
+- 页面明确展示统计区间和报表导出时间。
 - 前端代码和公开仓库中不存在商店后台凭据。
 
 ## 13. 实施阶段
 
-### Phase 1：数据模型与 Firefox
+### Phase 1：数据模型与 Chrome/Edge 报表导入
 
-1. 创建 `stats.json` schema、状态模型和官网展示组件，支持指标来源质量及 `store_listing_users`。
-2. 接入 Firefox AMO 官方 API；使用 GUID 定位并准备正常、空值、错误响应 fixture。
-3. 用 Chrome 页面 fixture 验证“商店展示用户数”标签的稳定性；未达到稳定门槛前默认不可用，不放入定时任务。
-4. 完成本地 fixture、schema 校验和过期展示。
+1. 创建 `stats.json` schema，仅支持 `cumulative_install_events` 与 `unavailable`。
+2. 实现 Chrome/Edge All time 每日安装 CSV 导入、区间完整性校验和累计求和。
+3. Firefox 明确输出 `unavailable`，不接入 AMO 周下载/用户数字段。
+4. 完成本地 CSV fixture、schema 校验和过期展示。
 
-### Phase 2：Chrome
+### Phase 2：Firefox 数据源评估
 
-1. 根据公开页面可见标签实现 Chrome 解析器，不依赖旧项目的单一正则解析。
-2. 增加 fixture、标签/数值完整性校验和失败保留机制。
-3. 与商店页面实际显示人工对照，并确认标注为“商店展示用户数”。
+1. 只接受 Mozilla 官方新增的累计安装事件 API 或后台导出。
+2. 用户数、下载量和页面展示值一律不映射为累计安装。
 
-### Phase 3：Edge
+### Phase 3：官网展示与三端汇总门槛
 
-1. 实现本地 Partner Center 汇总 CSV/手工值导入，只输出批准公开的聚合字段与统计时间。
-2. 未确认官方公开接口和字段语义前，不启用 Edge 页面抓取。
-3. 在官网明确 Edge 数据来源和口径；未录入时显示不可用状态。
+1. 展示 Chrome/Edge 的分平台累计成功安装事件和统计起点。
+2. 仅当 Firefox 也提供完整同口径区间数据时计算三端合计。
+3. 任一平台缺数据或历史区间不完整时显示暂无法计算合计。
 
-### Phase 4：无服务器定时发布与监控
+### Phase 4：无服务器手动发布与监控
 
-1. 建立 GitHub Actions 定时任务和手动 dispatch，默认不依赖服务器。
+1. 建立 GitHub Actions 手动 dispatch，处理维护者提供的官方报表，不自动登录后台。
 2. 生成并提交 `assets/data/store-stats.json`，触发 GitHub Pages 更新。
 3. 提供可选 Cloudflare Worker 部署和公开只读 API。
 4. 增加失败告警、数据新鲜度检查和官网回归测试。
 
-## 14. 待确认事项
+## 14. 当前限制与下一步
 
-1. 官网是否允许展示“各平台指标”，还是必须只显示同口径合计？
-2. Chrome 商店展示的用户数是否满足首期展示需要，还是也必须使用后台导出数据？
-3. 默认同步周期采用 12 小时还是 24 小时？
-4. 是否有公开动态 API 的实际需要；如无，首期不启用 Cloudflare Worker？
-5. 官网卡片显示“安装量统计”还是“商店用户数据”？
+- 当前按“首次上架以来累计成功安装事件”定义累计安装总数；不代表当前仍安装的去重用户数。
+- Chrome、Edge 数值需维护者提供开发者后台完整历史报表，本轮没有访问后台或核验实际累计值。
+- Firefox 当前可验证 API 不提供累计安装事件数，因此目前无法给出可信的三端合计。不得使用 Firefox 用户数或下载量补位；需要 Mozilla 官方提供同口径报表后才能开放三端总计。
+- 首期实现前，需用 Chrome/Edge 导出 CSV 验证“首次上架日至今”是否能完整导出且日期无缺口。
 
 ## 15. 参考资料
 
 - [Chrome Web Store metrics](https://developer.chrome.com/docs/webstore/metrics)
 - [Microsoft Edge extensions analytics](https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/extensions-analytics)
 - [Mozilla Add-ons API](https://mozilla.github.io/addons-server/topics/api/addons)
+- [Chrome Web Store analytics dashboard overview](https://developer.chrome.com/blog/cws-analytics-revamp)
 - [Chrome Web Store listing example](https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg)
 - [Microsoft Edge Add-ons listing example](https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck)
 - [AMO API example by GUID](https://addons.mozilla.org/api/v5/addons/addon/github-chinese-localization%40caodan.io/)
