@@ -4,10 +4,11 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 产品 | GitHub 中文汉化翻译插件官网安装量统计 |
+| 产品 | 三端商店安装量聚合开源项目 |
 | 版本 | V1.0（需求草案） |
 | 状态 | 待评审 |
 | 目标平台 | Chrome Web Store、Microsoft Edge Add-ons、Firefox Add-ons |
+| 部署原则 | 开源、可配置、无自建服务器优先 |
 | 统计口径 | 商店公开可取得的安装/用户/下载指标，不宣称实时活跃用户 |
 
 ## 2. 背景与问题
@@ -31,7 +32,15 @@
 5. 官网前端不保存商店账号、Cookie、API 密钥或其他敏感凭据。
 6. 支持后续增加 Opera、Firefox Developer Edition 等平台适配器。
 
-### 3.2 不在本期范围
+### 3.2 开源与可配置要求
+
+1. 所有商店 ID、采集开关、同步周期、输出路径和过期策略都通过配置文件管理，不写死在采集器中。
+2. 默认运行不需要自建服务器；GitHub Actions 负责定时采集并生成静态 JSON。
+3. 需要公开动态接口时，提供可选的 Cloudflare Worker 部署方式；Worker 只做缓存和接口转发，不保存商店账号凭据。
+4. 提供本地 Node.js 命令用于开发、fixture 测试和手动采集。
+5. 采集器、规范化层、存储层和官网展示层解耦，方便社区贡献新的商店适配器。
+
+### 3.3 不在本期范围
 
 - 不统计真实的实时在线用户数。
 - 不通过插件主动上报用户设备标识来估算安装量。
@@ -91,9 +100,51 @@
                       官网读取
 ```
 
-首期推荐使用 GitHub Actions 定时运行并提交静态 `stats.json`，原因是当前官网部署在 GitHub Pages，不需要新增常驻服务。若后续要求更短刷新周期或隐藏采集逻辑，再迁移到 Cloudflare Worker/API。
+首期推荐使用 GitHub Actions 定时运行并提交静态 `stats.json`，原因是当前官网部署在 GitHub Pages，不需要新增常驻服务。Cloudflare Worker 作为可选的公开 API 层；两种模式共用同一套采集器和数据模型。
 
-### 6.2 适配器接口
+### 6.2 配置与运行模式
+
+项目提供 `config.example.json`，实际配置通过仓库文件或环境变量覆盖：
+
+```json
+{
+  "schedule": "0 */12 * * *",
+  "stores": {
+    "chrome": {
+      "enabled": true,
+      "extensionId": "emoeojemgbjcogiodobkpeohoailphgg",
+      "source": "public_page"
+    },
+    "edge": {
+      "enabled": true,
+      "productId": "gafbkmdjmeamppdonbdcoekfcagfpcck",
+      "source": "public_page"
+    },
+    "firefox": {
+      "enabled": true,
+      "slug": "github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6",
+      "guid": "github-chinese-localization@caodan.io",
+      "source": "amo_api"
+    }
+  },
+  "output": {
+    "jsonPath": "assets/data/store-stats.json",
+    "staleAfterHours": 48
+  }
+}
+```
+
+支持三种运行模式：
+
+| 模式 | 用途 | 是否需要服务器 |
+| --- | --- | --- |
+| GitHub Actions | 定时采集、提交静态 `stats.json`、触发官网部署 | 否 |
+| Cloudflare Worker | 提供 `/api/v1/store-stats`、边缘缓存和按需刷新 | 否，使用 CF 托管 |
+| 本地 Node.js | 开发调试、单个平台重跑、fixture 测试 | 否 |
+
+GitHub Actions 是默认模式；Cloudflare Worker 只在需要公开动态接口、缩短缓存时间或不希望提交统计文件时启用。
+
+### 6.3 适配器接口
 
 每个平台实现统一接口：
 
@@ -112,21 +163,21 @@ type StoreStats = {
 
 采集器只负责取得原始数据和来源；规范化、缓存、总计和展示逻辑由公共层处理。
 
-### 6.3 Chrome 适配器
+### 6.4 Chrome 适配器
 
 - 输入：Chrome 扩展 ID `emoeojemgbjcogiodobkpeohoailphgg`。
 - 优先来源：官方开发者后台导出的安装数据或可公开访问的商店页面。
 - 可参考旧项目的页面提取结构，但不得依赖单一正则；需要多选择器、页面版本检测和字段完整性校验。
 - 若页面结构变化或返回限流，保留上一次成功值并标记 `stale`。
 
-### 6.4 Edge 适配器
+### 6.5 Edge 适配器
 
 - 输入：Edge 产品 ID `gafbkmdjmeamppdonbdcoekfcagfpcck`。
 - 优先来源：Partner Center 导出的安装数据。
 - 备用来源：公开商店页面抓取，但必须标记为非官方页面解析，并设置较长缓存和失败告警。
 - 不使用开发者后台 Cookie 写入仓库或前端；如未来接入凭据，必须通过受保护的 CI Secret 或服务端 Secret 管理。
 
-### 6.5 Firefox 适配器
+### 6.6 Firefox 适配器
 
 - 输入：AMO slug `github-%E4%B8%AD%E6%96%87%E6%B1%89%E5%8C%96%E6%8F%92%E4%BB%B6` 或稳定 GUID `github-chinese-localization@caodan.io`。
 - 优先来源：`https://addons.mozilla.org/api/v5/addons/addon/{slug}/`。
@@ -169,6 +220,17 @@ GET /api/v1/store-stats
 
 响应必须包含 `schemaVersion`、`generatedAt`、各平台 `metricType`、`value`、`status`、`fetchedAt` 和 `sourceUrl`。接口应支持 `Cache-Control`，默认缓存 10～60 分钟，避免官网访问放大商店请求。
 
+Cloudflare Worker 版本必须支持：
+
+- `GET /api/v1/store-stats`：读取规范化统计结果；
+- `GET /api/v1/store-stats?store=chrome`：读取单个平台结果；
+- `GET /health`：返回 Worker 和数据缓存状态；
+- `Access-Control-Allow-Origin` 白名单配置；
+- 基于 Cloudflare Cache API 的响应缓存；
+- 上游失败时返回最近一次成功数据和 `status: "stale"`。
+
+接口默认只读，不提供公开写入和任意 URL 抓取能力，避免被滥用为代理。
+
 ## 8. 官网展示要求
 
 新增“安装量统计”卡片，至少包含：
@@ -200,6 +262,34 @@ GET /api/v1/store-stats
 - 抓取页面仅保存聚合统计，不保存用户个人信息。
 - 第三方抓取服务若不可验证数据来源、隐私政策或稳定性，不作为生产依赖。
 - 官网文案必须区分“安装量”“用户数”“下载量”，避免营销性误导。
+
+### 10.1 开源交付要求
+
+首期目录建议如下：
+
+```text
+store-install-stats-aggregator/
+├── PRD.md
+├── README.md
+├── config.example.json
+├── src/
+│   ├── collectors/
+│   ├── normalize/
+│   └── storage/
+├── worker/cloudflare/
+├── fixtures/
+├── scripts/
+├── tests/
+└── .github/workflows/update-stats.yml
+```
+
+必须提供：
+
+- `config.example.json`，不提交真实密钥和后台 Cookie；
+- 本地运行、测试、GitHub Actions 和 Cloudflare Worker 部署说明；
+- 采集器贡献约定和 fixture 更新流程；
+- 开源许可证和第三方依赖清单；
+- 示例 API 响应与故障排查说明。
 
 ## 11. 测试要求
 
@@ -244,11 +334,12 @@ GET /api/v1/store-stats
 2. 优先落地 Partner Center CSV 导入；再评估公开页面抓取。
 3. 在官网明确 Edge 数据来源和口径。
 
-### Phase 4：定时发布与监控
+### Phase 4：无服务器定时发布与监控
 
-1. 建立 GitHub Actions 定时任务和手动 dispatch。
-2. 生成并提交 `assets/data/store-stats.json`。
-3. 增加失败告警、数据新鲜度检查和官网回归测试。
+1. 建立 GitHub Actions 定时任务和手动 dispatch，默认不依赖服务器。
+2. 生成并提交 `assets/data/store-stats.json`，触发 GitHub Pages 更新。
+3. 提供可选 Cloudflare Worker 部署和公开只读 API。
+4. 增加失败告警、数据新鲜度检查和官网回归测试。
 
 ## 13. 待确认事项
 
