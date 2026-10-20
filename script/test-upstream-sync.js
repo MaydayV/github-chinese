@@ -86,6 +86,14 @@ assert.ok(
   content.includes('translateReactGlobalNavSearchPlaceholder();'),
   '顶栏搜索占位符翻译应被调用',
 );
+assert.ok(
+  content.includes('octolytics-dimension-repository_nwo'),
+  '仓库页面识别应支持 octolytics 仓库元数据兜底',
+);
+assert.ok(
+  content.includes('const reservedFirstSegment ='),
+  '仓库页面 URL 兜底应排除 GitHub 保留路径',
+);
 
 // —— 三端共享文件保持一致 ——
 for (const file of ['locals.js', 'content.js']) {

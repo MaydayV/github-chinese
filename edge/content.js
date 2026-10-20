@@ -983,7 +983,21 @@
         const isSession = document.body.classList.contains('session-authentication');
         const isHomepage = pathname === '/' && site === 'github';
         const isProfile = document.body.classList.contains('page-profile') || metaLocation === '/<user-name>';
-        const isRepository = /\/<user-name>\/<repo-name>/.test(metaLocation);
+        // analytics-location 带 data-turbo-transient，Turbo 软导航时可能暂时缺失。
+        // 使用与当前 URL 一致的仓库元数据和两级路径结构兜底，避免仓库页整页跳过翻译。
+        const repositoryNwo = document.head
+            .querySelector('meta[name="octolytics-dimension-repository_nwo"]')
+            ?.content?.trim() || '';
+        const pathRepository = pathname.split('/').slice(1, 3).join('/');
+        const hasRepositoryMetadata = hostname === 'github.com'
+            && /^[^/]+\/[^/]+$/.test(repositoryNwo)
+            && repositoryNwo.toLowerCase() === pathRepository.toLowerCase();
+        const reservedFirstSegment = /^\/(?:home|dashboard|feed|copilot|spark|signup|account_verifications|login|logout|sessions?|password_reset|orgs|organizations|explore|topics|notifications|watching|stars|issues|pulls|repos|search|discussions|gist|sponsors|marketplace|apps|codespaces|developer|features|status|education|sitemap|mcp|settings|account|new|redeem|trending|collections|showcases|about|pricing|security|enterprise|customer-stories|site|support|learn|events|tools|edu|campus|git|contact|users|installations|billing|plans)\//i;
+        const isRepository = /\/<user-name>\/<repo-name>/.test(metaLocation)
+            || hasRepositoryMetadata
+            || (site === 'github'
+                && !reservedFirstSegment.test(pathname)
+                && /^\/[^\/@?#]+\/[^\/@?#]+(?:\/|$)/.test(pathname));
         const isOrganization = /\/<org-login>/.test(metaLocation) || /^\/(?:orgs|organizations)/.test(pathname);
 
         // 正则配置 ================================================
