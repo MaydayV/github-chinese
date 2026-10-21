@@ -6,6 +6,7 @@ const DEFAULTS = {
   readme_enable_token_record: false,
   readme_enable_repo_cache: false,
   readme_enable_progressive: false,
+  readme_enable_debug: false,
   readme_provider: 'deepseek',
   readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
   readme_deepl_api_key: '',
@@ -25,12 +26,14 @@ const DEFAULTS = {
 const LOCAL_STORAGE_KEYS = {
   TRANSLATION_RECORDS: 'ghcn_readme_translation_records',
   REPO_CACHE: 'ghcn_readme_repo_cache',
+  DEBUG_LOGS: 'ghcn_readme_translation_debug_logs',
 };
 
 const ADVANCED_SWITCH_KEYS = [
   'readme_enable_token_record',
   'readme_enable_repo_cache',
   'readme_enable_progressive',
+  'readme_enable_debug',
 ];
 
 const RECORD_STATUS_META = {
@@ -43,6 +46,7 @@ const RECORD_STATUS_META = {
 const RECORDS_STATE = {
   records: [],
   cacheEntries: [],
+  debugLogs: [],
   page: 1,
   pageSize: 8,
 };
@@ -455,6 +459,7 @@ function enforceFeatureSwitchRules(values, options = {}) {
     'readme_enable_token_record',
     'readme_enable_repo_cache',
     'readme_enable_progressive',
+    'readme_enable_debug',
   ];
 
   if (!nextValues.enable_readme_translation) {
@@ -930,6 +935,8 @@ function renderRecords() {
   const nextEl = byId('recordsNext');
   const clearRecordsEl = byId('clearRecords');
   const clearRepoCacheEl = byId('clearRepoCache');
+  const exportDebugLogsEl = byId('exportDebugLogs');
+  const clearDebugLogsEl = byId('clearDebugLogs');
 
   if (!listEl || !summaryEl || !pagerEl || !pageInfoEl || !prevEl || !nextEl) return;
 
@@ -941,13 +948,15 @@ function renderRecords() {
 
   if (clearRecordsEl) clearRecordsEl.disabled = allRecords.length === 0;
   if (clearRepoCacheEl) clearRepoCacheEl.disabled = cacheEntries.length === 0;
+  if (exportDebugLogsEl) exportDebugLogsEl.disabled = RECORDS_STATE.debugLogs.length === 0;
+  if (clearDebugLogsEl) clearDebugLogsEl.disabled = RECORDS_STATE.debugLogs.length === 0;
 
   if (!allRecords.length) {
     const emptyEl = document.createElement('li');
     emptyEl.className = 'history-empty';
     emptyEl.textContent = '暂无翻译记录，开启“记录翻译消耗”后会自动累积。';
     listEl.replaceChildren(emptyEl);
-    summaryEl.textContent = `暂无记录。当前缓存条目：${cacheEntries.length}`;
+    summaryEl.textContent = `暂无记录。当前缓存条目：${cacheEntries.length}，调试日志：${RECORDS_STATE.debugLogs.length} 条`;
     pagerEl.hidden = true;
     pageInfoEl.textContent = '';
     prevEl.disabled = true;
@@ -956,7 +965,7 @@ function renderRecords() {
   }
 
   const tokenTotal = allRecords.reduce((sum, item) => sum + (Number.isFinite(item.tokens) ? item.tokens : 0), 0);
-  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计 Tokens：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}`;
+  summaryEl.textContent = `共 ${allRecords.length} 条记录，累计 Tokens：${formatNumber(tokenTotal)}，缓存条目：${cacheEntries.length}，调试日志：${RECORDS_STATE.debugLogs.length} 条`;
 
   const start = (currentPage - 1) * RECORDS_STATE.pageSize;
   const end = start + RECORDS_STATE.pageSize;
@@ -974,10 +983,14 @@ async function refreshRecordsView() {
   const data = await chrome.storage.local.get({
     [LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS]: [],
     [LOCAL_STORAGE_KEYS.REPO_CACHE]: [],
+    [LOCAL_STORAGE_KEYS.DEBUG_LOGS]: [],
   });
 
   RECORDS_STATE.records = normalizeRecords(data[LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS]);
   RECORDS_STATE.cacheEntries = normalizeCacheEntries(data[LOCAL_STORAGE_KEYS.REPO_CACHE]);
+  RECORDS_STATE.debugLogs = Array.isArray(data[LOCAL_STORAGE_KEYS.DEBUG_LOGS])
+    ? data[LOCAL_STORAGE_KEYS.DEBUG_LOGS]
+    : [];
   RECORDS_STATE.page = clampRecordsPage(RECORDS_STATE.page);
 
   renderRecords();
@@ -989,6 +1002,24 @@ async function clearTranslationRecords() {
 
 async function clearRepoCache() {
   await chrome.storage.local.set({ [LOCAL_STORAGE_KEYS.REPO_CACHE]: [] });
+}
+
+async function clearDebugLogs() {
+  await chrome.storage.local.set({ [LOCAL_STORAGE_KEYS.DEBUG_LOGS]: [] });
+}
+
+function exportDebugLogs() {
+  if (!RECORDS_STATE.debugLogs.length) return false;
+
+  const payload = JSON.stringify(RECORDS_STATE.debugLogs, null, 2);
+  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `github-chinese-readme-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return true;
 }
 
 function setActiveTab(tabId) {
@@ -1067,6 +1098,7 @@ function bindEvents() {
           readme_enable_token_record: false,
           readme_enable_repo_cache: false,
           readme_enable_progressive: false,
+          readme_enable_debug: false,
         });
         setStatus('README 翻译已开启。高级功能默认关闭，可按需手动开启。', 'success');
       } catch (error) {
@@ -1086,6 +1118,7 @@ function bindEvents() {
         readme_enable_token_record: false,
         readme_enable_repo_cache: false,
         readme_enable_progressive: false,
+        readme_enable_debug: false,
       });
       setStatus('README 翻译已关闭，相关高级开关已自动关闭。', 'success');
     } catch (error) {
@@ -1247,6 +1280,23 @@ function bindEvents() {
     }
   });
 
+  byId('exportDebugLogs')?.addEventListener('click', () => {
+    if (exportDebugLogs()) {
+      setStatus('调试日志已导出。', 'success');
+    }
+  });
+
+  byId('clearDebugLogs')?.addEventListener('click', async () => {
+    try {
+      await clearDebugLogs();
+      await refreshRecordsView();
+      setStatus('调试日志已清空。', 'success');
+    } catch (error) {
+      console.error(error);
+      setStatus('清空调试日志失败。', 'error');
+    }
+  });
+
   byId('recordsPrev')?.addEventListener('click', () => {
     setRecordsPage(RECORDS_STATE.page - 1);
   });
@@ -1273,7 +1323,9 @@ function bindEvents() {
     }
 
     if (areaName === 'local') {
-      if (changes[LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS] || changes[LOCAL_STORAGE_KEYS.REPO_CACHE]) {
+      if (changes[LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS]
+        || changes[LOCAL_STORAGE_KEYS.REPO_CACHE]
+        || changes[LOCAL_STORAGE_KEYS.DEBUG_LOGS]) {
         refreshRecordsView().catch((error) => {
           console.error(error);
         });

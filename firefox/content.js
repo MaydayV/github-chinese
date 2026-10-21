@@ -16,6 +16,7 @@
         readme_enable_token_record: false,
         readme_enable_repo_cache: false,
         readme_enable_progressive: false,
+        readme_enable_debug: false,
         readme_provider: 'deepseek',
         readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
         readme_deepl_api_key: '',
@@ -101,6 +102,9 @@
         TRANSLATION_CONCURRENCY: 3,
         DEBOUNCE_MS: 700,
         RECORD_MAX_ENTRIES: 200,
+        DEBUG_LOG_MAX_ENTRIES: 40,
+        DEBUG_EVENT_MAX_ENTRIES: 240,
+        DEBUG_TEXT_MAX_CHARS: 96,
         REPO_CACHE_MAX_ENTRIES: 24,
         MAX_CACHE_HTML_CHARS: 260000,
     };
@@ -108,6 +112,7 @@
     const README_LOCAL_STORAGE_KEYS = {
         TRANSLATION_RECORDS: 'ghcn_readme_translation_records',
         REPO_CACHE: 'ghcn_readme_repo_cache',
+        DEBUG_LOGS: 'ghcn_readme_translation_debug_logs',
     };
 
     const ISSUE_PR_CONFIG = {
@@ -1266,12 +1271,14 @@
         return getRepoAboutElements()[0] || null;
     }
 
-    async function translateRepoAboutDescription() {
+    async function translateRepoAboutDescription(debugContext = null) {
         const providerConfig = getProviderConfig();
         const aboutElements = getRepoAboutElements();
         if (!aboutElements.length) return 0;
+        addReadmeDebugEvent(debugContext, 'about_start', { elementCount: aboutElements.length });
         if (!providerConfig.ok) {
             warnReadmeConfig(`About 描述未翻译：${providerConfig.message}`);
+            addReadmeDebugEvent(debugContext, 'about_skipped', { reason: providerConfig.message });
             return 0;
         }
 
@@ -1291,11 +1298,15 @@
                 tasksByText.get(task.normalizedText).push(task);
             });
 
-            const { translatedMap } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+            const { translatedMap } = await translateTextsWithProvider(uniqueTexts, providerConfig, {
+                debugContext,
+                debugPhase: 'about',
+            });
             translatedCount += withReadmeDomMutationGuard(() =>
                 applyTextGroupTranslations(aboutEl, tasksByText, uniqueTexts, translatedMap));
         }
 
+        addReadmeDebugEvent(debugContext, 'about_end', { translatedCount });
         return translatedCount;
     }
 
@@ -1569,6 +1580,94 @@
         await setLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, trimmed);
     }
 
+    function createReadmeDebugContext(reason) {
+        if (!FeatureSet.readme_enable_debug) return null;
+
+        return {
+            runId: generateRecordId(),
+            repo: getCurrentRepoInfo()?.fullName || 'unknown/unknown',
+            reason: reason || 'unknown',
+            provider: (FeatureSet.readme_provider || '').trim().toLowerCase(),
+            createdAt: Date.now(),
+            events: [],
+        };
+    }
+
+    function sanitizeReadmeDebugText(text) {
+        return truncateText(String(text || '')
+            .replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]')
+            .replace(/(?:sk|gh[opsu]|xox[baprs])-?[A-Za-z0-9_-]{8,}/g, '[redacted]')
+            .replace(/https?:\/\/[^\s)]+/gi, '[url]')
+            .replace(/[\r\n\t]+/g, ' ')
+            .trim(), README_CONFIG.DEBUG_TEXT_MAX_CHARS);
+    }
+
+    function describeReadmeDebugTask(task, rootEl) {
+        const node = task?.node;
+        const parent = node?.parentElement;
+        const path = [];
+        let current = parent;
+        while (current && current !== rootEl && path.length < 5) {
+            const tag = current.tagName?.toLowerCase() || 'element';
+            const className = typeof current.className === 'string'
+                ? current.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.')
+                : '';
+            path.unshift(className ? `${tag}.${className}` : tag);
+            current = current.parentElement;
+        }
+
+        return {
+            textHash: createHash(task?.normalizedText || ''),
+            textPreview: sanitizeReadmeDebugText(task?.normalizedText),
+            element: path.join(' > ') || 'unknown',
+        };
+    }
+
+    function addReadmeDebugEvent(context, phase, detail = {}) {
+        if (!context) return;
+
+        const event = {
+            at: Date.now(),
+            phase,
+            ...detail,
+        };
+        if (detail.status) context.status = detail.status;
+        context.events.push(event);
+        if (context.events.length > README_CONFIG.DEBUG_EVENT_MAX_ENTRIES) {
+            context.events.splice(0, context.events.length - README_CONFIG.DEBUG_EVENT_MAX_ENTRIES);
+        }
+        console.debug('[README翻译调试]', context.runId, event);
+    }
+
+    async function flushReadmeDebugContext(context, status, summary = {}) {
+        if (!context) return;
+
+        const entry = {
+            runId: context.runId,
+            repo: context.repo,
+            reason: context.reason,
+            provider: context.provider,
+            status: context.status || status,
+            createdAt: context.createdAt,
+            finishedAt: Date.now(),
+            durationMs: Math.max(0, Date.now() - context.createdAt),
+            summary,
+            events: context.events,
+        };
+
+        try {
+            const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, []);
+            const logs = Array.isArray(existing) ? existing : [];
+            logs.push(entry);
+            await setLocalValue(
+                README_LOCAL_STORAGE_KEYS.DEBUG_LOGS,
+                logs.slice(-README_CONFIG.DEBUG_LOG_MAX_ENTRIES),
+            );
+        } catch (error) {
+            console.warn('[README翻译调试] 保存调试日志失败:', error);
+        }
+    }
+
     function pushReadmeDomMutationGuard() {
         readmeRuntime.domMutationGuardDepth += 1;
         readmeRuntime.isApplyingTranslation = true;
@@ -1740,22 +1839,35 @@
 
         readmeRuntime.inFlight = true;
         const startAt = performance.now();
+        const debugContext = createReadmeDebugContext(reason);
+        let debugStatus = 'success';
 
         try {
+            addReadmeDebugEvent(debugContext, 'run_start', {
+                readmeEnabled: shouldTranslateReadme,
+                aboutEnabled: shouldTranslateAbout,
+            });
             // About 与 README 没有内容依赖，分别发起翻译请求；任一请求失败只告警，不影响另一部分。
             const translationTasks = [];
             if (shouldTranslateAbout) {
-                translationTasks.push(translateRepoAboutDescription().catch((error) => {
+                translationTasks.push(translateRepoAboutDescription(debugContext).catch((error) => {
+                    addReadmeDebugEvent(debugContext, 'about_failed', {
+                        message: normalizeRuntimeErrorMessage(error),
+                    });
                     console.warn('[About翻译] 执行失败:', error);
                 }));
             }
 
             if (shouldTranslateReadme && readmeEl) {
-                translationTasks.push(translateReadmeElement(readmeEl, reason));
+                translationTasks.push(translateReadmeElement(readmeEl, reason, debugContext));
             }
 
             await Promise.all(translationTasks);
         } catch (error) {
+            debugStatus = 'failed';
+            addReadmeDebugEvent(debugContext, 'run_failed', {
+                message: normalizeRuntimeErrorMessage(error),
+            });
             const sourceHash = readmeEl
                 ? createHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '')
                 : '';
@@ -1771,6 +1883,12 @@
             });
             throw error;
         } finally {
+            addReadmeDebugEvent(debugContext, 'run_end', {
+                durationMs: Math.max(0, performance.now() - startAt),
+            });
+            await flushReadmeDebugContext(debugContext, debugStatus, {
+                durationMs: Math.max(0, performance.now() - startAt),
+            });
             readmeRuntime.inFlight = false;
             if (readmeRuntime.rerunRequested) {
                 readmeRuntime.rerunRequested = false;
@@ -1779,7 +1897,7 @@
         }
     }
 
-    async function translateReadmeElement(readmeEl, reason) {
+    async function translateReadmeElement(readmeEl, reason, debugContext = null) {
         const startAt = performance.now();
         const state = getReadmeElementState(readmeEl);
         const currentHash = createHash(readmeEl.innerHTML);
@@ -1803,7 +1921,13 @@
         const repoInfo = getCurrentRepoInfo();
         const sourceHash = createHash(state.originalHtml);
         const signature = createHash(`${providerConfig.signature}\n${state.originalHtml}`);
+        addReadmeDebugEvent(debugContext, 'readme_start', {
+            reason: reason || 'unknown',
+            sourceHash,
+            htmlLength: state.originalHtml.length,
+        });
         if (state.translatedSignature === signature && currentHash === state.translatedHash) {
+            addReadmeDebugEvent(debugContext, 'readme_skipped', { reason: 'already_translated' });
             return;
         }
 
@@ -1842,6 +1966,10 @@
                 }).catch((error) => {
                     console.warn('[README翻译] 写入缓存命中记录失败:', error);
                 });
+                addReadmeDebugEvent(debugContext, 'cache_hit', {
+                    cacheKey: repoCacheKey,
+                    htmlLength: cacheHit.translatedHtml.length,
+                });
                 return;
             }
         }
@@ -1857,8 +1985,15 @@
             applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
-        const runTranslationPass = async () => {
+        const runTranslationPass = async (passName) => {
             const tasks = collectReadmeTextTasks(readmeEl);
+            addReadmeDebugEvent(debugContext, 'pass_start', {
+                pass: passName,
+                taskCount: tasks.length,
+                concurrency: README_CONFIG.TRANSLATION_CONCURRENCY,
+                progressive: Boolean(FeatureSet.readme_enable_progressive),
+                tasks: tasks.slice(0, 24).map((task) => describeReadmeDebugTask(task, readmeEl)),
+            });
             if (!tasks.length) return { translatedCount: 0, totalTokens: 0 };
 
             const uniqueTexts = [...new Set(tasks.map(task => task.normalizedText))];
@@ -1885,8 +2020,19 @@
                     README_CONFIG.TRANSLATION_CONCURRENCY,
                     async (group, index) => {
                         const groupTexts = [...new Set(group.map(task => task.normalizedText))];
-                        const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
+                        const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(
+                            groupTexts,
+                            providerConfig,
+                            { debugContext, debugPhase: passName, debugBatchIndex: index },
+                        );
                         const applied = applyReadmeTaskTranslations(readmeEl, group, translatedMap);
+                        addReadmeDebugEvent(debugContext, 'group_applied', {
+                            pass: passName,
+                            batch: index,
+                            requested: groupTexts.length,
+                            applied,
+                            tokens: groupTokens,
+                        });
                         if (index < groups.length - 1) await waitForNextPaint();
                         return { applied, tokens: groupTokens };
                     },
@@ -1896,15 +2042,24 @@
                     passTranslatedCount += applied;
                 });
             } else {
-                const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+                const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(
+                    uniqueTexts,
+                    providerConfig,
+                    { debugContext, debugPhase: passName, debugBatchIndex: 0 },
+                );
                 passTokens += tokens;
                 passTranslatedCount += applyReadmeTextGroupTranslations(readmeEl, tasksByText, uniqueTexts, translatedMap);
             }
 
+            addReadmeDebugEvent(debugContext, 'pass_end', {
+                pass: passName,
+                translatedCount: passTranslatedCount,
+                totalTokens: passTokens,
+            });
             return { translatedCount: passTranslatedCount, totalTokens: passTokens };
         };
 
-        const firstPass = await runTranslationPass();
+        const firstPass = await runTranslationPass('initial');
         translatedCount += firstPass.translatedCount;
         totalTokens += firstPass.totalTokens;
 
@@ -1914,6 +2069,11 @@
         for (let attempt = 0; attempt < maxRetryPasses; attempt += 1) {
             const remainingTasks = collectReadmeTextTasks(readmeEl)
                 .filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText));
+            addReadmeDebugEvent(debugContext, 'retry_scan', {
+                attempt,
+                remaining: remainingTasks.length,
+                tasks: remainingTasks.slice(0, 24).map((task) => describeReadmeDebugTask(task, readmeEl)),
+            });
             if (!remainingTasks.length) break;
             if (attempt === 0) retryMissedCount = remainingTasks.length;
 
@@ -1926,10 +2086,20 @@
                 retryTasksByText.get(task.normalizedText).push(task);
             });
 
-            const { translatedMap, totalTokens: retryTokens } = await translateTextsWithProvider(retryTexts, providerConfig, { preferSingleItem: true });
+            const { translatedMap, totalTokens: retryTokens } = await translateTextsWithProvider(
+                retryTexts,
+                providerConfig,
+                { preferSingleItem: true, debugContext, debugPhase: `retry_${attempt + 1}` },
+            );
             totalTokens += retryTokens;
             const applied = applyReadmeTextGroupTranslations(readmeEl, retryTasksByText, retryTexts, translatedMap);
             translatedCount += applied;
+            addReadmeDebugEvent(debugContext, 'retry_applied', {
+                attempt,
+                requested: retryTexts.length,
+                applied,
+                tokens: retryTokens,
+            });
             if (!applied) break;
         }
 
@@ -1943,6 +2113,16 @@
         }
 
         const stillMissed = collectReadmeTextTasks(readmeEl).filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText)).length;
+        addReadmeDebugEvent(debugContext, 'readme_end', {
+            status: stillMissed ? 'partial' : 'success',
+            translatedCount,
+            retryMissedCount,
+            remaining: stillMissed,
+            remainingTasks: collectReadmeTextTasks(readmeEl)
+                .filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText))
+                .slice(0, 24)
+                .map((task) => describeReadmeDebugTask(task, readmeEl)),
+        });
         state.translatedSignature = signature;
         state.translatedHash = createHash(readmeEl.innerHTML);
 
@@ -2769,6 +2949,8 @@
         const uncached = [];
         let totalTokens = 0;
         const preferSingleItem = !!options.preferSingleItem;
+        const debugContext = options.debugContext || null;
+        const debugPhase = options.debugPhase || 'provider';
 
         texts.forEach(text => {
             const cacheKey = `${providerConfig.signature}|${text}`;
@@ -2792,35 +2974,82 @@
             ? Number.MAX_SAFE_INTEGER
             : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_CHARS : README_CONFIG.MAX_BATCH_CHARS);
         const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
+        addReadmeDebugEvent(debugContext, 'batches_created', {
+            phase: debugPhase,
+            inputCount: texts.length,
+            uncachedCount: uncached.length,
+            batchCount: batches.length,
+            concurrency: preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY,
+            batchSizes: batches.map((batch) => batch.length),
+        });
         const batchResults = await mapWithConcurrency(
             batches,
             preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY,
-            async (batch) => {
-                const batchResult = await translateBatchWithFallback(batch, providerConfig);
-                const batchResults = batchResult.translations;
+            async (batch, batchIndex) => {
+                const startedAt = Date.now();
+                addReadmeDebugEvent(debugContext, 'batch_start', {
+                    phase: debugPhase,
+                    batch: batchIndex,
+                    itemCount: batch.length,
+                    texts: batch.slice(0, 24).map((text) => ({
+                        textHash: createHash(text),
+                        textPreview: sanitizeReadmeDebugText(text),
+                    })),
+                });
 
-                for (let index = 0; index < batch.length; index += 1) {
-                    const text = batch[index];
-                    let translated = normalizeTranslationText(batchResults[index]);
+                try {
+                    const batchResult = await translateBatchWithFallback(batch, providerConfig);
+                    const batchTranslations = batchResult.translations;
+                    let translatedItems = 0;
+                    const missedItems = [];
 
-                    if (!isUsableTranslation(text, translated)) {
-                        try {
-                            const retry = await translateBatchWithFallback([text], providerConfig);
-                            translated = normalizeTranslationText(retry.translations[0]);
-                        } catch (error) {
-                            console.warn('[README翻译] 单条重试失败:', error);
+                    for (let index = 0; index < batch.length; index += 1) {
+                        const text = batch[index];
+                        let translated = normalizeTranslationText(batchTranslations[index]);
+
+                        if (!isUsableTranslation(text, translated)) {
+                            try {
+                                const retry = await translateBatchWithFallback([text], providerConfig);
+                                translated = normalizeTranslationText(retry.translations[0]);
+                            } catch (error) {
+                                console.warn('[README翻译] 单条重试失败:', error);
+                            }
+                        }
+
+                        const cacheKey = `${providerConfig.signature}|${text}`;
+                        if (isUsableTranslation(text, translated)) {
+                            readmeRuntime.translationCache.set(cacheKey, translated);
+                            translatedMap.set(text, translated);
+                            translatedItems += 1;
+                        } else {
+                            translatedMap.set(text, text);
+                            missedItems.push({
+                                textHash: createHash(text),
+                                textPreview: sanitizeReadmeDebugText(text),
+                            });
                         }
                     }
 
-                    const cacheKey = `${providerConfig.signature}|${text}`;
-                    if (isUsableTranslation(text, translated)) {
-                        readmeRuntime.translationCache.set(cacheKey, translated);
-                        translatedMap.set(text, translated);
-                    } else {
-                        translatedMap.set(text, text);
-                    }
+                    addReadmeDebugEvent(debugContext, 'batch_end', {
+                        phase: debugPhase,
+                        batch: batchIndex,
+                        itemCount: batch.length,
+                        translatedItems,
+                        missedItems,
+                        tokens: batchResult.tokens,
+                        durationMs: Math.max(0, Date.now() - startedAt),
+                    });
+                    return batchResult.tokens;
+                } catch (error) {
+                    addReadmeDebugEvent(debugContext, 'batch_failed', {
+                        phase: debugPhase,
+                        batch: batchIndex,
+                        itemCount: batch.length,
+                        message: normalizeRuntimeErrorMessage(error),
+                        durationMs: Math.max(0, Date.now() - startedAt),
+                    });
+                    throw error;
                 }
-                return batchResult.tokens;
             },
         );
         totalTokens = batchResults.reduce((sum, tokens) => sum + tokens, 0);

@@ -89,6 +89,17 @@
                 <span class="ios-switch" aria-hidden="true"></span>
               </span>
             </label>
+
+            <label for="readme_enable_debug" class="switch-row">
+              <span class="switch-copy">
+                <strong>翻译调试日志</strong>
+                <small>记录批次并发、重试、未完成节点和动态重渲染信息，仅用于排查“部分完成”。默认关闭。</small>
+              </span>
+              <span class="ios-switch-wrap">
+                <input id="readme_enable_debug" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
           </div>
         </section>
 
@@ -246,6 +257,8 @@
               <button id="refreshRecords" type="button" class="btn btn-ghost btn-mini">刷新记录</button>
               <button id="clearRecords" type="button" class="btn btn-ghost btn-mini">清空记录</button>
               <button id="clearRepoCache" type="button" class="btn btn-ghost btn-mini">清空仓库缓存</button>
+              <button id="exportDebugLogs" type="button" class="btn btn-ghost btn-mini">导出调试日志</button>
+              <button id="clearDebugLogs" type="button" class="btn btn-ghost btn-mini">清空调试日志</button>
             </div>
           </div>
           <p id="recordsSummary" class="hint">暂无翻译记录。</p>

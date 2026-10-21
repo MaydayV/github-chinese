@@ -176,6 +176,19 @@ test('README translation setting explains that repository About descriptions use
   });
 });
 
+test('README translation debug switch records concurrent batches and remaining nodes', () => {
+  browserOptions.forEach(({ browser, html, js }) => {
+    assert.match(js, /readme_enable_debug:\s*false/, `${browser} 应默认关闭翻译调试日志`);
+    assert.match(html, /id="readme_enable_debug"/, `${browser} 设置页应提供翻译调试开关`);
+    assert.match(html, /导出调试日志/, `${browser} 记录页应支持导出调试日志`);
+    assert.match(js, /DEBUG_LOGS:\s*'ghcn_readme_translation_debug_logs'/, `${browser} 应保存调试日志`);
+  });
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /batch_start/, `${browser} 应记录翻译批次开始事件`);
+    assert.match(js, /remainingTasks:/, `${browser} 应记录最终未完成节点明细`);
+  });
+});
+
 test('README translation switch rolls back the UI when persistence fails', () => {
   browserOptions.forEach(({ browser, js }) => {
     const handlerStart = js.indexOf("mainSwitch?.addEventListener('change', async () =>");
