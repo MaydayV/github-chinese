@@ -1315,6 +1315,7 @@
             readmeRuntime.stateByElement.set(readmeEl, {
                 originalHtml: '',
                 translatedHash: '',
+                translatedTextHash: '',
                 translatedSignature: '',
             });
         }
@@ -1352,6 +1353,12 @@
     function buildRepoCacheKey(repoInfo, sourceHash, signature) {
         if (!repoInfo?.owner || !repoInfo?.repo || !sourceHash || !signature) return '';
         return `${String(repoInfo.owner).toLowerCase()}/${String(repoInfo.repo).toLowerCase()}|${sourceHash}|${signature}`;
+    }
+
+    function getStableReadmeTextHash(html) {
+        const container = document.createElement('div');
+        container.innerHTML = String(html || '');
+        return createHash(normalizeText(container.textContent || ''));
     }
 
     function buildProgressiveGroups(items, groupSize) {
@@ -1803,6 +1810,7 @@
         }
 
         state.translatedHash = '';
+        state.translatedTextHash = '';
         state.translatedSignature = '';
     }
 
@@ -1869,7 +1877,7 @@
                 message: normalizeRuntimeErrorMessage(error),
             });
             const sourceHash = readmeEl
-                ? createHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '')
+                ? getStableReadmeTextHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '')
                 : '';
             await appendReadmeTranslationRecord({
                 sourceType: 'readme',
@@ -1901,12 +1909,20 @@
         const startAt = performance.now();
         const state = getReadmeElementState(readmeEl);
         const currentHash = createHash(readmeEl.innerHTML);
+        const currentTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
         if (state.translatedHash && currentHash !== state.translatedHash) {
-            // README 被重新渲染后，重置翻译状态，以最新英文内容作为基线。
-            state.originalHtml = readmeEl.innerHTML;
-            state.translatedHash = '';
-            state.translatedSignature = '';
+            if (state.translatedTextHash && currentTextHash === state.translatedTextHash) {
+                // GitHub/React 只重建了等价 HTML（属性、节点包装或空白变化），保留翻译基线，
+                // 避免把稳定的本地翻译误判成新内容并再次请求接口。
+                state.translatedHash = currentHash;
+            } else {
+                // README 被重新渲染为新的文本内容时，才重置翻译状态。
+                state.originalHtml = readmeEl.innerHTML;
+                state.translatedHash = '';
+                state.translatedTextHash = '';
+                state.translatedSignature = '';
+            }
         } else if (!state.originalHtml) {
             state.originalHtml = readmeEl.innerHTML;
         }
@@ -1919,8 +1935,10 @@
         }
 
         const repoInfo = getCurrentRepoInfo();
-        const sourceHash = createHash(state.originalHtml);
-        const signature = createHash(`${providerConfig.signature}\n${state.originalHtml}`);
+        // 只根据 README 的可见文本生成内容指纹，忽略 GitHub React 动态属性和节点包装变化。
+        // 这样刷新/软导航时可以命中本地仓库缓存，不会因 HTML 外壳变化重复调用接口。
+        const sourceHash = getStableReadmeTextHash(state.originalHtml);
+        const signature = createHash(`${providerConfig.signature}\n${sourceHash}`);
         addReadmeDebugEvent(debugContext, 'readme_start', {
             reason: reason || 'unknown',
             sourceHash,
@@ -1939,6 +1957,7 @@
 
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
+            state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
             return;
         }
 
@@ -1955,6 +1974,7 @@
                 applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
                 state.translatedSignature = signature;
                 state.translatedHash = createHash(readmeEl.innerHTML);
+                state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
                 await appendReadmeTranslationRecord({
                     sourceType: 'readme',
@@ -1986,7 +2006,8 @@
         }
 
         const runTranslationPass = async (passName) => {
-            const tasks = collectReadmeTextTasks(readmeEl);
+            const tasks = collectReadmeTextTasks(readmeEl)
+                .filter((task) => !isKnownUntranslatedTechnicalText(task.normalizedText));
             addReadmeDebugEvent(debugContext, 'pass_start', {
                 pass: passName,
                 taskCount: tasks.length,
@@ -2107,6 +2128,7 @@
             .some((task) => task.node?.isConnected)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
+            state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
             return;
         }
         } finally {
@@ -2126,6 +2148,7 @@
         });
         state.translatedSignature = signature;
         state.translatedHash = createHash(readmeEl.innerHTML);
+        state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
         await upsertRepoCachedTranslation(repoCacheKey, {
             repo: repoInfo?.fullName || '',
@@ -2190,14 +2213,7 @@
     function isLikelyTechnicalReadmeText(text, node = null) {
         const input = String(text || '').trim();
         if (!input || input.length > 120) return false;
-        const technicalTerms = new Set([
-            'contributing.md',
-            'crd',
-            'emqx',
-            'helm',
-            'kubernetes',
-            'kubebuilder',
-        ]);
+        if (isKnownUntranslatedTechnicalText(input)) return true;
 
         // 标题、版本号、文件名和产品/项目名通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。
         if (/^[A-Z0-9][A-Za-z0-9._+/#:@-]*(?:\s+[A-Z0-9][A-Za-z0-9._+/#:@-]*)+$/.test(input)) {
@@ -2214,6 +2230,32 @@
             return true;
         }
         return false;
+    }
+
+    function isKnownUntranslatedTechnicalText(text) {
+        const input = String(text || '').trim();
+        const normalized = input.toLowerCase().replace(/\s+/g, ' ');
+        const technicalTerms = new Set([
+            'amazon simple queue service (sqs)',
+            'amazon cloudwatch (mon)',
+            'amazon cloudtrail (ct)',
+            'aws systems manager (ssm)',
+            'boto',
+            'cloudwatch',
+            'contributing.md',
+            'crd',
+            'emqx',
+            'helm',
+            'kinesis',
+            'kubernetes',
+            'kubebuilder',
+            'mechanicalturk',
+            'step functions (sf)',
+        ]);
+        if (technicalTerms.has(normalized)) return true;
+
+        // 产品名后带官方缩写时，翻译服务通常会原样返回；将其视为已处理，避免无意义重试。
+        return /^(?:amazon|aws)\s+[a-z][a-z0-9 .'-]+\s+\([A-Z0-9]{2,}\)$/.test(input);
     }
 
     function collectReadmeOriginalTextCounts(originalHtml) {

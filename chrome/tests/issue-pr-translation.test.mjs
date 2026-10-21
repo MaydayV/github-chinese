@@ -188,6 +188,10 @@ test('README translation debug switch records concurrent batches and remaining n
     assert.match(js, /remainingTasks:/, `${browser} 应记录最终未完成节点明细`);
     assert.match(js, /function collectReadmeUntranslatedTasks\(/, `${browser} 应按原始节点判断未翻译内容`);
     assert.match(js, /function isLikelyTechnicalReadmeText\(/, `${browser} 应排除技术标识误判`);
+    assert.match(js, /function isKnownUntranslatedTechnicalText\(/, `${browser} 应识别保持原文的产品名和服务名`);
+    assert.match(js, /amazon simple queue service \(sqs\)/i, `${browser} 应忽略带缩写的产品名`);
+    assert.match(js, /getStableReadmeTextHash\(state\.originalHtml\)/, `${browser} README 缓存应使用稳定文本指纹`);
+    assert.match(js, /translatedTextHash/, `${browser} 应区分 HTML 外壳变化和正文变化`);
     assert.match(js, /batchPhase: debugPhase/, `${browser} 调试批次阶段不应覆盖事件类型`);
   });
 });
