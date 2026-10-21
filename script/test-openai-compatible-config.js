@@ -52,7 +52,7 @@ assertPreset(context.getAiProviderDefaults('openai'), {
 
 assertPreset(context.getAiProviderDefaults('deepseek'), {
   apiUrl: 'https://api.deepseek.com',
-  model: 'deepseek-v4-flash',
+  model: 'deepseek-flash',
 });
 
 assertPreset(context.getAiProviderDefaults('qwen'), {

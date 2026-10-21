@@ -6,7 +6,7 @@ const DEFAULTS = {
   readme_enable_token_record: false,
   readme_enable_repo_cache: false,
   readme_enable_progressive: false,
-  readme_provider: 'deepl',
+  readme_provider: 'deepseek',
   readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
   readme_deepl_api_key: '',
   readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',
@@ -51,7 +51,7 @@ const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'm
 
 const AI_PROVIDER_DEFAULTS = {
   openai: { apiUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' },
-  deepseek: { apiUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  deepseek: { apiUrl: 'https://api.deepseek.com', model: 'deepseek-flash' },
   qwen: { apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-flash' },
   minimax: { apiUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7-highspeed' },
   kimi: { apiUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' },

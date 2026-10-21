@@ -16,7 +16,7 @@
         readme_enable_token_record: false,
         readme_enable_repo_cache: false,
         readme_enable_progressive: false,
-        readme_provider: 'deepl',
+        readme_provider: 'deepseek',
         readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
         readme_deepl_api_key: '',
         readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',

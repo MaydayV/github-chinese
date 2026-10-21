@@ -19,7 +19,7 @@ const browserContent = ['chrome', 'edge', 'firefox'].map((browser) => ({
 test('discussion body translation setting is exposed in storage and options UI', () => {
   assert.match(optionsJs, /enable_issue_pr_translation:\s*false/);
   assert.match(optionsHtml, /id="enable_issue_pr_translation"/);
-  assert.match(optionsHtml, /Issue \/ PR \/ Release/);
+  assert.match(optionsHtml, /Issue \/ Pull Request \/ Release/);
   assert.match(optionsHtml, /启用正文翻译/);
 });
 
@@ -115,6 +115,19 @@ test('README provider requests use official JSON payloads and optional Azure reg
     const qwenStart = js.indexOf("case 'qwen_mt':", azureStart);
     const azure = js.slice(azureStart, qwenStart);
     assert.match(azure, /if \(!url \|\| !key\)/, `${browser}: Azure Global 资源不应强制填写 Region`);
+  });
+});
+
+test('settings recommend DeepSeek and keep the three tabs copy consistent', () => {
+  browserOptions.forEach(({ browser, html, js }) => {
+    assert.match(js, /readme_provider:\s*'deepseek'/, `${browser}: 默认翻译服务应为 DeepSeek`);
+    assert.match(js, /deepseek:\s*\{[^}]*model:\s*'deepseek-flash'/, `${browser}: DeepSeek 默认模型应使用官方模型 ID`);
+    assert.match(html, /<option value="deepseek">DeepSeek（推荐）<\/option>/, `${browser}: 服务列表应标记 DeepSeek 推荐`);
+    assert.equal((html.match(/<option value="deepseek">/g) || []).length, 1, `${browser}: 服务列表不应重复 DeepSeek`);
+    assert.match(html, /推荐使用 DeepSeek：速度快、配置简单/, `${browser}: 接口页应说明推荐服务`);
+    assert.match(html, /Issue \/ Pull Request \/ Release/, `${browser}: 功能页标题应使用完整名称`);
+    assert.match(html, /刷新记录/, `${browser}: 记录页刷新按钮文案应明确`);
+    assert.match(html, /清空仓库缓存/, `${browser}: 记录页缓存按钮文案应明确范围`);
   });
 });
 

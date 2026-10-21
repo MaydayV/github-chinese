@@ -16,7 +16,7 @@
 
     <form id="settingsForm" class="form">
       <section class="card tabs-card">
-        <div class="tabs" role="tablist" aria-label="内容翻译设置标签">
+        <div class="tabs" role="tablist" aria-label="内容翻译设置标签页">
           <button type="button" class="tab-btn is-active" data-tab-target="features" role="tab" aria-selected="true">功能开关</button>
           <button type="button" class="tab-btn" data-tab-target="api" role="tab" aria-selected="false">翻译接口</button>
           <button type="button" class="tab-btn" data-tab-target="records" role="tab" aria-selected="false">翻译记录</button>
@@ -36,11 +36,11 @@
               <span class="ios-switch" aria-hidden="true"></span>
             </span>
           </label>
-          <p class="hint">README 与 About 描述共用此开关和翻译接口；未配置有效 API 并保存前，不能开启此开关。</p>
+          <p class="hint">README 与 About 描述共用此开关和翻译接口。请先在“翻译接口”中保存有效配置，再开启此功能。</p>
         </section>
 
         <section class="card">
-          <h2>Issue / PR / Release</h2>
+          <h2>Issue / Pull Request / Release</h2>
           <label for="enable_issue_pr_translation" class="switch-row">
             <span class="switch-copy">
               <strong>启用正文翻译</strong>
@@ -95,9 +95,9 @@
         <section class="card assist">
           <h2>使用说明</h2>
           <ul class="guide-list">
-            <li>步骤 1：切到“翻译接口”填写服务地址、Key、模型并保存。</li>
+            <li>步骤 1：切到“翻译接口”，填写服务地址、API Key 和模型并保存。</li>
             <li>步骤 2：点击“测试连通性”确认接口可用。</li>
-            <li>步骤 3：回到“功能开关”开启需要的翻译功能，再按需开启高级功能。</li>
+            <li>步骤 3：回到“功能开关”，开启需要的翻译功能，再按需开启高级功能。</li>
             <li>步骤 4：在“翻译记录”查看 Tokens 消耗、缓存命中与翻译状态。</li>
           </ul>
         </section>
@@ -113,12 +113,12 @@
           <div class="field">
             <label for="readme_provider">翻译服务</label>
             <select id="readme_provider">
+              <option value="deepseek">DeepSeek（推荐）</option>
               <option value="deepl">DeepL</option>
               <option value="google">Google Cloud Translation</option>
               <option value="azure">Microsoft Translator (Azure)</option>
               <option value="qwen_mt">Qwen-MT（机器翻译）</option>
               <option value="openai">OpenAI 官方接口</option>
-              <option value="deepseek">DeepSeek</option>
               <option value="qwen">Qwen 对话模型</option>
               <option value="minimax">MiniMax</option>
               <option value="kimi">Kimi</option>
@@ -126,7 +126,7 @@
               <option value="volcengine">火山方舟</option>
               <option value="openai_compatible">自定义 OpenAI 兼容接口</option>
             </select>
-            <p class="hint">选择当前使用的翻译接口。翻译目标语言固定为简体中文（zh-CN）。该配置同时用于 README、Issue、Pull Request 和 Release 正文翻译。</p>
+            <p class="hint">推荐使用 DeepSeek：速度快、配置简单，适合 README 和正文翻译。翻译目标语言固定为简体中文（zh-CN）；该配置同时用于 README、About、Issue、Pull Request 和 Release 正文翻译。</p>
           </div>
         </section>
 
@@ -200,7 +200,7 @@
           <div class="field">
             <label for="readme_qwen_mt_model">模型</label>
             <input id="readme_qwen_mt_model" type="text" placeholder="qwen-mt-turbo">
-            <p class="hint">默认 `qwen-mt-turbo`，可按额度和质量需求改为 `qwen-mt-flash`、`qwen-mt-plus` 或 `qwen-mt-lite`。</p>
+            <p class="hint">默认使用 `qwen-mt-turbo`，可按平台实际可用模型和额度调整。</p>
           </div>
         </section>
 
@@ -220,10 +220,10 @@
           </div>
           <div class="field">
             <label for="readme_openai_model">模型</label>
-            <input id="readme_openai_model" type="text" placeholder="gpt-4.1-mini / deepseek-v4-flash / qwen-flash / MiniMax-M2.7-highspeed">
+            <input id="readme_openai_model" type="text" placeholder="deepseek-flash / gpt-4.1-mini / qwen-flash">
             <p class="hint">填接口实际可用的模型名，大小写请与平台要求一致。</p>
           </div>
-          <p class="hint">对话模型翻译提示词已内置：自动保留 Markdown 结构、链接、代码块、图片与表格格式。</p>
+          <p class="hint">对话模型翻译提示词已内置，会自动保留 Markdown 结构、链接、代码块、图片与表格格式；DeepSeek 默认关闭思考模式，以优先保证翻译速度。</p>
         </section>
 
         <section class="card connection-test">
@@ -243,9 +243,9 @@
           <div class="history-head">
             <h2>翻译记录</h2>
             <div class="history-tools">
-              <button id="refreshRecords" type="button" class="btn btn-ghost btn-mini">刷新</button>
+              <button id="refreshRecords" type="button" class="btn btn-ghost btn-mini">刷新记录</button>
               <button id="clearRecords" type="button" class="btn btn-ghost btn-mini">清空记录</button>
-              <button id="clearRepoCache" type="button" class="btn btn-ghost btn-mini">清空缓存</button>
+              <button id="clearRepoCache" type="button" class="btn btn-ghost btn-mini">清空仓库缓存</button>
             </div>
           </div>
           <p id="recordsSummary" class="hint">暂无翻译记录。</p>
