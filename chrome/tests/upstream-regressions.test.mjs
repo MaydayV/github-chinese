@@ -153,9 +153,12 @@ test('repository About descriptions support hashed SidebarAbout CSS-module class
     const content = readFileSync(file, 'utf8');
     assert.match(
       content,
-      /querySelector\('p\[class\*="SidebarAbout-module"\]\[class\*="description"\]'\)/,
+      /querySelectorAll\('p\[class\*="SidebarAbout-module"\]\[class\*="description"\]'\)/,
       `${browser}: About 描述选择器未兼容新版 CSS-module 哈希类`,
     );
+    assert.match(content, /function getRepoAboutElements\(\)/, `${browser}: About 描述应支持多个动态侧栏节点`);
+    assert.match(content, /function isRepoAboutTranslationEnabled\(\)/, `${browser}: About 描述独立触发条件缺失`);
+    assert.match(content, /About 描述未翻译：/, `${browser}: About 配置失败时应输出诊断信息`);
     assert.match(content, /translateRepoAboutDescription/, `${browser}: About 描述翻译入口缺失`);
   }
 });
