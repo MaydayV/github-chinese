@@ -1962,10 +1962,24 @@
         }
 
         const repoCacheKey = buildRepoCacheKey(repoInfo, sourceHash, providerConfig.signature);
-        const cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
+        // 兼容 2.5.9 之前按原始 HTML 建立的缓存；命中后会在下方迁移为稳定文本指纹。
+        const legacyRepoCacheKey = buildRepoCacheKey(
+            repoInfo,
+            createHash(state.originalHtml),
+            providerConfig.signature,
+        );
+        let cacheKeyUsed = repoCacheKey;
+        let cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
             console.warn('[README翻译] 读取仓库缓存失败:', error);
             return null;
         });
+        if (!cacheHit && legacyRepoCacheKey && legacyRepoCacheKey !== repoCacheKey) {
+            cacheHit = await getRepoCachedTranslation(legacyRepoCacheKey).catch((error) => {
+                console.warn('[README翻译] 读取旧版仓库缓存失败:', error);
+                return null;
+            });
+            if (cacheHit) cacheKeyUsed = legacyRepoCacheKey;
+        }
 
         if (cacheHit?.translatedHtml) {
             if (containsObjectObjectArtifact(cacheHit.translatedHtml)) {
@@ -1987,9 +2001,20 @@
                     console.warn('[README翻译] 写入缓存命中记录失败:', error);
                 });
                 addReadmeDebugEvent(debugContext, 'cache_hit', {
-                    cacheKey: repoCacheKey,
+                    cacheKey: cacheKeyUsed,
+                    stableCacheKey: repoCacheKey,
+                    migrated: cacheKeyUsed !== repoCacheKey,
                     htmlLength: cacheHit.translatedHtml.length,
                 });
+                if (cacheKeyUsed !== repoCacheKey) {
+                    await upsertRepoCachedTranslation(repoCacheKey, {
+                        repo: repoInfo?.fullName || '',
+                        sourceHash,
+                        translatedHtml: cacheHit.translatedHtml,
+                    }).catch((error) => {
+                        console.warn('[README翻译] 迁移旧版仓库缓存失败:', error);
+                    });
+                }
                 return;
             }
         }
