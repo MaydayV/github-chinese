@@ -2032,7 +2032,7 @@
 
         const runTranslationPass = async (passName) => {
             const tasks = collectReadmeTextTasks(readmeEl)
-                .filter((task) => !isKnownUntranslatedTechnicalText(task.normalizedText));
+                .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node));
             addReadmeDebugEvent(debugContext, 'pass_start', {
                 pass: passName,
                 taskCount: tasks.length,
@@ -2238,49 +2238,53 @@
     function isLikelyTechnicalReadmeText(text, node = null) {
         const input = String(text || '').trim();
         if (!input || input.length > 120) return false;
-        if (isKnownUntranslatedTechnicalText(input)) return true;
+        if (isLikelyOpaqueReadmeLabel(input, node)) return true;
 
-        // 标题、版本号、文件名和产品/项目名通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。
-        if (/^[A-Z0-9][A-Za-z0-9._+/#:@-]*(?:\s+[A-Z0-9][A-Za-z0-9._+/#:@-]*)+$/.test(input)) {
-            return true;
-        }
+        // 版本号、文件名和纯标识符通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。
         if (/^[a-z]+\s+(?:version\s+)?v?\d+(?:\.\d+)+(?:[+._-][A-Za-z0-9]+)?[.!]?$/i.test(input)) {
-            return true;
-        }
-        if (/^[A-Za-z0-9][A-Za-z0-9._/+:#@-]*$/.test(input)
-            && (/[0-9._/+:#@-]/.test(input)
-                || technicalTerms.has(input.toLowerCase())
-                || input === input.toUpperCase()
-                || Boolean(node?.parentElement?.closest('h1, h2, h3, h4, h5, h6')))) {
             return true;
         }
         return false;
     }
 
-    function isKnownUntranslatedTechnicalText(text) {
+    function isLikelyOpaqueReadmeLabel(text, node = null) {
         const input = String(text || '').trim();
-        const normalized = input.toLowerCase().replace(/\s+/g, ' ');
-        const technicalTerms = new Set([
-            'amazon simple queue service (sqs)',
-            'amazon cloudwatch (mon)',
-            'amazon cloudtrail (ct)',
-            'aws systems manager (ssm)',
-            'boto',
-            'cloudwatch',
-            'contributing.md',
-            'crd',
-            'emqx',
-            'helm',
-            'kinesis',
-            'kubernetes',
-            'kubebuilder',
-            'mechanicalturk',
-            'step functions (sf)',
-        ]);
-        if (technicalTerms.has(normalized)) return true;
+        if (!input || input.length > 120 || /[\u3400-\u9FFF]/.test(input)) return false;
 
-        // 产品名后带官方缩写时，翻译服务通常会原样返回；将其视为已处理，避免无意义重试。
-        return /^(?:amazon|aws)\s+[a-z][a-z0-9 .'-]+\s+\([A-Z0-9]{2,}\)$/.test(input);
+        const words = input.split(/\s+/).filter(Boolean);
+        if (!words.length || words.length > 8) return false;
+
+        // 普通句子不能因为首字母大写就被误判为产品名；这些词出现时仍需正常翻译。
+        const sentenceWords = new Set([
+            'a', 'an', 'and', 'are', 'as', 'at', 'about', 'build', 'by', 'can', 'configure',
+            'documentation', 'download', 'features', 'for', 'from', 'get', 'getting', 'how',
+            'in', 'install', 'installation', 'into', 'is', 'it', 'of', 'on', 'or', 'overview',
+            'quick', 'run', 'start', 'started', 'support', 'test', 'the', 'this', 'to', 'use',
+            'usage', 'using', 'with', 'what', 'when', 'where', 'why',
+        ]);
+        const normalizedWords = words.map((word) => word.toLowerCase().replace(/^[([{]+|[)\]},.;:!?]+$/g, ''));
+        if (normalizedWords.length === 1 && sentenceWords.has(normalizedWords[0])) return false;
+        if (normalizedWords.some((word) => sentenceWords.has(word))
+            && !/\([A-Z0-9]{2,}\)/.test(input)) return false;
+
+        const element = node?.parentElement;
+        const isLink = Boolean(element?.closest('a[href]'));
+        const isListLabel = Boolean(element?.closest('li, dt, code'));
+        const hasOpaquePattern = /[0-9_./+#@:-]/.test(input)
+            || /[a-z][A-Z]/.test(input)
+            || /\([A-Z0-9]{2,}\)/.test(input)
+            || words.some((word) => /^[A-Z0-9]{2,}$/.test(word));
+        if (hasOpaquePattern) return true;
+
+        const titleCaseWords = words.filter((word) => /^[A-Z][A-Za-z0-9]*$/.test(word));
+        if ((isLink || isListLabel)
+            && titleCaseWords.length === words.length
+            && words.some((word) => word.length > 2)) {
+            return true;
+        }
+
+        // 外部链接中的单一小写标识通常是包名/库名（如 boto），而不是自然语言句子。
+        return isLink && words.length === 1 && /^[a-z][a-z0-9-]*$/.test(input);
     }
 
     function collectReadmeOriginalTextCounts(originalHtml) {
