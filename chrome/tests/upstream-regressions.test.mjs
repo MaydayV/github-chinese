@@ -99,6 +99,14 @@ test('upstream editable-content and notification fixes are present in every brow
   }
 });
 
+test('repository hydration text changes stay eligible for translation', () => {
+  for (const [browser, file] of locales) {
+    const config = loadLocale(file).conf;
+    assert.ok(config.characterDataPage.includes('repository'), `${browser}: 仓库首页应监听 hydration 文本变更`);
+    assert.ok(config.characterDataPage.includes('repository/tree'), `${browser}: 仓库文件页应监听 hydration 文本变更`);
+  }
+});
+
 test('recent upstream Copilot, fork, and repository settings terms are synchronized', () => {
   for (const [browser, file] of locales) {
     const i18n = loadLocale(file)['zh-CN'];
@@ -145,6 +153,20 @@ test('selected PR #801 Copilot textarea label is synchronized without changing s
     assert.ok(globalIgnore.includes('qbsearch-input'), `${browser}: 快速搜索组件保护规则缺失`);
     assert.ok(!globalIgnore.includes('input'), `${browser}: 不能通过全局规则跳过 input 属性翻译`);
     assert.ok(!globalIgnore.includes('textarea'), `${browser}: 不能通过全局规则跳过 textarea 属性翻译`);
+  }
+});
+
+test('recent upstream repository and search labels are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const i18n = loadLocale(file)['zh-CN'];
+    assert.equal(i18n.public.static['Try a different search query.'], '请尝试其他搜索查询。', browser);
+    assert.equal(i18n.public.static['Repository files navigation'], '仓库文件导航', browser);
+    assert.equal(i18n.public.static['Open more actions menu'], '打开更多操作菜单', browser);
+    assert.equal(i18n['page-dashboard'].static['Join GitHub Education!'], '加入 GitHub 教育！', browser);
+    assert.equal(i18n.repository.static['Folders and files'], '文件夹和文件', browser);
+    assert.equal(i18n.repository.static['Policy insights'], '策略分析', browser);
+    assert.equal(i18n['repository/pull_issue_public'].static['Assign to Agent'], '分配给智能体', browser);
+    assert.equal(i18n['repository/actions'].static['Filter by Workflow'], '按工作流程筛选', browser);
   }
 });
 

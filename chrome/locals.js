@@ -54,7 +54,7 @@ I18N.conf = {
     rePagePathOrg: /^\/[^\/]+\/[^\/]+\/(repositories\/new|repositories|sponsoring|discussions|projects|packages|teams|new-team|people|outside-collaborators|pending_collaborators|dashboard|billing_managers\/new|invitations?|settings\/(profile|billing|roles|member_privileges|teams|import-export|blocked_users|interaction_limits|code_review_limits|moderators|repository-defaults|rules|codespaces|copilot|actions|hooks|discussions|packages|pages|projects|security_analysis|security|dependabot_rules|domains|secrets|variables|oauth_application_policy|installations|personal-access-token|reminders|sponsors-log|audit-log|deleted_repositories|applications\/new|applications|apps\/new|apps|publisher|policies\/repositories|custom-properties|issue-fields|sandboxes)|topics|domain\/new|audit-log\/event_settings|billing\/(history|plans)|policies\/applications)|^\/[^\/]+\/(enterprise_plan|sponsoring)/,
 
     // 特定页面，启用`字符数据`监测
-    characterDataPage: ['repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules', 'pulls'],
+    characterDataPage: ['repository', 'repository/tree', 'repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules', 'pulls'],
 
     // 特定页面，忽略突变元素规则
     ignoreMutationSelectorPage: {
@@ -411,6 +411,21 @@ I18N.conf = {
         "Organizations": "组织",
         "Open Copilot chat": "打开 Copilot 聊天",
         "Chat with Copilot": "与 Copilot 聊天",
+        "Ask Copilot…": "询问 Copilot…",
+        "Download for…": "下载插件…",
+        "Sign out...": "登出…",
+        "What's happening?": "发生了什么？",
+        "Updating…": "更新中…",
+        "Updating...": "更新中…",
+        "Loading…": "载入中…",
+        "Loading...": "载入中…",
+        "Learn more.": "了解更多。",
+        "Repository…": "仓库…",
+        "Repositories…": "仓库…",
+        "Spaces…": "空间…",
+        "Extensions…": "扩展…",
+        "Search...": "搜索…",
+        "Try a different search query.": "请尝试其他搜索查询。",
         "Chat with Copilot, Start a new Copilot thread": "与 Copilot 聊天，启动新的 Copilot 对话",
         "Start a new Copilot thread": "启动新的 Copilot 对话",
         "Enterprises": "企业",
@@ -429,6 +444,8 @@ I18N.conf = {
         "Sponsors Navigation": "赞助者导航",
         "Switch repository": "切换仓库",
         "Repository navigation": "仓库导航",
+        "Repository files navigation": "仓库文件导航",
+        "Open more actions menu": "打开更多操作菜单",
         "More items, including current item": "更多项目，包括当前项",
         "Agent navigation": "智能体导航",
         "Session filters": "会话筛选",
@@ -690,6 +707,9 @@ I18N["zh-CN"]["title"] = { // 标题翻译
 
 I18N["zh-CN"]["public"] = { // 公共区域翻译
     "static": { // 静态翻译
+            "Try a different search query.": "请尝试其他搜索查询。",
+            "Repository files navigation": "仓库文件导航",
+            "Open more actions menu": "打开更多操作菜单",
         // 错误页面
             "Find code, projects, and people on GitHub:": "在 GitHub 上查找代码、项目和人员：",
             "Access has been restricted": "访问被限制",
@@ -2404,6 +2424,7 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
         // 教育版
             "GitHub Education opens doors to new skills, tools, and a collaborative community eager to drive innovation. Join us and build a foundation for your future in technology.": "GitHub 教育为您打开通往新技能、新工具以及渴望推动创新的协作社区的大门。加入我们，为您的技术未来打下基础。",
         "Join GitHub Education": "加入 GitHub 教育",
+        "Join GitHub Education!": "加入 GitHub 教育！",
 
         // 组织
         // [/You’re an owner of the ([^ ]+) organization!/, "您是 $1 组织的所有者！"],
@@ -9242,6 +9263,9 @@ I18N["zh-CN"]["repository"] = { // 仓库页面 /<user-name>/<repo-name>/
                 "Public archive repository · Forked from": "公共存档仓库 · 复刻自",
                 "generated from": "创建自",
                 "mirrored from": "镜像自",
+                "Folders and files": "文件夹和文件",
+                "Auto-deletes": "将自动删除",
+                "Policy insights": "策略分析",
 
                 "Pin": "置顶",
                     "Pin this repository to your profile": "置顶此仓库到您的个人资料",
@@ -10017,6 +10041,7 @@ I18N["zh-CN"]["repository/pull_issue_public"] = { // 仓库 - 议题和拉取请
             "Milestones": "里程碑",
             "New issue": "创建议题",
             "New": "创建", // 小屏
+            "Assign to Agent": "分配给智能体",
 
             // 筛选工作条
             // "Author": "作者",
@@ -10429,6 +10454,16 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
 
                 "Load older activity": "加载更早的活动",
                 "Load newer activity": "加载更新的活动",
+                "How to move objects via keyboard": "通过键盘移动项目",
+                "This navigation is only available when move mode is activated.": "此导航仅在开启移动模式可用。",
+                "Cancel drag mode": "取消拖拽",
+                "Move item one position": "单次移动",
+                "Place item": "放置",
+                "Don't show this again": "下次不再显示",
+                "Convert issue to discussion…": "将议题转化为讨论…",
+                "Clone issue": "复制议题",
+                "Delete issue?": "删除议题？",
+                "Last edited by": "最后编辑：",
 
             // [/Want to contribute to ([^ ]+)/, "想为 $1 做贡献吗？"], /issues
             "If you have a bug or an idea, read the": "如果您发现一个错误或有任何想法，请阅读",
@@ -14046,6 +14081,15 @@ I18N["zh-CN"]["repository/actions"] = { // 仓库 - 操作页面
 
             // 筛选条
                 "Filter workflow runs": "筛选工作流程",
+                    "Workflow": "工作流程",
+                    "Filter by Workflow": "按工作流程筛选",
+                    "No matching workflows.": "无匹配工作流程。",
+                    "to exclude": "排除",
+                    "This action cannot be undone.": "此操作无法撤消。",
+                    "Branch:": "分支：",
+                    "Fix with Copilot": "使用 Copilot 修复",
+                    "More fix options": "更多修复选项",
+                    "Customize prompt": "自定义提示词",
                     "Narrow your search": "缩小搜索范围",
 
             //访问上限

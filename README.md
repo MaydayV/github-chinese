@@ -128,6 +128,8 @@ node script/test-update-entry.js
 1. 优化 DeepL 与 Google Cloud Translation 请求格式，改用官方 JSON 请求，提升接口兼容性
 1. 优化 Azure Translator 配置，支持单服务 Global 资源省略 Region，并按资源类型发送认证请求头
 1. 同步 Chrome、Edge、Firefox 三端接口实现、设置提示和版本号，保持 README、About 及顶部搜索框翻译行为不变
+1. 跟进上游近期词条与 Issues 反馈，补充仓库文件导航、更多操作菜单、Dashboard 教育入口、Actions 工作流和议题拖拽等新版文案
+1. 针对仓库页 Turbo hydration 文本变更启用字符数据监听，并新增回归校验；不改变顶部搜索框翻译、展开和输入保护
 
 ### v2.5.8 (2026-10-20)
 
