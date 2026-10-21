@@ -1628,8 +1628,8 @@
 
         const event = {
             at: Date.now(),
-            phase,
             ...detail,
+            phase,
         };
         if (detail.status) context.status = detail.status;
         context.events.push(event);
@@ -2067,8 +2067,8 @@
         // 逐条重试收尾。以“无进展即停止 + 最多 maxRetryPasses 轮”双重保险避免空转。
         const maxRetryPasses = 2;
         for (let attempt = 0; attempt < maxRetryPasses; attempt += 1) {
-            const remainingTasks = collectReadmeTextTasks(readmeEl)
-                .filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText));
+            const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+                .filter((task) => task.node?.isConnected);
             addReadmeDebugEvent(debugContext, 'retry_scan', {
                 attempt,
                 remaining: remainingTasks.length,
@@ -2103,7 +2103,8 @@
             if (!applied) break;
         }
 
-        if (!translatedCount && !collectReadmeTextTasks(readmeEl).some((task) => needsReadmeTranslation(task.normalizedText))) {
+        if (!translatedCount && !collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+            .some((task) => task.node?.isConnected)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
             return;
@@ -2112,15 +2113,15 @@
             popReadmeDomMutationGuard();
         }
 
-        const stillMissed = collectReadmeTextTasks(readmeEl).filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText)).length;
+        const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+            .filter((task) => task.node?.isConnected);
+        const stillMissed = remainingTasks.length;
         addReadmeDebugEvent(debugContext, 'readme_end', {
             status: stillMissed ? 'partial' : 'success',
             translatedCount,
             retryMissedCount,
             remaining: stillMissed,
-            remainingTasks: collectReadmeTextTasks(readmeEl)
-                .filter((task) => task.node?.isConnected && needsReadmeTranslation(task.normalizedText))
-                .slice(0, 24)
+            remainingTasks: remainingTasks.slice(0, 24)
                 .map((task) => describeReadmeDebugTask(task, readmeEl)),
         });
         state.translatedSignature = signature;
@@ -2184,6 +2185,58 @@
         if (!/[A-Za-z]/.test(text)) return true;
         if (/[\u3400-\u9FFF]/.test(text) && !/[A-Za-z]{2,}/.test(text)) return true;
         return false;
+    }
+
+    function isLikelyTechnicalReadmeText(text, node = null) {
+        const input = String(text || '').trim();
+        if (!input || input.length > 120) return false;
+        const technicalTerms = new Set([
+            'contributing.md',
+            'crd',
+            'emqx',
+            'helm',
+            'kubernetes',
+            'kubebuilder',
+        ]);
+
+        // 标题、版本号、文件名和产品/项目名通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。
+        if (/^[A-Z0-9][A-Za-z0-9._+/#:@-]*(?:\s+[A-Z0-9][A-Za-z0-9._+/#:@-]*)+$/.test(input)) {
+            return true;
+        }
+        if (/^[a-z]+\s+(?:version\s+)?v?\d+(?:\.\d+)+(?:[+._-][A-Za-z0-9]+)?[.!]?$/i.test(input)) {
+            return true;
+        }
+        if (/^[A-Za-z0-9][A-Za-z0-9._/+:#@-]*$/.test(input)
+            && (/[0-9._/+:#@-]/.test(input)
+                || technicalTerms.has(input.toLowerCase())
+                || input === input.toUpperCase()
+                || Boolean(node?.parentElement?.closest('h1, h2, h3, h4, h5, h6')))) {
+            return true;
+        }
+        return false;
+    }
+
+    function collectReadmeOriginalTextCounts(originalHtml) {
+        const container = document.createElement('div');
+        container.innerHTML = String(originalHtml || '');
+        const counts = new Map();
+
+        collectReadmeTextTasks(container).forEach((task) => {
+            counts.set(task.normalizedText, (counts.get(task.normalizedText) || 0) + 1);
+        });
+        return counts;
+    }
+
+    function collectReadmeUntranslatedTasks(readmeEl, originalHtml) {
+        const originalCounts = collectReadmeOriginalTextCounts(originalHtml);
+        return collectReadmeTextTasks(readmeEl)
+            .filter((task) => {
+                const remaining = originalCounts.get(task.normalizedText) || 0;
+                if (!remaining) return false;
+
+                originalCounts.set(task.normalizedText, remaining - 1);
+                return !isLikelyTechnicalReadmeText(task.normalizedText, task.node);
+            });
     }
 
     function isMostlyCjkText(text) {
@@ -2975,7 +3028,7 @@
             : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_CHARS : README_CONFIG.MAX_BATCH_CHARS);
         const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
         addReadmeDebugEvent(debugContext, 'batches_created', {
-            phase: debugPhase,
+            batchPhase: debugPhase,
             inputCount: texts.length,
             uncachedCount: uncached.length,
             batchCount: batches.length,
@@ -2988,7 +3041,7 @@
             async (batch, batchIndex) => {
                 const startedAt = Date.now();
                 addReadmeDebugEvent(debugContext, 'batch_start', {
-                    phase: debugPhase,
+                    batchPhase: debugPhase,
                     batch: batchIndex,
                     itemCount: batch.length,
                     texts: batch.slice(0, 24).map((text) => ({
@@ -3031,7 +3084,7 @@
                     }
 
                     addReadmeDebugEvent(debugContext, 'batch_end', {
-                        phase: debugPhase,
+                        batchPhase: debugPhase,
                         batch: batchIndex,
                         itemCount: batch.length,
                         translatedItems,
@@ -3042,7 +3095,7 @@
                     return batchResult.tokens;
                 } catch (error) {
                     addReadmeDebugEvent(debugContext, 'batch_failed', {
-                        phase: debugPhase,
+                        batchPhase: debugPhase,
                         batch: batchIndex,
                         itemCount: batch.length,
                         message: normalizeRuntimeErrorMessage(error),

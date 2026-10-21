@@ -186,6 +186,9 @@ test('README translation debug switch records concurrent batches and remaining n
   browserContent.forEach(({ browser, js }) => {
     assert.match(js, /batch_start/, `${browser} 应记录翻译批次开始事件`);
     assert.match(js, /remainingTasks:/, `${browser} 应记录最终未完成节点明细`);
+    assert.match(js, /function collectReadmeUntranslatedTasks\(/, `${browser} 应按原始节点判断未翻译内容`);
+    assert.match(js, /function isLikelyTechnicalReadmeText\(/, `${browser} 应排除技术标识误判`);
+    assert.match(js, /batchPhase: debugPhase/, `${browser} 调试批次阶段不应覆盖事件类型`);
   });
 });
 
