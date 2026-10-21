@@ -45,6 +45,7 @@
 - 支持 Issue / Pull Request / Release 正文翻译（可选）：复用同一套翻译接口配置，可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
 - 弹窗提供总开关；切换后若当前标签页为 GitHub 页面，将自动刷新并立即生效
 - 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue、Pull Request 或 Release
+- DeepL 与 Google Cloud Translation 使用官方 JSON 请求格式；Azure 单服务 Global 资源可不填写 Region，多服务或区域资源仍需填写
 - 提供 Chrome、Edge、Firefox 三套浏览器扩展目录，便于按浏览器加载
 
 ## 🔒 隐私与数据
@@ -121,6 +122,12 @@ node script/test-update-entry.js
 官网更新日志板块由 README 生成，请勿直接编辑 `index.html` 中 `<!-- CHANGELOG:START -->` 与 `<!-- CHANGELOG:END -->` 之间的内容。
 
 ## 🔄 更新日志
+
+### v2.5.9 (2026-10-21)
+
+1. 优化 DeepL 与 Google Cloud Translation 请求格式，改用官方 JSON 请求，提升接口兼容性
+1. 优化 Azure Translator 配置，支持单服务 Global 资源省略 Region，并按资源类型发送认证请求头
+1. 同步 Chrome、Edge、Firefox 三端接口实现、设置提示和版本号，保持 README、About 及顶部搜索框翻译行为不变
 
 ### v2.5.8 (2026-10-20)
 
