@@ -1741,16 +1741,19 @@
         const startAt = performance.now();
 
         try {
-            // 仓库 About 描述：独立于 README 是否存在，就地 AI 翻译；失败仅告警，不影响 README。
+            // About 与 README 没有内容依赖，分别发起翻译请求；任一请求失败只告警，不影响另一部分。
+            const translationTasks = [];
             if (shouldTranslateAbout) {
-                await translateRepoAboutDescription().catch((error) => {
+                translationTasks.push(translateRepoAboutDescription().catch((error) => {
                     console.warn('[About翻译] 执行失败:', error);
-                });
+                }));
             }
 
             if (shouldTranslateReadme && readmeEl) {
-                await translateReadmeElement(readmeEl, reason);
+                translationTasks.push(translateReadmeElement(readmeEl, reason));
             }
+
+            await Promise.all(translationTasks);
         } catch (error) {
             const sourceHash = readmeEl
                 ? createHash(getReadmeElementState(readmeEl).originalHtml || readmeEl.innerHTML || '')
