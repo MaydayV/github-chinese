@@ -98,6 +98,7 @@
         OPENAI_MAX_BATCH_CHARS: 2400,
         PROGRESSIVE_GROUP_SIZE: 12,
         OPENAI_PROGRESSIVE_GROUP_SIZE: 6,
+        TRANSLATION_CONCURRENCY: 3,
         DEBOUNCE_MS: 700,
         RECORD_MAX_ENTRIES: 200,
         REPO_CACHE_MAX_ENTRIES: 24,
@@ -1879,16 +1880,21 @@
                     : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
                 const groups = buildProgressiveTaskGroups(readmeEl, tasks, groupSize);
 
-                for (let index = 0; index < groups.length; index += 1) {
-                    const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
-                    const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
-                    passTokens += groupTokens;
-                    passTranslatedCount += applyReadmeTaskTranslations(readmeEl, groups[index], translatedMap);
-
-                    if (index < groups.length - 1) {
-                        await waitForNextPaint();
-                    }
-                }
+                const groupResults = await mapWithConcurrency(
+                    groups,
+                    README_CONFIG.TRANSLATION_CONCURRENCY,
+                    async (group, index) => {
+                        const groupTexts = [...new Set(group.map(task => task.normalizedText))];
+                        const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
+                        const applied = applyReadmeTaskTranslations(readmeEl, group, translatedMap);
+                        if (index < groups.length - 1) await waitForNextPaint();
+                        return { applied, tokens: groupTokens };
+                    },
+                );
+                groupResults.forEach(({ applied, tokens }) => {
+                    passTokens += tokens;
+                    passTranslatedCount += applied;
+                });
             } else {
                 const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
                 passTokens += tokens;
@@ -2786,38 +2792,64 @@
             ? Number.MAX_SAFE_INTEGER
             : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_CHARS : README_CONFIG.MAX_BATCH_CHARS);
         const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
-        for (const batch of batches) {
-            const batchResult = await translateBatchWithFallback(batch, providerConfig);
-            const batchResults = batchResult.translations;
-            totalTokens += batchResult.tokens;
+        const batchResults = await mapWithConcurrency(
+            batches,
+            preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY,
+            async (batch) => {
+                const batchResult = await translateBatchWithFallback(batch, providerConfig);
+                const batchResults = batchResult.translations;
 
-            for (let index = 0; index < batch.length; index += 1) {
-                const text = batch[index];
-                let translated = normalizeTranslationText(batchResults[index]);
+                for (let index = 0; index < batch.length; index += 1) {
+                    const text = batch[index];
+                    let translated = normalizeTranslationText(batchResults[index]);
 
-                if (!isUsableTranslation(text, translated)) {
-                    try {
-                        const retry = await translateBatchWithFallback([text], providerConfig);
-                        translated = normalizeTranslationText(retry.translations[0]);
-                    } catch (error) {
-                        console.warn('[README翻译] 单条重试失败:', error);
+                    if (!isUsableTranslation(text, translated)) {
+                        try {
+                            const retry = await translateBatchWithFallback([text], providerConfig);
+                            translated = normalizeTranslationText(retry.translations[0]);
+                        } catch (error) {
+                            console.warn('[README翻译] 单条重试失败:', error);
+                        }
+                    }
+
+                    const cacheKey = `${providerConfig.signature}|${text}`;
+                    if (isUsableTranslation(text, translated)) {
+                        readmeRuntime.translationCache.set(cacheKey, translated);
+                        translatedMap.set(text, translated);
+                    } else {
+                        translatedMap.set(text, text);
                     }
                 }
-
-                const cacheKey = `${providerConfig.signature}|${text}`;
-                if (isUsableTranslation(text, translated)) {
-                    readmeRuntime.translationCache.set(cacheKey, translated);
-                    translatedMap.set(text, translated);
-                } else {
-                    translatedMap.set(text, text);
-                }
-            }
-        }
+                return batchResult.tokens;
+            },
+        );
+        totalTokens = batchResults.reduce((sum, tokens) => sum + tokens, 0);
 
         return {
             translatedMap,
             totalTokens,
         };
+    }
+
+    async function mapWithConcurrency(items, concurrency, worker) {
+        const values = Array.isArray(items) ? items : [];
+        if (!values.length) return [];
+
+        const results = new Array(values.length);
+        let nextIndex = 0;
+        const workerCount = Math.min(values.length, Math.max(1, Number(concurrency) || 1));
+
+        const runWorker = async () => {
+            while (true) {
+                const index = nextIndex;
+                nextIndex += 1;
+                if (index >= values.length) return;
+                results[index] = await worker(values[index], index);
+            }
+        };
+
+        await Promise.all(Array.from({ length: workerCount }, runWorker));
+        return results;
     }
 
     // 内容/解析类错误：HTTP 已成功，只是返回体不可解析，可降级为原文而不必中断整篇翻译。

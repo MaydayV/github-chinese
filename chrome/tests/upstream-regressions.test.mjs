@@ -161,6 +161,8 @@ test('repository About descriptions support hashed SidebarAbout CSS-module class
     assert.match(content, /About 描述未翻译：/, `${browser}: About 配置失败时应输出诊断信息`);
     assert.match(content, /const translationTasks = \[\];/, `${browser}: About 与 README 应使用独立并行任务`);
     assert.match(content, /await Promise\.all\(translationTasks\)/, `${browser}: About 与 README 不应串行等待`);
+    assert.match(content, /TRANSLATION_CONCURRENCY: 3/, `${browser}: README 应限制并发请求数`);
+    assert.match(content, /async function mapWithConcurrency\(items, concurrency, worker\)/, `${browser}: README 并发调度器缺失`);
     assert.match(content, /translateRepoAboutDescription/, `${browser}: About 描述翻译入口缺失`);
   }
 });
