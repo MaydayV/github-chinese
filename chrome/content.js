@@ -1271,7 +1271,7 @@
         return getRepoAboutElements()[0] || null;
     }
 
-    async function translateRepoAboutDescription(debugContext = null) {
+    async function translateRepoAboutDescription(debugContext = null, reason = 'unknown') {
         const providerConfig = getProviderConfig();
         const aboutElements = getRepoAboutElements();
         if (!aboutElements.length) return 0;
@@ -1282,14 +1282,80 @@
             return 0;
         }
 
-        let translatedCount = 0;
-        for (const aboutEl of aboutElements) {
-            // 逐文本节点收集：已是中文/纯符号/无字母会被 collectReadmeTextTasks 跳过，
-            // 因此翻译后再次运行会自然短路，配合变更守卫不会自触发循环。
-            const tasks = collectReadmeTextTasks(aboutEl);
-            if (!tasks.length) continue;
+        const startAt = performance.now();
+        const repoInfo = getCurrentRepoInfo();
+        const elementsWithTasks = [];
 
-            const uniqueTexts = [...new Set(tasks.map((task) => task.normalizedText))];
+        for (const aboutEl of aboutElements) {
+            const tasks = collectReadmeTextTasks(aboutEl);
+            if (tasks.length) {
+                elementsWithTasks.push({ aboutEl, tasks });
+            }
+        }
+
+        if (!elementsWithTasks.length) {
+            addReadmeDebugEvent(debugContext, 'about_end', { translatedCount: 0, skipped: 'already_translated' });
+            return 0;
+        }
+
+        const allTasks = elementsWithTasks.flatMap((item) => item.tasks);
+        const uniqueTexts = [...new Set(allTasks.map((task) => task.normalizedText))];
+        const sourceHash = createHash(uniqueTexts.join('||'));
+        const signature = providerConfig.signature;
+        const cacheKey = repoInfo && sourceHash && signature
+            ? `about:${repoInfo.fullName}|${sourceHash}|${signature}`
+            : '';
+
+        let translatedCount = 0;
+        let totalTokens = 0;
+
+        if (cacheKey) {
+            const cached = await getRepoCachedTranslation(cacheKey).catch(() => null);
+            if (cached?.translatedHtml) {
+                try {
+                    const cachedData = JSON.parse(cached.translatedHtml);
+                    if (cachedData?.translations && typeof cachedData.translations === 'object') {
+                        const translatedMap = new Map(Object.entries(cachedData.translations));
+                        for (const { aboutEl, tasks } of elementsWithTasks) {
+                            const tasksByText = new Map();
+                            tasks.forEach((task) => {
+                                if (!tasksByText.has(task.normalizedText)) {
+                                    tasksByText.set(task.normalizedText, []);
+                                }
+                                tasksByText.get(task.normalizedText).push(task);
+                            });
+                            translatedCount += withReadmeDomMutationGuard(() =>
+                                applyTextGroupTranslations(aboutEl, tasksByText, uniqueTexts, translatedMap));
+                            aboutEl.setAttribute('data-ghcn-about-translated', 'true');
+                        }
+
+                        addReadmeDebugEvent(debugContext, 'about_end', { translatedCount, cacheHit: true });
+                        await appendReadmeTranslationRecord({
+                            sourceType: 'about',
+                            status: 'cache_hit',
+                            tokens: 0,
+                            durationMs: performance.now() - startAt,
+                            sourceHash,
+                            detail: 'about_cache_hit',
+                        }).catch((error) => {
+                            console.warn('[About翻译] 写入缓存记录失败:', error);
+                        });
+
+                        return translatedCount;
+                    }
+                } catch {
+                    // JSON 解析失败则回退至常规翻译
+                }
+            }
+        }
+
+        const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig, {
+            debugContext,
+            debugPhase: 'about',
+        });
+        totalTokens = tokens;
+
+        for (const { aboutEl, tasks } of elementsWithTasks) {
             const tasksByText = new Map();
             tasks.forEach((task) => {
                 if (!tasksByText.has(task.normalizedText)) {
@@ -1297,16 +1363,39 @@
                 }
                 tasksByText.get(task.normalizedText).push(task);
             });
-
-            const { translatedMap } = await translateTextsWithProvider(uniqueTexts, providerConfig, {
-                debugContext,
-                debugPhase: 'about',
-            });
             translatedCount += withReadmeDomMutationGuard(() =>
                 applyTextGroupTranslations(aboutEl, tasksByText, uniqueTexts, translatedMap));
+            aboutEl.setAttribute('data-ghcn-about-translated', 'true');
         }
 
         addReadmeDebugEvent(debugContext, 'about_end', { translatedCount });
+
+        if (translatedCount > 0) {
+            if (cacheKey) {
+                const cachePayload = {
+                    translations: Object.fromEntries(translatedMap),
+                };
+                await upsertRepoCachedTranslation(cacheKey, {
+                    repo: repoInfo?.fullName || '',
+                    sourceHash,
+                    translatedHtml: JSON.stringify(cachePayload),
+                }).catch((error) => {
+                    console.warn('[About翻译] 写入缓存失败:', error);
+                });
+            }
+
+            await appendReadmeTranslationRecord({
+                sourceType: 'about',
+                status: 'success',
+                tokens: totalTokens,
+                durationMs: performance.now() - startAt,
+                sourceHash,
+                detail: `about_translated_nodes=${translatedCount}`,
+            }).catch((error) => {
+                console.warn('[About翻译] 写入翻译记录失败:', error);
+            });
+        }
+
         return translatedCount;
     }
 
@@ -1858,7 +1947,7 @@
             // About 与 README 没有内容依赖，分别发起翻译请求；任一请求失败只告警，不影响另一部分。
             const translationTasks = [];
             if (shouldTranslateAbout) {
-                translationTasks.push(translateRepoAboutDescription(debugContext).catch((error) => {
+                translationTasks.push(translateRepoAboutDescription(debugContext, reason).catch((error) => {
                     addReadmeDebugEvent(debugContext, 'about_failed', {
                         message: normalizeRuntimeErrorMessage(error),
                     });
@@ -2256,11 +2345,13 @@
 
         // 普通句子不能因为首字母大写就被误判为产品名；这些词出现时仍需正常翻译。
         const sentenceWords = new Set([
-            'a', 'an', 'and', 'are', 'as', 'at', 'about', 'build', 'by', 'can', 'configure',
-            'documentation', 'download', 'features', 'for', 'from', 'get', 'getting', 'how',
-            'in', 'install', 'installation', 'into', 'is', 'it', 'of', 'on', 'or', 'overview',
-            'quick', 'run', 'start', 'started', 'support', 'test', 'the', 'this', 'to', 'use',
-            'usage', 'using', 'with', 'what', 'when', 'where', 'why',
+            'a', 'an', 'and', 'are', 'as', 'at', 'about', 'build', 'by', 'can', 'changelog',
+            'community', 'configure', 'contribute', 'contributing', 'documentation', 'download',
+            'features', 'for', 'from', 'get', 'getting', 'guide', 'how', 'in', 'install',
+            'installation', 'into', 'is', 'it', 'license', 'of', 'on', 'or', 'overview',
+            'quick', 'resources', 'roadmap', 'run', 'security', 'start', 'started', 'support',
+            'test', 'the', 'this', 'to', 'use', 'usage', 'using', 'with', 'what', 'when',
+            'where', 'why',
         ]);
         const normalizedWords = words.map((word) => word.toLowerCase().replace(/^[([{]+|[)\]},.;:!?]+$/g, ''));
         if (normalizedWords.length === 1 && sentenceWords.has(normalizedWords[0])) return false;
@@ -2279,12 +2370,12 @@
         const titleCaseWords = words.filter((word) => /^[A-Z][A-Za-z0-9]*$/.test(word));
         if ((isLink || isListLabel)
             && titleCaseWords.length === words.length
-            && words.some((word) => word.length > 2)) {
+            && (words.some((word) => word.length > 2) || (isLink && words.length === 1 && !sentenceWords.has(normalizedWords[0])))) {
             return true;
         }
 
-        // 外部链接中的单一小写标识通常是包名/库名（如 boto），而不是自然语言句子。
-        return isLink && words.length === 1 && /^[a-z][a-z0-9-]*$/.test(input);
+        // 外部链接中的单一标识通常是包名/库名/平台名（如 boto、X），而不是自然语言句子。
+        return isLink && words.length === 1 && !sentenceWords.has(normalizedWords[0]) && /^[A-Za-z0-9-]+$/.test(input);
     }
 
     function collectReadmeOriginalTextCounts(originalHtml) {
@@ -2318,7 +2409,15 @@
         const latinCount = (input.match(/[A-Za-z]/g) || []).length;
         if (!latinCount) return true;
 
-        return cjkCount >= 8 && cjkCount >= latinCount * 1.25;
+        const latinWords = (input.match(/[A-Za-z]{2,}/g) || []).length;
+        const cjkPunctuation = (input.match(/[\u3000-\u303F\uFF01-\uFF5E]/g) || []).length;
+
+        // 若中文字符达到 8 个以上，且中文字数明显多于英文词数（技术名词混排常见场景），视为中文
+        if (cjkCount >= 8 && cjkCount >= latinWords * 1.5) return true;
+        // 中文标点加 6 个以上汉字也是明显的中文语句
+        if (cjkCount >= 6 && cjkPunctuation > 0 && cjkCount >= latinWords) return true;
+
+        return cjkCount >= 8 && cjkCount >= latinCount * 0.8;
     }
 
     function shouldSkipReadmeByLanguage(text, targetLang) {

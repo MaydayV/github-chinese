@@ -62,12 +62,25 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  formatRecordDetail('about_translated_nodes=2'),
+  '已翻译节点：2',
+  'about_translated_nodes 详情应显示为可读中文',
+);
+
+assert.strictEqual(
+  formatRecordDetail('about_cache_hit'),
+  '命中简介缓存',
+  'about_cache_hit 详情应显示为可读中文',
+);
+
+assert.strictEqual(
   formatRecordDetail('translated_nodes=30;retry_missed=51;remaining=48'),
   '已翻译节点：30；重试未翻译：51；剩余未翻译：48',
   '复合翻译详情不应直接显示内部字段名',
 );
 
 assert.strictEqual(getRecordSourceMeta('readme').label, '说明文档', 'README 来源应显示中文');
+assert.strictEqual(getRecordSourceMeta('about').label, '仓库简介', 'About 来源应显示中文');
 assert.strictEqual(getStatusMeta('partial').label, '部分完成', 'partial 状态应显示中文');
 
 {

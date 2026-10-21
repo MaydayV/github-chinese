@@ -60,6 +60,7 @@ const {
   parseOpenAiArray,
   stripOpenAiReasoningBlocks,
   normalizeRuntimeErrorMessage,
+  isLikelyOpaqueReadmeLabel,
 } = loadFunctions([
   'isExtensionContextInvalidatedError',
   'normalizeRuntimeErrorMessage',
@@ -71,6 +72,7 @@ const {
   'isMostlyCjkText',
   'shouldSkipReadmeText',
   'shouldSkipReadmeByLanguage',
+  'isLikelyOpaqueReadmeLabel',
   'mapTargetLangForDeepL',
   'mapTargetLangForAzure',
   'isObjectObjectArtifact',
@@ -136,9 +138,27 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  isMostlyCjkText('面向 AI、IoT、IIoT 和车联网的最具可扩展性和可靠性的 MQTT broker'),
+  true,
+  '技术英文缩写偏多的中文技术语句应正确识别为 CJK 主导',
+);
+
+assert.strictEqual(
   shouldSkipReadmeText('这是一个 GitHub 中文插件，用于仓库界面翻译。'),
   true,
   '中文 README 中夹少量英文时应跳过翻译',
+);
+
+assert.strictEqual(
+  shouldSkipReadmeText('面向 AI、IoT、IIoT 和车联网的最具可扩展性和可靠性的 MQTT broker'),
+  true,
+  '含技术专有词的已翻译简介语句应跳过重复翻译',
+);
+
+assert.strictEqual(
+  isLikelyOpaqueReadmeLabel('X', { parentElement: { closest: (selector) => selector.includes('a') } }),
+  true,
+  '外链中的单字母社交平台标签（如 X）应识别为不透明标签避免重试',
 );
 
 assert.strictEqual(

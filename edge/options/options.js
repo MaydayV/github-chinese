@@ -777,7 +777,7 @@ function formatRecordDetail(detail) {
     const value = String(part || '').trim();
     if (!value) return '';
 
-    let match = value.match(/^(?:nodes|translated_nodes|discussion_translated_nodes|issue_translated_nodes|pull_translated_nodes|release_translated_nodes)=(\d+)$/i);
+    let match = value.match(/^(?:nodes|translated_nodes|discussion_translated_nodes|issue_translated_nodes|pull_translated_nodes|release_translated_nodes|about_translated_nodes)=(\d+)$/i);
     if (match) return `已翻译节点：${match[1]}`;
 
     match = value.match(/^retry_missed=(\d+)$/i);
@@ -788,6 +788,7 @@ function formatRecordDetail(detail) {
 
     if (value === 'discussion_cache_hit') return '命中讨论内容缓存';
     if (/^(?:issue|pull|release)_cache_hit$/i.test(value)) return '命中正文缓存';
+    if (value === 'about_cache_hit') return '命中简介缓存';
 
     match = value.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
     if (match) {
@@ -818,7 +819,7 @@ function formatRecordDetail(detail) {
 
 function normalizeRecordSourceType(sourceType) {
   const value = String(sourceType || '').trim().toLowerCase();
-  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme') return value;
+  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme' || value === 'about') return value;
   return 'readme';
 }
 
@@ -826,6 +827,7 @@ function getRecordSourceMeta(sourceType) {
   const value = normalizeRecordSourceType(sourceType);
   const map = {
     readme: { label: '说明文档', className: 'is-readme' },
+    about: { label: '仓库简介', className: 'is-about' },
     issue: { label: '议题', className: 'is-issue' },
     pull: { label: '拉取请求', className: 'is-pull' },
     release: { label: '发行版', className: 'is-release' },

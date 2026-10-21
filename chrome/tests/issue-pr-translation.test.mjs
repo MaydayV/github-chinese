@@ -221,6 +221,11 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(optionsJs, /sourceType:\s*normalizeRecordSourceType\(item\.sourceType\)/);
   assert.match(optionsJs, /getRecordSourceMeta\(item\.sourceType\)/);
   assert.match(optionsJs, /release:\s*\{\s*label:\s*'发行版'/);
+  assert.match(optionsJs, /about:\s*\{\s*label:\s*'仓库简介'/);
+  assert.match(optionsJs, /about_cache_hit/);
+  assert.match(optionsJs, /about_translated_nodes/);
+  assert.match(content, /sourceType:\s*'about'/);
+  assert.match(content, /about_translated_nodes=/);
   assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
 });
 

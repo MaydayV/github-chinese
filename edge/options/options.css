@@ -446,6 +446,12 @@ select:focus {
   background: #eefaff;
 }
 
+.history-source.is-about {
+  color: #0b6356;
+  border-color: #a3ded2;
+  background: #effbf8;
+}
+
 .history-source.is-release {
   color: #6f4a1d;
   border-color: #e0bf8f;
