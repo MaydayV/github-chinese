@@ -2697,8 +2697,8 @@
                 const url = normalizeUrl(FeatureSet.readme_azure_api_url);
                 const key = (FeatureSet.readme_azure_api_key || '').trim();
                 const region = (FeatureSet.readme_azure_region || '').trim();
-                if (!url || !key || !region) {
-                    return { ok: false, message: 'Azure Translator 需要 API 地址、API Key 与 Region。' };
+                if (!url || !key) {
+                    return { ok: false, message: 'Azure Translator 需要 API 地址与 API Key。' };
                 }
 
                 return {
@@ -2953,18 +2953,17 @@
     }
 
     async function translateWithDeepL(texts, providerConfig) {
-        const body = new URLSearchParams();
-        body.append('target_lang', mapTargetLangForDeepL());
-        texts.forEach(text => body.append('text', text));
-
         const data = await proxyFetchJson({
             url: providerConfig.url,
             method: 'POST',
             headers: {
                 Authorization: `DeepL-Auth-Key ${providerConfig.key}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: body.toString(),
+            body: JSON.stringify({
+                text: texts,
+                target_lang: mapTargetLangForDeepL(),
+            }),
         });
 
         return {
@@ -2977,18 +2976,15 @@
         const url = new URL(providerConfig.url);
         url.searchParams.set('key', providerConfig.key);
 
-        const body = new URLSearchParams();
-        body.append('target', providerConfig.targetLang);
-        body.append('format', 'text');
-        texts.forEach(text => body.append('q', text));
-
         const data = await proxyFetchJson({
             url: url.toString(),
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: body.toString(),
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({
+                q: texts,
+                target: providerConfig.targetLang,
+                format: 'text',
+            }),
         });
 
         return {
@@ -3002,15 +2998,19 @@
         url.searchParams.set('api-version', '3.0');
         url.searchParams.set('to', mapTargetLangForAzure());
 
+        const headers = {
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Ocp-Apim-Subscription-Key': providerConfig.key,
+            'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
+        };
+        if (providerConfig.region) {
+            headers['Ocp-Apim-Subscription-Region'] = providerConfig.region;
+        }
+
         const data = await proxyFetchJson({
             url: url.toString(),
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json; charset=UTF-8',
-                'Ocp-Apim-Subscription-Key': providerConfig.key,
-                'Ocp-Apim-Subscription-Region': providerConfig.region,
-                'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
-            },
+            headers,
             body: JSON.stringify(texts.map(text => ({ text }))),
         });
 

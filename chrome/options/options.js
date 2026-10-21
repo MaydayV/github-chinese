@@ -318,8 +318,8 @@ function getProviderConfig(values) {
       const url = normalizeUrl(values.readme_azure_api_url);
       const key = (values.readme_azure_api_key || '').trim();
       const region = (values.readme_azure_region || '').trim();
-      if (!url || !key || !region) {
-        return { ok: false, message: 'Azure 需要 API 地址、API Key 和 Region。' };
+      if (!url || !key) {
+        return { ok: false, message: 'Azure 需要 API 地址和 API Key。' };
       }
       return { ok: true, provider, targetLang, url, key, region };
     }
@@ -566,18 +566,17 @@ async function proxyFetchJson(request) {
 }
 
 async function testDeepL(config) {
-  const body = new URLSearchParams();
-  body.append('target_lang', mapTargetLangForDeepL());
-  body.append('text', '翻译接口连通性测试。');
-
   const data = await proxyFetchJson({
     url: config.url,
     method: 'POST',
     headers: {
       Authorization: `DeepL-Auth-Key ${config.key}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: body.toString(),
+    body: JSON.stringify({
+      text: ['翻译接口连通性测试。'],
+      target_lang: mapTargetLangForDeepL(),
+    }),
   });
 
   if (!Array.isArray(data?.translations) || !data.translations[0]?.text) {
@@ -589,16 +588,15 @@ async function testGoogle(config) {
   const url = new URL(config.url);
   url.searchParams.set('key', config.key);
 
-  const body = new URLSearchParams();
-  body.append('target', config.targetLang);
-  body.append('format', 'text');
-  body.append('q', '翻译接口连通性测试。');
-
   const data = await proxyFetchJson({
     url: url.toString(),
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({
+      q: ['翻译接口连通性测试。'],
+      target: config.targetLang,
+      format: 'text',
+    }),
   });
 
   if (!Array.isArray(data?.data?.translations) || !data.data.translations[0]?.translatedText) {
@@ -611,15 +609,19 @@ async function testAzure(config) {
   url.searchParams.set('api-version', '3.0');
   url.searchParams.set('to', mapTargetLangForAzure());
 
+  const headers = {
+    'Content-Type': 'application/json; charset=UTF-8',
+    'Ocp-Apim-Subscription-Key': config.key,
+    'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
+  };
+  if (config.region) {
+    headers['Ocp-Apim-Subscription-Region'] = config.region;
+  }
+
   const data = await proxyFetchJson({
     url: url.toString(),
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'Ocp-Apim-Subscription-Key': config.key,
-      'Ocp-Apim-Subscription-Region': config.region,
-      'X-ClientTraceId': crypto?.randomUUID?.() || String(Date.now()),
-    },
+    headers,
     body: JSON.stringify([{ text: '翻译接口连通性测试。' }]),
   });
 

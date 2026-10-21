@@ -11,6 +11,10 @@ const browserOptions = ['chrome', 'edge', 'firefox'].map((browser) => ({
   html: readFileSync(new URL(`../../${browser}/options/options.html`, import.meta.url), 'utf8'),
   js: readFileSync(new URL(`../../${browser}/options/options.js`, import.meta.url), 'utf8'),
 }));
+const browserContent = ['chrome', 'edge', 'firefox'].map((browser) => ({
+  browser,
+  js: readFileSync(new URL(`../../${browser}/content.js`, import.meta.url), 'utf8'),
+}));
 
 test('discussion body translation setting is exposed in storage and options UI', () => {
   assert.match(optionsJs, /enable_issue_pr_translation:\s*false/);
@@ -82,6 +86,35 @@ test('translation connection test is visible for every provider', () => {
       false,
       `${browser} 的连通性测试按钮不应嵌套在单个服务面板中`,
     );
+  });
+});
+
+test('README provider requests use official JSON payloads and optional Azure region', () => {
+  browserContent.forEach(({ browser, js }) => {
+    const deeplStart = js.indexOf('async function translateWithDeepL');
+    const googleStart = js.indexOf('async function translateWithGoogle');
+    const azureStart = js.indexOf('async function translateWithAzure');
+    const deepl = js.slice(deeplStart, googleStart);
+    const google = js.slice(googleStart, azureStart);
+    const azure = js.slice(azureStart, js.indexOf('async function translateWithQwenMt', azureStart));
+
+    assert.match(deepl, /'Content-Type': 'application\/json'/, `${browser}: DeepL 应使用 JSON 请求`);
+    assert.match(deepl, /body: JSON\.stringify\(\{[\s\S]*text: texts[\s\S]*target_lang:/, `${browser}: DeepL JSON 字段缺失`);
+    assert.doesNotMatch(deepl, /application\/x-www-form-urlencoded/, `${browser}: DeepL 不应回退到表单请求`);
+
+    assert.match(google, /'Content-Type': 'application\/json; charset=UTF-8'/, `${browser}: Google 应使用 JSON 请求`);
+    assert.match(google, /body: JSON\.stringify\(\{[\s\S]*q: texts[\s\S]*target:/, `${browser}: Google JSON 字段缺失`);
+    assert.doesNotMatch(google, /application\/x-www-form-urlencoded/, `${browser}: Google 不应回退到表单请求`);
+
+    assert.match(azure, /if \(providerConfig\.region\) \{[\s\S]*Ocp-Apim-Subscription-Region/, `${browser}: Azure Region 应按需发送`);
+    assert.doesNotMatch(azure, /'Ocp-Apim-Subscription-Region': providerConfig\.region/, `${browser}: Azure 不应发送空 Region 请求头`);
+  });
+
+  browserOptions.forEach(({ browser, js }) => {
+    const azureStart = js.indexOf("case 'azure':");
+    const qwenStart = js.indexOf("case 'qwen_mt':", azureStart);
+    const azure = js.slice(azureStart, qwenStart);
+    assert.match(azure, /if \(!url \|\| !key\)/, `${browser}: Azure Global 资源不应强制填写 Region`);
   });
 });
 
