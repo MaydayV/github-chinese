@@ -3,6 +3,8 @@
 const DEFAULTS = {
   enable_readme_translation: false,
   enable_issue_pr_translation: false,
+  enable_collaboration_helper: false,
+  enable_repo_tldr: false,
   readme_enable_token_record: false,
   readme_enable_repo_cache: false,
   readme_enable_progressive: false,
@@ -120,7 +122,12 @@ function updateAdvancedSwitchUi(mainEnabled) {
 }
 
 function isAnyAiTranslationEnabled(values) {
-  return Boolean(values.enable_readme_translation || values.enable_issue_pr_translation);
+  return Boolean(
+    values.enable_readme_translation
+    || values.enable_issue_pr_translation
+    || values.enable_collaboration_helper
+    || values.enable_repo_tldr
+  );
 }
 
 function applyValues(values) {
@@ -147,6 +154,7 @@ function refreshProviderPanel(provider) {
     panel.classList.toggle('is-active', panel.dataset.provider === normalizedProvider);
   });
 }
+
 
 function getAiProviderDefaults(provider) {
   return AI_PROVIDER_DEFAULTS[provider] ? { ...AI_PROVIDER_DEFAULTS[provider] } : null;
@@ -513,7 +521,13 @@ async function loadValues() {
     const permission = await ensureProviderHostPermission(normalized, { request: false });
     if (!permission.ok) {
       normalized = enforceFeatureSwitchRules(
-        { ...normalized, enable_readme_translation: false, enable_issue_pr_translation: false },
+        {
+          ...normalized,
+          enable_readme_translation: false,
+          enable_issue_pr_translation: false,
+          enable_collaboration_helper: false,
+          enable_repo_tldr: false,
+        },
         { requireApiConfig: false },
       ).values;
     }
@@ -789,6 +803,19 @@ function formatRecordDetail(detail) {
     if (value === 'discussion_cache_hit') return '命中讨论内容缓存';
     if (/^(?:issue|pull|release)_cache_hit$/i.test(value)) return '命中正文缓存';
     if (value === 'about_cache_hit') return '命中简介缓存';
+    if (value === 'tldr_cache_hit') return '命中速读缓存';
+    if (value === 'tldr_generated') return '生成速读胶囊';
+
+    match = value.match(/^(?:collab_mode)=(.+)$/i);
+    if (match) {
+      const modeMap = {
+        bug: 'Bug 反馈',
+        feature: '功能建议',
+        reply: '讨论回复',
+        general: '通用润色',
+      };
+      return `润色模式：${modeMap[match[1]] || match[1]}`;
+    }
 
     match = value.match(/^(?:reason|cache_reason|trigger)=(.+)$/i);
     if (match) {
@@ -819,7 +846,7 @@ function formatRecordDetail(detail) {
 
 function normalizeRecordSourceType(sourceType) {
   const value = String(sourceType || '').trim().toLowerCase();
-  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme' || value === 'about') return value;
+  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme' || value === 'about' || value === 'collab' || value === 'tldr') return value;
   return 'readme';
 }
 
@@ -831,6 +858,8 @@ function getRecordSourceMeta(sourceType) {
     issue: { label: '议题', className: 'is-issue' },
     pull: { label: '拉取请求', className: 'is-pull' },
     release: { label: '发行版', className: 'is-release' },
+    collab: { label: '协作润色', className: 'is-collab' },
+    tldr: { label: '速读胶囊', className: 'is-tldr' },
   };
   return map[value];
 }
@@ -1172,6 +1201,114 @@ function bindEvents() {
 
     await savePartialValues({ enable_issue_pr_translation: false });
     setStatus('正文翻译已关闭并保存。', 'success');
+  });
+
+  const collabSwitch = byId('enable_collaboration_helper');
+  collabSwitch?.addEventListener('change', async () => {
+    const values = collectValues();
+
+    if (values.enable_collaboration_helper) {
+      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+      if (!ruled.ok) {
+        collabSwitch.checked = false;
+        setStatus(ruled.message, 'error');
+        return;
+      }
+
+      const savedConfig = getProviderConfig(LAST_SAVED_VALUES);
+      if (!savedConfig.ok) {
+        collabSwitch.checked = false;
+        setStatus('请先在“翻译接口”中保存可用配置，再开启协作润色助手。', 'error');
+        return;
+      }
+
+      try {
+        const permission = await ensureProviderHostPermission(LAST_SAVED_VALUES, { request: false });
+        if (!permission.ok) {
+          collabSwitch.checked = false;
+          setStatus(permission.message, 'error');
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        collabSwitch.checked = false;
+        setStatus('读取接口权限失败，请重新点击“保存设置”或“测试连通性”。', 'error');
+        return;
+      }
+
+      applyValues(ruled.values);
+      await savePartialValues({ enable_collaboration_helper: true });
+      setStatus('协作润色助手已开启并保存。进入 Issue / PR / 讨论输入框，可使用“润色转为英文”。', 'success');
+      return;
+    }
+
+    await savePartialValues({ enable_collaboration_helper: false });
+    setStatus('协作润色助手已关闭并保存。', 'success');
+  });
+
+  const tldrSwitch = byId('enable_repo_tldr');
+  tldrSwitch?.addEventListener('change', async () => {
+    const values = collectValues();
+
+    if (values.enable_repo_tldr) {
+      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+      if (!ruled.ok) {
+        tldrSwitch.checked = false;
+        setStatus(ruled.message, 'error');
+        return;
+      }
+
+      const savedConfig = getProviderConfig(LAST_SAVED_VALUES);
+      if (!savedConfig.ok) {
+        tldrSwitch.checked = false;
+        setStatus('请先在“翻译接口”中保存可用配置，再开启 AI 速读胶囊。', 'error');
+        return;
+      }
+
+      try {
+        const permission = await ensureProviderHostPermission(LAST_SAVED_VALUES, { request: false });
+        if (!permission.ok) {
+          tldrSwitch.checked = false;
+          setStatus(permission.message, 'error');
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        tldrSwitch.checked = false;
+        setStatus('读取接口权限失败，请重新点击“保存设置”或“测试连通性”。', 'error');
+        return;
+      }
+
+      applyValues(ruled.values);
+      await savePartialValues({ enable_repo_tldr: true });
+      setStatus('仓库首页 AI 速读胶囊已开启并保存。访问项目主页时可一键速读。', 'success');
+      return;
+    }
+
+    await savePartialValues({ enable_repo_tldr: false });
+    setStatus('仓库首页 AI 速读胶囊已关闭并保存。', 'success');
+  });
+
+  document.querySelectorAll('.feature-tip-trigger').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const wasOpen = btn.classList.contains('is-open');
+      document.querySelectorAll('.feature-tip-trigger.is-open').forEach((el) => {
+        el.classList.remove('is-open');
+      });
+      if (!wasOpen) {
+        btn.classList.add('is-open');
+      }
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.feature-tip-trigger')) {
+      document.querySelectorAll('.feature-tip-trigger.is-open').forEach((el) => {
+        el.classList.remove('is-open');
+      });
+    }
   });
 
   ADVANCED_SWITCH_KEYS.forEach((key) => {

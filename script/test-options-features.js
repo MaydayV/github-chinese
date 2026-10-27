@@ -79,9 +79,43 @@ assert.strictEqual(
   '复合翻译详情不应直接显示内部字段名',
 );
 
+assert.strictEqual(
+  formatRecordDetail('collab_mode=bug'),
+  '润色模式：Bug 反馈',
+  'collab_mode=bug 详情应显示为可读中文',
+);
+
+assert.strictEqual(
+  formatRecordDetail('collab_mode=feature'),
+  '润色模式：功能建议',
+  'collab_mode=feature 详情应显示为可读中文',
+);
+
+assert.strictEqual(
+  formatRecordDetail('tldr_generated'),
+  '生成速读胶囊',
+  'tldr_generated 详情应显示为可读中文',
+);
+
+assert.strictEqual(
+  formatRecordDetail('tldr_cache_hit'),
+  '命中速读缓存',
+  'tldr_cache_hit 详情应显示为可读中文',
+);
+
 assert.strictEqual(getRecordSourceMeta('readme').label, '说明文档', 'README 来源应显示中文');
 assert.strictEqual(getRecordSourceMeta('about').label, '仓库简介', 'About 来源应显示中文');
+assert.strictEqual(getRecordSourceMeta('collab').label, '协作润色', '协作润色来源应显示中文');
+assert.strictEqual(getRecordSourceMeta('tldr').label, '速读胶囊', '速读胶囊来源应显示中文');
 assert.strictEqual(getStatusMeta('partial').label, '部分完成', 'partial 状态应显示中文');
+
+assert.strictEqual(
+  getProviderConfig({
+    readme_provider: 'builtin_ai',
+  }).ok,
+  false,
+  '已移除的 builtin_ai 配置校验应返回 false',
+);
 
 {
   const { ok, values } = enforceFeatureSwitchRules({
@@ -132,6 +166,21 @@ assert.strictEqual(getStatusMeta('partial').label, '部分完成', 'partial 状�
   assert.strictEqual(values.readme_enable_token_record, false, '开启主开关时高级开关默认关闭');
   assert.strictEqual(values.readme_enable_repo_cache, false, '开启主开关时高级开关默认关闭');
   assert.strictEqual(values.readme_enable_progressive, false, '开启主开关时高级开关默认关闭');
+}
+
+{
+  const { ok, values } = enforceFeatureSwitchRules({
+    enable_readme_translation: true,
+    enable_collaboration_helper: true,
+    enable_repo_tldr: true,
+    readme_provider: 'deepl',
+    readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
+    readme_deepl_api_key: 'demo-key',
+    readme_target_lang: 'zh-CN',
+  }, { requireApiConfig: true });
+  assert.strictEqual(ok, false, '非对话翻译服务不应启用协作润色或 AI 速读');
+  assert.strictEqual(values.enable_collaboration_helper, false, '非对话服务应关闭协作润色开关');
+  assert.strictEqual(values.enable_repo_tldr, false, '非对话服务应关闭 AI 速读开关');
 }
 
 assert.strictEqual(

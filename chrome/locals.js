@@ -710,6 +710,9 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
             "Try a different search query.": "请尝试其他搜索查询。",
             "Repository files navigation": "仓库文件导航",
             "Open more actions menu": "打开更多操作菜单",
+            "Give me a high-level overview": "为我提供全局概览",
+            "How can I contribute?": "我该如何参与贡献？",
+            "Summarize latest changes": "总结最新变更",
         // 错误页面
             "Find code, projects, and people on GitHub:": "在 GitHub 上查找代码、项目和人员：",
             "Access has been restricted": "访问被限制",

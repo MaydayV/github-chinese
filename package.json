@@ -1,0 +1,10 @@
+{
+  "name": "github-chinese",
+  "version": "3.0.0",
+  "private": true,
+  "description": "GitHub 汉化与开源协作套件",
+  "scripts": {
+    "build": "node script/build.js",
+    "test": "node script/build.js --check && node chrome/tests/issue-pr-translation.test.mjs && node chrome/tests/upstream-regressions.test.mjs && node script/test-options-features.js && node script/test-openai-compatible-config.js && node script/test-readme-features.js && node script/test-popup-version.js && node script/test-upstream-sync.js && node script/test-update-entry.js && node script/test-deepl-auth.js"
+  }
+}

@@ -25,76 +25,176 @@
 
       <section class="tab-panel is-active" data-tab-panel="features">
         <section class="card">
-          <h2>README / About</h2>
-          <label for="enable_readme_translation" class="switch-row">
-            <span class="switch-copy">
-              <strong>启用 README / About 翻译</strong>
-              <small>翻译仓库 README 内容区域和侧栏 About 描述，不影响代码块、链接、图片路径与 Markdown 结构。</small>
-            </span>
-            <span class="ios-switch-wrap">
-              <input id="enable_readme_translation" type="checkbox" class="ios-switch-input">
-              <span class="ios-switch" aria-hidden="true"></span>
-            </span>
-          </label>
-          <p class="hint">README 与 About 描述共用此开关和翻译接口。请先在“翻译接口”中保存有效配置，再开启此功能。</p>
-        </section>
-
-        <section class="card">
-          <h2>Issue / Pull Request / Release</h2>
-          <label for="enable_issue_pr_translation" class="switch-row">
-            <span class="switch-copy">
-              <strong>启用正文翻译</strong>
-              <small>在 Issue、Pull Request 和 Release 页面为正文增加“翻译”按钮，点击后仅翻译当前内容。</small>
-            </span>
-            <span class="ios-switch-wrap">
-              <input id="enable_issue_pr_translation" type="checkbox" class="ios-switch-input">
-              <span class="ios-switch" aria-hidden="true"></span>
-            </span>
-          </label>
-          <p class="hint">复用“翻译接口”中的服务配置。默认手动触发，不会自动翻译整页内容。</p>
-        </section>
-
-        <section class="card">
-          <h2>高级功能</h2>
-          <div class="switch-stack">
-            <label for="readme_enable_token_record" class="switch-row">
-              <span class="switch-copy">
-                <strong>记录翻译消耗</strong>
-                <small>记录每次翻译状态、Tokens、时间和仓库名，用于评估调用成本。</small>
-              </span>
+          <div class="card-head">
+            <h2>页面基础汉化</h2>
+          </div>
+          <p class="section-desc">对 GitHub 网页中的技术说明、文档、议题及讨论正文进行就地中文汉化，严格保留代码块与排版结构。</p>
+          <div class="feature-list">
+            <label for="enable_readme_translation" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>启用 README / About 翻译</strong>
+                  <span class="feature-badge">说明文档</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">翻译仓库 README 内容区域和侧栏 About 描述，不影响代码块、链接、图片路径与 Markdown 结构。</span>
+                  </button>
+                </div>
+              </div>
               <span class="ios-switch-wrap">
-                <input id="readme_enable_token_record" type="checkbox" class="ios-switch-input">
+                <input id="enable_readme_translation" type="checkbox" class="ios-switch-input">
                 <span class="ios-switch" aria-hidden="true"></span>
               </span>
             </label>
 
-            <label for="readme_enable_repo_cache" class="switch-row">
-              <span class="switch-copy">
-                <strong>仓库翻译缓存</strong>
-                <small>仓库 README 未变化时，直接使用上次翻译结果，减少重复 API 请求。</small>
+            <label for="enable_issue_pr_translation" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>启用正文翻译</strong>
+                  <span class="feature-badge">Issue / Pull Request / Release</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">在 Issue、Pull Request 各楼层评论和 Release 页面为正文增加“翻译”按钮，点击后仅按需翻译当前内容。</span>
+                  </button>
+                </div>
+              </div>
+              <span class="ios-switch-wrap">
+                <input id="enable_issue_pr_translation" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
               </span>
+            </label>
+          </div>
+          <p class="hint">README 与 About 描述共用此开关和翻译接口。默认手动或按需触发，不会强行自动破坏整页英文原始排版。</p>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>AI 智能增强</h2>
+          </div>
+          <p class="section-desc">依托云端大语言模型（DeepSeek、OpenAI、Qwen 等）的深度理解、提炼与重写能力，提供高阶开源交互辅助。</p>
+          <div class="feature-list">
+            <label for="enable_repo_tldr" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>启用仓库首页 AI 速读胶囊 (TL;DR)</strong>
+                  <span class="feature-badge">仓库首页</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">在开源项目 README 顶部生成结构化速读胶囊（核心定位与选型考量），秒懂项目价值，支持本地缓存秒开。</span>
+                  </button>
+                </div>
+              </div>
+              <span class="ios-switch-wrap">
+                <input id="enable_repo_tldr" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
+
+            <label for="enable_collaboration_helper" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>启用协作润色助手</strong>
+                  <span class="feature-badge feature-badge--purple">输入框工具栏</span>
+                  <span class="feature-badge">中文转英文</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">在 Issue、Pull Request、讨论及评论输入框增加“润色转为英文”按钮，将中文草稿润色为规范开源英文（支持 Bug 反馈、功能建议、讨论回复、通用润色 4 大模式，带撤销栈保护）。</span>
+                  </button>
+                </div>
+              </div>
+              <span class="ios-switch-wrap">
+                <input id="enable_collaboration_helper" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
+              </span>
+            </label>
+          </div>
+          <p class="hint">复用“翻译接口”中的服务配置。建议选择 DeepSeek 等推理速度快的模型，获得秒级响应体验。</p>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>性能与高级设置</h2>
+          </div>
+          <p class="section-desc">优化请求效率、消除重复开销与 Token 消耗监控。开启“页面基础汉化”后可按需启用高级加速与调试配置。</p>
+          <div class="feature-list">
+            <label for="readme_enable_repo_cache" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>仓库翻译缓存</strong>
+                  <span class="feature-badge feature-badge--green">秒开免消耗</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">仓库 README 与速读胶囊未变化时，直接使用上次翻译结果，减少重复 API 请求并实现零等待秒开。</span>
+                  </button>
+                </div>
+              </div>
               <span class="ios-switch-wrap">
                 <input id="readme_enable_repo_cache" type="checkbox" class="ios-switch-input">
                 <span class="ios-switch" aria-hidden="true"></span>
               </span>
             </label>
 
-            <label for="readme_enable_progressive" class="switch-row">
-              <span class="switch-copy">
-                <strong>分段渐进翻译</strong>
-                <small>长 README 按段落分批翻译并逐步显示，降低长时间等待体感。</small>
-              </span>
+            <label for="readme_enable_progressive" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>分段渐进翻译</strong>
+                  <span class="feature-badge">长文档加速</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">长 README 按段落分批翻译并逐步显示，显著降低长时间等待体感。</span>
+                  </button>
+                </div>
+              </div>
               <span class="ios-switch-wrap">
                 <input id="readme_enable_progressive" type="checkbox" class="ios-switch-input">
                 <span class="ios-switch" aria-hidden="true"></span>
               </span>
             </label>
 
-            <label for="readme_enable_debug" class="switch-row">
-              <span class="switch-copy">
-                <strong>翻译调试日志</strong>
-                <small>记录批次并发、重试、未完成节点和动态重渲染信息，仅用于排查“部分完成”。默认关闭。</small>
+            <label for="readme_enable_token_record" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>记录翻译消耗</strong>
+                  <span class="feature-badge">用量统计</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">记录每次翻译状态、Tokens、耗时和仓库名，用于评估调用成本（可在“翻译记录”面板查看）。</span>
+                  </button>
+                </div>
+              </div>
+              <span class="ios-switch-wrap">
+                <input id="readme_enable_token_record" type="checkbox" class="ios-switch-input">
+                <span class="ios-switch" aria-hidden="true"></span>
               </span>
+            </label>
+
+            <label for="readme_enable_debug" class="feature-item switch-row">
+              <div class="feature-info">
+                <div class="feature-title-row">
+                  <strong>翻译调试日志</strong>
+                  <span class="feature-badge feature-badge--gray">诊断排查</span>
+                  <button type="button" class="feature-tip-trigger" aria-label="查看说明">
+                    <svg class="tip-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor">
+                      <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zM7.25 4.75a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zm.75 6.25a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                    </svg>
+                    <span class="tip-popover" role="tooltip">记录批次并发、重试、未完成节点和动态重渲染信息，仅用于排查“部分完成”。默认关闭。</span>
+                  </button>
+                </div>
+              </div>
               <span class="ios-switch-wrap">
                 <input id="readme_enable_debug" type="checkbox" class="ios-switch-input">
                 <span class="ios-switch" aria-hidden="true"></span>

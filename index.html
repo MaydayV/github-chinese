@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHub 中文汉化翻译插件 - Chrome、Edge、Firefox 的 GitHub 中文化扩展</title>
-  <meta name="description" content="GitHub 中文汉化翻译插件由 MaydayV 开发，使用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
-  <meta name="keywords" content="GitHub 中文,GitHub 汉化,GitHub 翻译,GitHub 中文化插件,GitHub Chinese,Chrome 扩展,Edge 扩展,Firefox 附加组件,README 翻译,Issue 翻译,Pull Request 翻译">
+  <meta name="description" content="GitHub 中文汉化翻译插件由 MaydayV 开发，提供本地词库界面汉化与正文/Discussions 双语翻译，内置开源协作 AI 润色助手与仓库速读胶囊 (TL;DR)，全面支持 DeepSeek 等多模型。支持 Chrome、Edge、Firefox。">
+  <meta name="keywords" content="GitHub 中文,GitHub 汉化,GitHub 翻译,开源协作润色,Issue 润色,PR 润色,仓库速读,Discussions 翻译,DeepSeek 翻译,GitHub 中文化插件,GitHub Chinese,Chrome 扩展,Edge 扩展,Firefox 附加组件">
   <meta name="author" content="MaydayV">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://maydayv.github.io/github-chinese/">
@@ -15,12 +15,12 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://maydayv.github.io/github-chinese/">
   <meta property="og:title" content="GitHub 中文汉化翻译插件 - MaydayV">
-  <meta property="og:description" content="本地词库汉化 GitHub 界面，按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。支持 Chrome、Edge、Firefox。">
+  <meta property="og:description" content="本地词库汉化 GitHub 界面，正文与 Discussions 双语翻译，全新内置开源协作 AI 润色助手与仓库速读胶囊。支持 Chrome、Edge、Firefox。">
   <meta property="og:image" content="https://maydayv.github.io/github-chinese/chrome/assets/icons/icon512.png">
   <meta property="og:locale" content="zh_CN">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="GitHub 中文汉化翻译插件">
-  <meta name="twitter:description" content="由 MaydayV 开发的 GitHub 中文化浏览器扩展。本地汉化界面，按需翻译正文内容。">
+  <meta name="twitter:description" content="由 MaydayV 开发的 GitHub 汉化与开源协作扩展。本地汉化界面，双语翻译正文，支持开源协作润色与仓库速读。">
   <meta name="twitter:image" content="https://maydayv.github.io/github-chinese/chrome/assets/icons/icon512.png">
 
   <script type="application/ld+json">
@@ -31,7 +31,7 @@
     "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome, Edge, Firefox",
-    "softwareVersion": "2.6.0",
+    "softwareVersion": "3.0.0",
     "url": "https://maydayv.github.io/github-chinese/",
     "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
     "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
@@ -50,14 +50,14 @@
     "license": "https://www.gnu.org/licenses/gpl-3.0.html",
     "featureList": [
       "GitHub 界面本地汉化",
-      "README 和仓库侧栏 About 描述翻译",
-      "Issue 正文和评论翻译",
-      "Pull Request 正文和评论翻译",
-      "Release 正文翻译",
+      "开源协作 AI 润色助手",
+      "仓库首页 AI 速读胶囊",
+      "Discussions 讨论区与正文双语翻译",
+      "README 与 About 描述翻译",
       "Chrome、Edge、Firefox 三端支持",
-      "本地保存配置和缓存"
+      "本地优先存储与离线缓存"
     ],
-    "description": "由 MaydayV 开发的浏览器扩展，使用本地词库将 GitHub 界面文本汉化为简体中文，并按需支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译。"
+    "description": "由 MaydayV 开发的 GitHub 汉化与开源协作套件，本地词库汉化界面，支持全场景正文双语翻译，内置开源协作 AI 润色助手与仓库速读胶囊。"
   }
   </script>
 
@@ -90,103 +90,135 @@
         "name": "GitHub 中文汉化翻译插件是什么？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "GitHub 中文汉化翻译插件是由 MaydayV 开发的浏览器扩展，用本地词库将 GitHub 界面汉化为简体中文，并按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。"
+          "text": "GitHub 中文汉化翻译插件（GitHub Chinese）是由 MaydayV 开发维护的开源浏览器扩展套件。不仅使用本地离线词库将 GitHub 界面汉化为简体中文，还按需支持 README、仓库侧栏 About、Discussions 讨论区、Issue、Pull Request 和 Release 正文双语翻译，并内置开源协作 AI 润色助手与仓库首页项目速读胶囊 (TL;DR)。"
         }
       },
       {
         "@type": "Question",
-        "name": "这个插件支持哪些浏览器？",
+        "name": "什么是开源协作润色助手？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件支持 Chrome、Microsoft Edge 和 Firefox，分别提供 Chrome 应用商店、Edge 加载项商店和 Firefox 附加组件安装入口。"
+          "text": "开源协作润色助手是插件专为国内开发者参与全球开源协作打造的 AI 写作辅助功能。内置 Bug 反馈、功能建议、讨论回复与通用润色 4 种专业技术模板，可将中文快速润色为纯正地道的英文技术表达。全面支持新建 Issue、新建 PR（含 /compare 与 /pull/new）及评论回复框，并支持双栏中英对照预览、代码块格式保留与一键无损写回。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件会上传用户数据吗？",
+        "name": "润色助手支持哪些页面和输入框？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "界面汉化默认在浏览器本地完成，不需要上传数据。只有用户主动触发 README、About、Issue、Pull Request 或 Release 正文翻译时，待翻译内容才会发送到用户配置的翻译服务。"
+          "text": "全面支持新建 Issue 表单（含新版结构化 Issue Form）、新建 Pull Request（包含 /compare 与 /pull/new 分支对比提交页）、Issue/PR/Discussions 互动讨论评论框，以及代码评审（Code Review）内联评论框。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件和浏览器自带翻译有什么区别？",
+        "name": "什么是仓库首页 AI 项目速读胶囊 (TL;DR)？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件使用 GitHub 专用词库替换界面文本，尽量保持 GitHub 原有交互和代码结构；浏览器自带翻译是通用整页翻译，可能影响动态页面、代码块和界面状态。"
+          "text": "位于仓库首页 README 顶部，支持一键秒级提炼项目的核心定位、架构特性与技术选型考量，帮助开发者无需读完整篇长文即可快速掌握项目核心价值；支持本地秒开长效缓存、自适应折叠与防重复调用保护。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件是谁开发的？",
+        "name": "是否支持 GitHub Discussions 讨论区翻译？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "GitHub 中文汉化翻译插件由开发者 MaydayV 开发维护，项目源码托管在 GitHub 仓库 MaydayV/github-chinese。"
+          "text": "支持。插件完整覆盖 GitHub Discussions（讨论区），深度适配主帖正文及全部互动楼层，支持原文、译文与双语对照三种视图自由切换。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件是否免费？",
+        "name": "和浏览器自带翻译有什么区别？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件本身免费开源。界面汉化不需要付费服务；正文翻译功能是否产生费用，取决于用户自行配置的翻译 API 服务商。"
+          "text": "插件针对 GitHub 界面维护专用本地离线词库，汉化零延迟且完全保持原有交互和动态状态；正文翻译采用精准 DOM 解析与段落级双语对照，严格保留 Markdown 结构、代码高亮和图片链接；同时具备浏览器翻译所没有的开源协作润色助手、仓库速读胶囊与 Discussions 讨论区双向翻译能力。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件支持哪些 GitHub 内容翻译？",
+        "name": "支持哪些翻译与 AI 服务商接口？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译，可用于阅读英文项目文档、仓库简介、问题讨论、代码评审说明和版本发布说明。"
+          "text": "全面支持 DeepSeek（推荐，高性价比）、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件是否会自动翻译整页？",
+        "name": "界面汉化是否需要配置 API Key？是否收费？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "界面文本会通过本地词库自动汉化；README、About、Issue、Pull Request 和 Release 正文翻译需要用户主动触发，不会默认自动翻译整页正文。"
+          "text": "界面汉化完全免费，且基于本地打包的离线词库运行，不需要配置 API Key 或联网调用接口；正文翻译、润色助手与速读胶囊是否产生费用，仅取决于用户自行配置的第三方 API 服务商（如 DeepSeek、OpenAI 等）的计费规则。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件支持哪些翻译接口？",
+        "name": "会上传或收集用户数据吗？API Key 安全吗？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件支持 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT、OpenAI 官方接口以及 OpenAI 兼容接口等翻译服务配置。"
+          "text": "插件严格遵循本地优先与隐私保护原则，不收集、不出售任何用户数据。所有 API Key、开关配置和翻译缓存均存储在浏览器本地（chrome.storage.local），正文翻译与润色内容仅直接发送给用户自己填写的官方 Endpoint，无任何中间服务器中转。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件适合谁使用？",
+        "name": "双语对照阅读是如何工作的？会影响代码显示吗？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者和需要阅读英文仓库文档的中文用户。"
+          "text": "正文翻译采用精准的 DOM 结构解析与分段注入机制，译文紧贴原文段落呈现，严格保留 Markdown 标题层级、链接、图片路径以及行内/独立代码块语法高亮，绝不会破坏代码缩进或语法，并原生适配 GitHub Primer 深色（暗黑）模式与浅色模式。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件会影响代码显示吗？",
+        "name": "支持哪些浏览器？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "插件的界面汉化主要处理 GitHub 菜单、按钮、标题、提示语等界面文本；正文翻译会尽量保留 Markdown、代码块、链接和图片路径结构。"
+          "text": "插件同步支持 Chrome、Microsoft Edge 和 Firefox，分别提供 Chrome 应用商店、Edge 加载项商店和 Firefox 附加组件官方安装入口。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件如何安装？",
+        "name": "开发者是谁？开源协议是什么？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "用户可以通过 Chrome 应用商店、Microsoft Edge 加载项商店或 Firefox 附加组件页面安装。安装后打开 GitHub 页面即可使用。"
+          "text": "插件由开发者 MaydayV 主导开发与维护，词条基于 maboloshi/github-chinese 社区词库，项目遵循 GPL-3.0 开源协议，源码托管于 GitHub 仓库 MaydayV/github-chinese。"
         }
       },
       {
         "@type": "Question",
-        "name": "GitHub 中文汉化翻译插件是否是 GitHub 官方产品？",
+        "name": "是否会自动翻译整页？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "不是。GitHub 中文汉化翻译插件是社区开源项目，并非 GitHub 官方产品。"
+          "text": "界面文本会自动通过本地离线词库汉化；而 README、Discussions、Issue、PR 等正文内容只有在用户主动点击对应按钮时才会按需触发，不会默认自动翻译整页正文，最大程度节省接口配额并避免页面卡顿。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "适合哪些用户群体？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者，以及需要地道输出英文 Issue/PR 向国际知名开源仓库贡献代码的技术工程师。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "安装后如何使用？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "安装后直接访问 github.com 即可自动享受中文界面；正文与讨论区双语翻译、润色助手及速读胶囊可在页面对应区域一键点击使用，点击浏览器工具栏的插件图标可进入设置面板自定义模型与接口参数。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "插件如何升级到最新版本？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "从各大官方扩展商店安装的用户，浏览器会在后台自动静默检查并更新至最新版本；手动通过开发者模式加载 CRX 或源码包的用户，可拉取最新 Release 版本重新载入。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "是否是 GitHub 官方产品？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "不是。GitHub 中文汉化翻译插件是独立的社区开源项目，并非 GitHub 官方产品。"
         }
       }
     ]
@@ -1151,9 +1183,9 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
-        <p class="eyebrow">GitHub Chinese · v2.6.0</p>
-        <h1 id="hero-title">让 GitHub 用中文呈现。</h1>
-        <p class="hero-copy">本地词库汉化 GitHub 界面。需要阅读英文内容时，再按需翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。</p>
+        <p class="eyebrow">GitHub Chinese · v3.0.0</p>
+        <h1 id="hero-title">让 GitHub 用中文呈现，让开源距离每个人更近。</h1>
+        <p class="hero-copy">本地词库深度汉化全站界面，按需双语翻译正文与讨论区。全新支持开源协作 AI 润色助手与仓库速读胶囊，无障碍融入全球开源社区。</p>
         <div class="hero-actions" aria-label="主要操作">
           <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg?utm_source=github_pages" rel="noopener">Chrome 应用商店</a>
           <a class="btn btn-test" href="https://microsoftedge.microsoft.com/addons/detail/gafbkmdjmeamppdonbdcoekfcagfpcck" rel="noopener">Edge 加载项</a>
@@ -1164,7 +1196,7 @@
           <span class="developer-dot" aria-hidden="true"></span>
           <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
         </div>
-        <p class="hero-note">v2.6.0 优化 README 与 About 翻译速度、缓存复用和完成判断，并保持顶部搜索框翻译、展开效果和输入保护不变。</p>
+        <p class="hero-note">v3.0.0 重磅发布：全新推出开源协作润色助手与仓库 AI 速读胶囊，Discussions 讨论区全面纳入双语翻译，底层性能与稳定性深度加固。</p>
       </div>
     </section>
 
@@ -1209,16 +1241,19 @@
               </div>
             </div>
             <div class="settings-card">
-              <div class="field-preview">
-                <span>翻译服务</span>
-                <div class="select-preview">Qwen-MT（机器翻译）</div>
+              <div class="switch-row">
+                <span class="switch-copy">
+                  <strong>开源协作润色助手</strong>
+                  <small>新建 Issue、PR 及评论框一键润色为纯正英文技术表达。</small>
+                </span>
+                <span class="ios-switch" aria-hidden="true"></span>
               </div>
             </div>
             <div class="settings-card">
               <div class="switch-row">
                 <span class="switch-copy">
-                  <strong>正文翻译</strong>
-                  <small>Issue、Pull Request、Release 手动触发。</small>
+                  <strong>正文与讨论区翻译</strong>
+                  <small>Issue、PR、Discussions、Release 手动触发双语对照。</small>
                 </span>
                 <span class="ios-switch" aria-hidden="true"></span>
               </div>
@@ -1237,19 +1272,19 @@
         </div>
         <div class="card-grid">
           <article class="card">
-            <span class="card-label">界面</span>
-            <h3>GitHub 专用词库</h3>
-            <p>覆盖菜单、按钮、标题、提示语和弹窗内容，适配 GitHub 主站、Sponsors、设置页及相关页面。</p>
+            <span class="card-label">界面与阅读</span>
+            <h3>专用词库 & 双语正文</h3>
+            <p>覆盖全站菜单、按钮与弹窗；支持 README、About、Discussions、Issue、PR 与 Release 双语对照阅读，无损保留 Markdown 与代码块结构。</p>
           </article>
           <article class="card">
-            <span class="card-label">正文</span>
-            <h3>README / Issue / PR / Release</h3>
-            <p>正文翻译手动触发，支持原文、译文和双语视图，适合阅读文档和参与讨论。</p>
+            <span class="card-label">输出与协作</span>
+            <h3>开源协作润色助手</h3>
+            <p>专为全球开源协作打造，内置 Bug 反馈、功能建议、讨论回复与通用润色 4 种专业模式，支持中英对照预览与一键回写。</p>
           </article>
           <article class="card">
-            <span class="card-label">接口</span>
-            <h3>多服务商配置</h3>
-            <p>支持 DeepL、Google、Azure、Qwen-MT、OpenAI 及兼容接口；DeepL 与 Google 使用官方 JSON 请求，Azure Global 资源可省略 Region，配置保存在本地。</p>
+            <span class="card-label">智能与生态</span>
+            <h3>仓库速读 & 多模型支持</h3>
+            <p>README 头部一键提炼核心定位与技术选型（TL;DR）；全面支持 DeepSeek、OpenAI、Qwen、Azure、DeepL 等主流服务商与兼容接口。</p>
           </article>
         </div>
       </div>
@@ -1294,6 +1329,20 @@
         </div>
         <!-- CHANGELOG:START -->
         <ol class="changelog-list">
+          <li class="changelog-item" id="v3-0-0">
+            <div class="changelog-meta">
+              <span class="changelog-version">v3.0.0</span>
+              <time class="changelog-date" datetime="2026-10-22">2026-10-22</time>
+            </div>
+            <ul class="changelog-points">
+              <li>全新推出开源协作润色助手：内置 Bug 反馈、功能建议、讨论回复与通用润色 4 种专业技术场景，支持双栏中英对照预览与代码块精准保留，全面适配新建 Issue 表单、新建 PR（<code>/compare</code>、<code>/pull/new</code>）及评论框</li>
+              <li>新增仓库首页 AI 项目速读胶囊 (TL;DR)：在 README 顶部一键秒级提炼核心定位与技术选型考量，支持本地长效缓存与自适应折叠，统一刷新与关闭图标交互</li>
+              <li>Discussions 讨论区全面纳入双语翻译：深度适配 GitHub Discussions 主帖及全部互动楼层，支持原文、译文与双语对照三种视图无缝切换</li>
+              <li>Primer 暗黑模式深度视觉对齐：全面优化双语对照在深色模式下的对比度、引用线与分割线布局，提升夜间浏览阅读体验</li>
+              <li>底层性能与稳定性全面加固：引入 Turbo 软导航防重入保护与 DOM 脱落熔断机制，实现 Storage 批量微防抖消除多标签页闪烁，修复节点遍历冗余</li>
+              <li>Chrome、Edge、Firefox 三端同步升级至 v3.0.0 正式版，统一多端清单配置与本地化文档</li>
+            </ul>
+          </li>
           <li class="changelog-item" id="v2-6-0">
             <div class="changelog-meta">
               <span class="changelog-version">v2.6.0</span>
@@ -1333,21 +1382,21 @@
               <li>保留顶部搜索框翻译、展开保护和 <code>Tokens</code> 术语，三端同步并重新生成插件包</li>
             </ul>
           </li>
-          <li class="changelog-item" id="v2-5-7">
-            <div class="changelog-meta">
-              <span class="changelog-version">v2.5.7</span>
-              <time class="changelog-date" datetime="2026-10-20">2026-10-20</time>
-            </div>
-            <ul class="changelog-points">
-              <li>合并上游 PR #808，补充组织自定义属性、议题字段、Copilot 代码审查、编程智能体、互联网访问和运行器设置页面的路由与词条</li>
-              <li>选择性同步上游 PR #668 的审查术语、登录验证、订单与未决状态词条优化</li>
-              <li>保留顶部搜索框翻译、展开保护和 <code>Tokens</code> 术语，Chrome、Edge、Firefox 三端同步并重新生成插件包</li>
-            </ul>
-          </li>
         </ol>
         <details class="changelog-more">
-          <summary>查看更早的 28 个版本</summary>
+          <summary>查看更早的 29 个版本</summary>
           <ol class="changelog-list">
+            <li class="changelog-item" id="v2-5-7">
+              <div class="changelog-meta">
+                <span class="changelog-version">v2.5.7</span>
+                <time class="changelog-date" datetime="2026-10-20">2026-10-20</time>
+              </div>
+              <ul class="changelog-points">
+                <li>合并上游 PR #808，补充组织自定义属性、议题字段、Copilot 代码审查、编程智能体、互联网访问和运行器设置页面的路由与词条</li>
+                <li>选择性同步上游 PR #668 的审查术语、登录验证、订单与未决状态词条优化</li>
+                <li>保留顶部搜索框翻译、展开保护和 <code>Tokens</code> 术语，Chrome、Edge、Firefox 三端同步并重新生成插件包</li>
+              </ul>
+            </li>
             <li class="changelog-item" id="v2-5-6">
               <div class="changelog-meta">
                 <span class="changelog-version">v2.5.6</span>
@@ -1706,7 +1755,7 @@
             <li><span class="check">✓</span><span>界面汉化无需在线翻译服务。</span></li>
             <li><span class="check">✓</span><span>不收集、不出售用户个人数据。</span></li>
             <li><span class="check">✓</span><span>正文翻译仅发送到你配置的接口。</span></li>
-            <li><span class="check">✓</span><span>可随时关闭 README、About、Issue、PR 和 Release 翻译功能。</span></li>
+            <li><span class="check">✓</span><span>可随时关闭 README、About、Discussions、Issue、PR 和 Release 翻译功能。</span></li>
           </ul>
         </div>
       </div>
@@ -1716,29 +1765,39 @@
       <h2>GitHub 中文汉化翻译插件 GEO 问答</h2>
       <dl>
         <dt>GitHub 中文汉化翻译插件是什么？</dt>
-        <dd>它是由 MaydayV 开发的开源浏览器扩展，用本地词库把 GitHub 界面汉化为简体中文，并在用户主动触发时翻译 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文。</dd>
-        <dt>开发者是谁？</dt>
-        <dd>插件开发者是 MaydayV，项目源码托管在 GitHub 仓库 MaydayV/github-chinese。</dd>
-        <dt>支持哪些浏览器？</dt>
-        <dd>插件支持 Chrome、Microsoft Edge 和 Firefox。</dd>
-        <dt>是否免费？</dt>
-        <dd>插件本身免费开源；正文翻译功能是否产生费用，取决于用户自行配置的翻译 API 服务商。</dd>
-        <dt>是否是 GitHub 官方产品？</dt>
-        <dd>不是。它是社区开源项目，并非 GitHub 官方产品。</dd>
+        <dd>GitHub 中文汉化翻译插件（GitHub Chinese）是由 MaydayV 开发维护的开源浏览器扩展套件。不仅使用本地离线词库将 GitHub 界面汉化为简体中文，还按需支持 README、仓库侧栏 About、Discussions 讨论区、Issue、Pull Request 和 Release 正文双语翻译，并内置开源协作 AI 润色助手与仓库首页项目速读胶囊 (TL;DR)。</dd>
+        <dt>什么是开源协作润色助手？</dt>
+        <dd>开源协作润色助手是插件专为国内开发者参与全球开源协作打造的 AI 写作辅助功能。内置 Bug 反馈、功能建议、讨论回复与通用润色 4 种专业技术模板，可将中文快速润色为纯正地道的英文技术表达。全面支持新建 Issue、新建 PR（含 /compare 与 /pull/new）及评论回复框，并支持双栏中英对照预览、代码块格式保留与一键无损写回。</dd>
+        <dt>润色助手支持哪些页面和输入框？</dt>
+        <dd>全面支持新建 Issue 表单（含新版结构化 Issue Form）、新建 Pull Request（包含 /compare 与 /pull/new 分支对比提交页）、Issue/PR/Discussions 互动讨论评论框，以及代码评审（Code Review）内联评论框。</dd>
+        <dt>什么是仓库首页 AI 项目速读胶囊 (TL;DR)？</dt>
+        <dd>位于仓库首页 README 顶部，支持一键秒级提炼项目的核心定位、架构特性与技术选型考量，帮助开发者无需读完整篇长文即可快速掌握项目核心价值；支持本地秒开长效缓存、自适应折叠与防重复调用保护。</dd>
+        <dt>是否支持 GitHub Discussions 讨论区翻译？</dt>
+        <dd>支持。插件完整覆盖 GitHub Discussions（讨论区），深度适配主帖正文及全部互动楼层，支持原文、译文与双语对照三种视图自由切换。</dd>
         <dt>和浏览器自带翻译有什么区别？</dt>
-        <dd>插件针对 GitHub 界面维护专用词库，尽量保持 GitHub 原有交互、代码块和 Markdown 结构；浏览器自带翻译是通用整页翻译。</dd>
-        <dt>会上传用户数据吗？</dt>
-        <dd>界面汉化默认在浏览器本地完成。只有用户主动点击正文翻译时，待翻译内容才会发送到用户自己配置的翻译服务。</dd>
-        <dt>支持哪些正文翻译场景？</dt>
-        <dd>支持 README、仓库侧栏 About 描述、Issue、Pull Request 和 Release 正文翻译，并可按原文、译文、双语视图查看。</dd>
-        <dt>支持哪些翻译接口？</dt>
-        <dd>支持 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT、OpenAI 官方接口以及 OpenAI 兼容接口等翻译服务配置。</dd>
-        <dt>适合哪些用户？</dt>
-        <dd>适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者和需要阅读英文仓库文档的中文用户。</dd>
+        <dd>插件针对 GitHub 界面维护专用本地离线词库，汉化零延迟且完全保持原有交互和动态状态；正文翻译采用精准 DOM 解析与段落级双语对照，严格保留 Markdown 结构、代码高亮和图片链接；同时具备浏览器翻译所没有的开源协作润色助手、仓库速读胶囊与 Discussions 讨论区双向翻译能力。</dd>
+        <dt>支持哪些翻译与 AI 服务商接口？</dt>
+        <dd>全面支持 DeepSeek（推荐，高性价比）、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。</dd>
+        <dt>界面汉化是否需要配置 API Key？是否收费？</dt>
+        <dd>界面汉化完全免费，且基于本地打包的离线词库运行，不需要配置 API Key 或联网调用接口；正文翻译、润色助手与速读胶囊是否产生费用，仅取决于用户自行配置的第三方 API 服务商（如 DeepSeek、OpenAI 等）的计费规则。</dd>
+        <dt>会上传或收集用户数据吗？API Key 安全吗？</dt>
+        <dd>插件严格遵循本地优先与隐私保护原则，不收集、不出售任何用户数据。所有 API Key、开关配置和翻译缓存均存储在浏览器本地（chrome.storage.local），正文翻译与润色内容仅直接发送给用户自己填写的官方 Endpoint，无任何中间服务器中转。</dd>
+        <dt>双语对照阅读是如何工作的？会影响代码显示吗？</dt>
+        <dd>正文翻译采用精准的 DOM 结构解析与分段注入机制，译文紧贴原文段落呈现，严格保留 Markdown 标题层级、链接、图片路径以及行内/独立代码块语法高亮，绝不会破坏代码缩进或语法，并原生适配 GitHub Primer 深色（暗黑）模式与浅色模式。</dd>
+        <dt>支持哪些浏览器？</dt>
+        <dd>插件同步支持 Chrome、Microsoft Edge 和 Firefox，分别提供 Chrome 应用商店、Edge 加载项商店和 Firefox 附加组件官方安装入口。</dd>
+        <dt>开发者是谁？开源协议是什么？</dt>
+        <dd>插件由开发者 MaydayV 主导开发与维护，词条基于 maboloshi/github-chinese 社区词库，项目遵循 GPL-3.0 开源协议，源码托管于 GitHub 仓库 MaydayV/github-chinese。</dd>
+        <dt>是否会自动翻译整页？</dt>
+        <dd>界面文本会自动通过本地离线词库汉化；而 README、Discussions、Issue、PR 等正文内容只有在用户主动点击对应按钮时才会按需触发，不会默认自动翻译整页正文，最大程度节省接口配额并避免页面卡顿。</dd>
+        <dt>适合哪些用户群体？</dt>
+        <dd>适合希望用中文浏览 GitHub 的开发者、学生、技术写作者、开源参与者，以及需要地道输出英文 Issue/PR 向国际知名开源仓库贡献代码的技术工程师。</dd>
         <dt>安装后如何使用？</dt>
-        <dd>安装后打开 github.com，插件会使用本地词库自动汉化 GitHub 界面；正文翻译需要用户在对应页面手动触发。</dd>
-        <dt>是否会影响代码显示？</dt>
-        <dd>界面汉化主要处理 GitHub 菜单、按钮、标题、提示语等文本；正文翻译会尽量保留 Markdown、代码块、链接和图片路径结构。</dd>
+        <dd>安装后直接访问 github.com 即可自动享受中文界面；正文与讨论区双语翻译、润色助手及速读胶囊可在页面对应区域一键点击使用，点击浏览器工具栏的插件图标可进入设置面板自定义模型与接口参数。</dd>
+        <dt>插件如何升级到最新版本？</dt>
+        <dd>从各大官方扩展商店安装的用户，浏览器会在后台自动静默检查并更新至最新版本；手动通过开发者模式加载 CRX 或源码包的用户，可拉取最新 Release 版本重新载入。</dd>
+        <dt>是否是 GitHub 官方产品？</dt>
+        <dd>不是。GitHub 中文汉化翻译插件是独立的社区开源项目，并非 GitHub 官方产品。</dd>
       </dl>
     </section>
 

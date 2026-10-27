@@ -212,7 +212,7 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /function buildDiscussionCacheKey\(/);
   assert.match(content, /function getIssuePrRecordSourceType\(/);
   assert.match(content, /function getDiscussionRecordSourceType\(/);
-  assert.match(content, /getRepoCachedTranslation\(cacheKey\)/);
+  assert.match(content, /getRepoCachedTranslation\(cacheKey,\s*\{\s*requireComplete:\s*true\s*\}\)/);
   assert.match(content, /upsertRepoCachedTranslation\(cacheKey/);
   assert.match(content, /FeatureSet\.readme_enable_progressive/);
   assert.match(content, /appendReadmeTranslationRecord\(/);
@@ -227,6 +227,8 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /sourceType:\s*'about'/);
   assert.match(content, /about_translated_nodes=/);
   assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
+  assert.match(content, /const complete = translatedCount >= tasks\.length/);
+  assert.match(content, /if \(complete\) \{[\s\S]*upsertRepoCachedTranslation\(cacheKey/);
 });
 
 test('Issue and PR translation covers React comments and legacy PR timeline comments', () => {
@@ -237,6 +239,16 @@ test('Issue and PR translation covers React comments and legacy PR timeline comm
   assert.match(content, /ActionsButtonsContainer/);
   assert.match(content, /comment-header-right-side-items/);
   assert.match(content, /\.timeline-comment-actions/);
+  assert.match(content, /const findMenuButton = \(scope\) =>/);
+  assert.match(content, /从正文向上查找/);
+  assert.match(content, /menuButton \|\|= findMenuButton\(rootEl\)/);
+  assert.match(content, /comment-actions-container'\)\?\.parentElement/);
+  assert.match(content, /menuButton\?\.closest\('comment-actions-container'\)\?\.parentElement/);
+  assert.match(content, /menuButton\?\.closest\('\.timeline-comment-actions'\)/);
+  assert.match(content, /menuButton\?\.closest\('\[class\*="ActionsButtonsContainer"\]'\)/);
+  assert.doesNotMatch(content, /menuButton\?\.closest\([^)]*\.d-flex\.flex-row[^)]*\)/);
+  assert.match(content, /state\.toolbarEl\.parentElement !== slotEl/);
+  assert.match(content, /\.timeline-comment-actions > \.d-flex/);
 });
 
 test('global navigation translation handles React portals without breaking hydration guards', () => {
@@ -304,4 +316,189 @@ test('new quick search dialog labels are translated', () => {
   assert.match(locals, /"Chat with Copilot": "与 Copilot 聊天"/);
   assert.match(locals, /"Open Copilot chat": "打开 Copilot 聊天"/);
   assert.match(locals, /Jump to \(\.\+\), repository/);
+});
+
+test('collaboration helper setting is exposed across options and content script', () => {
+  browserOptions.forEach(({ browser, html, js }) => {
+    assert.match(js, /enable_collaboration_helper:\s*false/, `${browser} options.js 应包含 enable_collaboration_helper 默认设置`);
+    assert.match(html, /id="enable_collaboration_helper"/, `${browser} options.html 应包含 enable_collaboration_helper 元素`);
+    assert.match(html, /启用协作润色助手/, `${browser} options.html 应包含协作润色助手文案`);
+    assert.match(js, /savePartialValues\(\{\s*enable_collaboration_helper:/, `${browser} options.js 应在开关切换时持久化保存`);
+  });
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /enable_collaboration_helper:\s*false/, `${browser} content.js 应包含 enable_collaboration_helper 默认设置`);
+    assert.match(js, /function isCollaborationHelperEnabled\(/, `${browser} content.js 应包含 isCollaborationHelperEnabled`);
+    assert.match(js, /function scheduleCollaborationHelperControls\(/, `${browser} content.js 应包含 scheduleCollaborationHelperControls`);
+    assert.match(js, /function findCollaborationToolbarMountPoint\(/, `${browser} content.js 应包含 findCollaborationToolbarMountPoint`);
+    assert.match(js, /button\[data-md-button="heading"\]/, `${browser} content.js 应定位 heading 标题按钮`);
+    assert.match(js, /headingBtn\.closest\('md-header'\)/, `${browser} content.js 应解析 PR 中的 md-header 容器`);
+    assert.match(js, /mountPoint\.container\.insertBefore\(btn,\s*mountPoint\.beforeEl\)/, `${browser} content.js 应将润色按钮挂载在工具栏左起`);
+    assert.match(js, /markdown-toolbar \.ghcn-collab-btn/, `${browser} content.js 应针对 PR markdown-toolbar 提供样式对齐`);
+    assert.match(js, /top:\s*-3\.5px;/, `${browser} content.js 应微调 PR 按钮上下居中对齐`);
+    assert.match(js, /COLLAB_ICONS\.sparkle/, `${browser} content.js 润色按钮应使用 SVG 图标而非 emoji`);
+    assert.doesNotMatch(js, /class="ghcn-collab-btn-icon"[^>]*>🪄/, `${browser} content.js 润色按钮不应使用 🪄 emoji`);
+    assert.match(js, /\.ghcn-collab-btn[\s\S]*?var\(--button-default-bgColor-rest/, `${browser} content.js 润色按钮背景色应规范化为 GitHub 原生设计变量`);
+    assert.doesNotMatch(js, /\[data-dark-theme="dark"\]\s*\.ghcn-collab-btn/, `${browser} content.js 不应使用会误伤浅色模式的 data-dark-theme 选择器`);
+    assert.match(js, /\.ghcn-collab-btn:hover[\s\S]*?color:\s*var\(--button-default-fgColor-rest/, `${browser} content.js 悬浮时文本颜色应保持为原生文本变量，防止变成白色`);
+    assert.match(js, /function mountCollaborationToolbar\(/, `${browser} content.js 应包含 mountCollaborationToolbar`);
+    assert.match(js, /function openCollaborationModal\(/, `${browser} content.js 应包含 openCollaborationModal`);
+    assert.match(js, /function applyPolishedTextToTextarea\(/, `${browser} content.js 应包含 applyPolishedTextToTextarea`);
+    assert.match(js, /document\.execCommand\('insertText', false, text\)/, `${browser} content.js 应使用 execCommand 保留撤回历史`);
+  });
+});
+
+test('collaboration helper prompts define 4 specialized open source modes', () => {
+  assert.match(content, /const COLLAB_MODES = \[/);
+  assert.match(content, /id:\s*'bug'/);
+  assert.match(content, /id:\s*'feature'/);
+  assert.match(content, /id:\s*'reply'/);
+  assert.match(content, /id:\s*'general'/);
+  assert.match(content, /### Steps to Reproduce/);
+  assert.match(content, /### Problem Statement \/ Motivation/);
+  assert.match(content, /sourceType:\s*'collab'/);
+  assert.match(content, /detail:\s*`collab_mode=\$\{mode\}`/);
+});
+
+test('collaboration helper supports new issue forms and pull request creation workflows', () => {
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /textarea\[name\^="issue\["\]/, `${browser} content.js 应匹配 Issue Form 模板的 issue[...] 输入框`);
+    assert.match(js, /textarea\[name\^="pull_request\["\]/, `${browser} content.js 应匹配 PR 模板的 pull_request[...] 输入框`);
+    assert.match(js, /form\.new_issue textarea/, `${browser} content.js 应匹配新建 Issue 表单内的 textarea`);
+    assert.match(js, /form\.new_pull_request textarea/, `${browser} content.js 应匹配新建 PR 表单内的 textarea`);
+    assert.match(js, /markdown-toolbar\[for\]/, `${browser} content.js 应支持通过 markdown-toolbar[for] 反查关联输入框`);
+    assert.match(js, /function ensureCollaborationGlobalListeners\(/, `${browser} content.js 应包含全局事件监听确保动态展开时挂载`);
+    assert.match(js, /turbo:frame-load/, `${browser} content.js 应监听 turbo:frame-load 事件`);
+    assert.match(js, /textarea:focusin/, `${browser} content.js 应在输入框获得焦点时唤醒润色挂载`);
+  });
+});
+
+test('tldr capsule setting is exposed across options and content script', () => {
+  browserOptions.forEach(({ browser, html, js }) => {
+    assert.match(js, /enable_repo_tldr:\s*false/, `${browser} options.js 应包含 enable_repo_tldr 默认设置`);
+    assert.match(html, /id="enable_repo_tldr"/, `${browser} options.html 应包含 enable_repo_tldr 元素`);
+    assert.match(html, /启用仓库首页 AI 速读胶囊/, `${browser} options.html 应包含速读胶囊开关文案`);
+    assert.match(js, /savePartialValues\(\{\s*enable_repo_tldr:/, `${browser} options.js 应在开关切换时持久化保存`);
+  });
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /enable_repo_tldr:\s*false/, `${browser} content.js 应包含 enable_repo_tldr 默认设置`);
+    assert.match(js, /function isTldrCapsuleEnabled\(/, `${browser} content.js 应包含 isTldrCapsuleEnabled`);
+    assert.match(js, /function scheduleTldrCapsuleControls\(/, `${browser} content.js 应包含 scheduleTldrCapsuleControls`);
+    assert.match(js, /function mountTldrCapsule\(/, `${browser} content.js 应包含 mountTldrCapsule`);
+    assert.match(js, /function executeTldrGeneration\(/, `${browser} content.js 应包含 executeTldrGeneration`);
+    assert.match(js, /TLDR_SYSTEM_PROMPT/, `${browser} content.js 应包含速读胶囊 Prompt`);
+    assert.match(js, /🎯 核心定位/, `${browser} content.js Prompt 应包含核心定位要素`);
+    assert.doesNotMatch(js, /⚡ 3秒极简启动/, `${browser} content.js Prompt 应去除 3 秒极简启动要素以精炼内容`);
+    assert.match(js, /💡 选型考量/, `${browser} content.js Prompt 应包含选型考量要素`);
+    assert.match(js, /sourceType:\s*'tldr'/, `${browser} content.js 应上报 tldr 记录来源`);
+  });
+});
+
+test('builtin_ai provider is completely removed to keep options clean and maintain performance', () => {
+  browserOptions.forEach(({ browser, html, js }) => {
+    assert.doesNotMatch(html, /<option value="builtin_ai">/, `${browser} options.html 不应包含 builtin_ai 选项`);
+    assert.doesNotMatch(html, /data-provider="builtin_ai"/, `${browser} options.html 不应包含 builtin_ai 配置面板`);
+    assert.doesNotMatch(html, /id="builtin_ai_status_badge"/, `${browser} options.html 不应包含端侧状态标签`);
+    assert.doesNotMatch(html, /id="btn_probe_builtin_ai"/, `${browser} options.html 不应包含探测端侧状态按钮`);
+    assert.doesNotMatch(js, /case 'builtin_ai':/, `${browser} options.js 不应包含 builtin_ai case`);
+    assert.doesNotMatch(js, /async function probeBuiltinAiStatus\(/, `${browser} options.js 不应包含 probeBuiltinAiStatus`);
+    assert.doesNotMatch(js, /async function updateBuiltinAiStatusUi\(/, `${browser} options.js 不应包含 updateBuiltinAiStatusUi`);
+  });
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /function normalizeTranslationText\(/, `${browser} content.js 应在顶层工具函数定义 normalizeTranslationText`);
+    assert.match(js, /const userPrompt = `项目：\$\{repoInfo\.fullName\}/, `${browser} content.js executeTldrGeneration 应定义 userPrompt 变量`);
+    assert.doesNotMatch(js, /case 'builtin_ai':/, `${browser} content.js 不应包含 builtin_ai case`);
+    assert.doesNotMatch(js, /async function probeBuiltinAiStatus\(/, `${browser} content.js 不应包含 probeBuiltinAiStatus`);
+    assert.doesNotMatch(js, /async function translateWithBuiltinAi\(/, `${browser} content.js 不应包含 translateWithBuiltinAi`);
+  });
+});
+
+test('tldr capsule matches github native styling and handles command snippets and colon line wrapping', () => {
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /card\.className\s*=\s*'ghcn-tldr-card'/, `${browser} content.js 应使用 ghcn-tldr-card 类`);
+    assert.match(js, /margin:\s*0 !important;/, `${browser} content.js 样式应贴紧上边和左右`);
+    assert.match(js, /border-radius:\s*0 !important;/, `${browser} content.js 样式应无圆角以贴紧容器`);
+    assert.match(js, /octicon-sparkle/, `${browser} content.js 应使用原生 Octicon Sparkle 图标`);
+    assert.match(js, /\.ghcn-tldr-body[\s\S]*?background-color:\s*#f6faf7/, `${browser} content.js 速读卡片内容区应使用淡雅背景色以增强可读性`);
+    assert.match(js, /ghcn-tldr-cmd-box/, `${browser} content.js 应包含终端命令展示框`);
+    assert.match(js, /function extractCommandInfo\(/, `${browser} content.js 应包含命令行智能提取`);
+    assert.doesNotMatch(js, /border-left:\s*4px solid/, `${browser} content.js 不应包含非原生的 4px 粗边框`);
+  });
+});
+
+test('copilot repository prompts and tldr caching persistence are implemented', () => {
+  assert.match(locals, /"Give me a high-level overview":\s*"为我提供全局概览"/);
+  assert.match(locals, /"How can I contribute\?":\s*"我该如何参与贡献？"/);
+  assert.match(locals, /"Summarize latest changes":\s*"总结最新变更"/);
+
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /tldrContent:\s*item\.tldrContent/, `${browser} content.js 应在缓存规范化中保留 tldrContent`);
+    assert.match(js, /hasTldr\s*=\s*typeof value\?\.tldrContent === 'string'/, `${browser} content.js upsert 应支持 tldrContent`);
+    assert.match(js, /function getTldrSourceHash\(/, `${browser} content.js 应包含 getTldrSourceHash`);
+    assert.match(js, /return\s*\{\s*parent:\s*readmeRoot\.parentElement,\s*before:\s*readmeRoot\s*\};/, `${browser} content.js 应在 README 容器内部顶部挂载胶囊`);
+  });
+});
+
+test('feature switch sections are ordered with basic translation first', () => {
+  browserOptions.forEach(({ browser, html }) => {
+    const basicIdx = html.indexOf('<h2>页面基础汉化</h2>');
+    const aiIdx = html.indexOf('<h2>AI 智能增强</h2>');
+    const perfIdx = html.indexOf('<h2>性能与高级设置</h2>');
+    assert.ok(basicIdx !== -1, `${browser} options.html 应包含 页面基础汉化`);
+    assert.ok(aiIdx !== -1, `${browser} options.html 应包含 AI 智能增强`);
+    assert.ok(perfIdx !== -1, `${browser} options.html 应包含 性能与高级设置`);
+    assert.ok(basicIdx < aiIdx, `${browser} options.html 基础汉化应排在 AI 智能增强前面`);
+    assert.ok(aiIdx < perfIdx, `${browser} options.html AI 智能增强应排在 性能与高级设置前面`);
+  });
+});
+
+test('tldr trigger button is mounted to the left of the Copilot icon in README header', () => {
+  browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /function findReadmeHeaderActions\(/, `${browser} content.js 应包含 findReadmeHeaderActions 函数`);
+    assert.match(js, /svg\.octicon-copilot/, `${browser} content.js 应定位 Copilot 图标按钮`);
+    assert.match(js, /function mountTldrHeaderButton\(/, `${browser} content.js 应包含 mountTldrHeaderButton 函数`);
+    assert.match(js, /data-ghcn-tldr="header-btn"/, `${browser} content.js 应生成 header-btn 标记`);
+    assert.match(js, /Button--primary Button--small/, `${browser} content.js 速读按钮应使用 GitHub 主按钮语义`);
+    assert.match(js, /headerActions\.container\.insertBefore\(btn,\s*headerActions\.beforeEl\)/, `${browser} content.js 应将按钮插入在 Copilot 图标左侧`);
+    assert.match(js, /ghcn-tldr-header-btn/, `${browser} content.js 应包含头部按钮样式类`);
+    assert.match(js, /ghcn-tldr-header-text.*AI 速读/, `${browser} content.js 头部速读按钮应包含醒目的 AI 速读文字`);
+    assert.match(js, /\.ghcn-tldr-header-btn[\s\S]*?var\(--button-primary-bgColor-rest/, `${browser} content.js 头部速读按钮应使用 GitHub 原生绿色背景色`);
+    assert.match(js, /\.ghcn-tldr-header-icon svg[\s\S]*?fill:\s*currentColor/, `${browser} content.js 头部速读图标应跟随按钮前景色`);
+    assert.match(js, /existingCard\.style\.display\s*=\s*'none'/, `${browser} content.js 默认不展示速读卡片，点击才展开`);
+    assert.match(js, /AI 项目速读 \(TL;DR\)/, `${browser} content.js 应包含速读 Tooltip`);
+  });
+});
+
+test('selected optimizations: discussions support, tldr threshold, traverseNode break, turbo guards, and batched storage', () => {
+  browserContent.forEach(({ browser, js }) => {
+    // 1. Discussions 讨论区支持
+    assert.match(js, /\(issues\|pull\|discussions\)/, `${browser} content.js 应在讨论判定中支持 discussions`);
+    assert.match(js, /if\s*\(match\?\.\[1\]\s*===\s*'discussions'\)\s*return\s*'discussion'/, `${browser} content.js 应在源类型中支持 discussion`);
+
+    // 2. 极短/空白 README 速读防浪费
+    assert.match(js, /introText\.trim\(\)\.length\s*<\s*80/, `${browser} content.js 应在不足 80 字符时拦截速读胶囊`);
+
+    // 3. traverseNode case 'BUTTON' 穿透修复
+    assert.match(js, /case 'BUTTON':[\s\S]*?transElement\(node\.dataset,\s*'disableWith'\);[\s\S]*?break;\s*case 'A':/, `${browser} content.js case BUTTON 应有 break 防止重复检查`);
+
+    // 4. README 软导航防重入
+    assert.match(js, /expectedHref\s*=\s*window\.location\.href;/, `${browser} content.js 应记录 expectedHref 防范软导航`);
+    assert.match(js, /!readmeEl\.isConnected\s*\|\|\s*window\.location\.href\s*!==\s*expectedHref/, `${browser} content.js 应在批次写回前校验 DOM 连接与 URL`);
+
+    // 5. 设置变更防抖防闪烁
+    assert.match(js, /applyBatchedFeatureToggles/, `${browser} content.js 应包含 applyBatchedFeatureToggles 批处理防抖`);
+    assert.match(js, /pendingChangedKeys/, `${browser} content.js 应收集待处理的设置变更`);
+    assert.match(js, /getRepoCachedTranslation\(repoCacheKey,\s*\{\s*requireComplete:\s*true\s*\}\)/, `${browser} README 缓存命中必须要求完整结果`);
+    assert.match(js, /if \(!stillMissed\) \{[\s\S]*complete: true/, `${browser} README 只有完整结果才写入缓存`);
+    assert.match(js, /entry\.tldrContent && entry\.complete === true/, `${browser} TL;DR 兜底缓存必须要求完整结果`);
+  });
+});
+
+test('tldr capsule action buttons are unified with icon-only refresh and close buttons', () => {
+  browserContent.forEach(({ browser, js }) => {
+    assert.doesNotMatch(js, /data-ghcn-tldr-action="toggle"/, `${browser} content.js 已移除多余的展开收起按钮`);
+    assert.match(js, /data-ghcn-tldr-action="refresh"[\s\S]*?TLDR_ICONS\.sync/, `${browser} content.js 刷新按钮应使用原生同步图标`);
+    assert.doesNotMatch(js, /data-ghcn-tldr-action="refresh"[\s\S]*?ghcn-tldr-tool-text/, `${browser} content.js 刷新按钮应为纯图标按钮`);
+    assert.match(js, /data-ghcn-tldr-action="close"[\s\S]*?TLDR_ICONS\.close/, `${browser} content.js 关闭按钮应使用原生关闭图标`);
+    assert.match(js, /\.ghcn-tldr-tool-btn[\s\S]*?width:\s*28px !important;[\s\S]*?height:\s*28px !important;/, `${browser} content.js 操作按钮应采用 28x28 方形标准图标按钮样式`);
+  });
 });
