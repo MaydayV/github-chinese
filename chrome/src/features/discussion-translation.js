@@ -538,40 +538,55 @@
         }
 
         const cacheKey = buildDiscussionCacheKey(item, sourceHash, providerConfig.signature);
-        const cacheHit = await getRepoCachedTranslation(cacheKey, { requireComplete: true }).catch((error) => {
+        const cacheHit = await getRepoCachedTranslation(cacheKey).catch((error) => {
             console.warn('[Issue/PR翻译] 读取讨论缓存失败:', error);
             return null;
         });
 
+        let translatedEl = createTranslatedClone(markdownEl);
+        let partialCacheApplied = false;
         if (cacheHit?.translatedHtml) {
             if (containsObjectObjectArtifact(cacheHit.translatedHtml)) {
                 console.warn('[Issue/PR翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
-                const translatedEl = createTranslatedClone(markdownEl);
                 replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
-                state.translatedEl?.remove();
-                state.translatedEl = translatedEl;
-                markdownEl.insertAdjacentElement('afterend', translatedEl);
-                state.translatedSignature = signature;
-                state.translatedHash = createHash(markdownEl.innerHTML);
-                state.sourceHash = sourceHash;
-                state.errorMessage = '';
+                const cachedRemaining = collectIssuePrTextTasks(translatedEl);
+                if (!cachedRemaining.length) {
+                    state.translatedEl?.remove();
+                    state.translatedEl = translatedEl;
+                    markdownEl.insertAdjacentElement('afterend', translatedEl);
+                    state.translatedSignature = signature;
+                    state.translatedHash = createHash(markdownEl.innerHTML);
+                    state.sourceHash = sourceHash;
+                    state.errorMessage = '';
 
-                await appendReadmeTranslationRecord({
-                    sourceType: getDiscussionRecordSourceType(item),
-                    status: 'cache_hit',
-                    tokens: 0,
-                    durationMs: performance.now() - startAt,
-                    sourceHash,
-                    detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
-                }).catch((error) => {
-                    console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
-                });
-                return;
+                    await appendReadmeTranslationRecord({
+                        sourceType: getDiscussionRecordSourceType(item),
+                        status: 'cache_hit',
+                        tokens: 0,
+                        durationMs: performance.now() - startAt,
+                        sourceHash,
+                        detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
+                    }).catch((error) => {
+                        console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                    });
+                    if (cacheHit.complete !== true) {
+                        await upsertRepoCachedTranslation(cacheKey, {
+                            repo: getCurrentRepoInfo()?.fullName || '',
+                            sourceHash,
+                            translatedHtml: cacheHit.translatedHtml,
+                            complete: true,
+                        }).catch((error) => {
+                            console.warn('[Issue/PR翻译] 补全讨论缓存状态失败:', error);
+                        });
+                    }
+                    return;
+                }
+
+                partialCacheApplied = true;
             }
         }
 
-        const translatedEl = createTranslatedClone(markdownEl);
         const tasks = collectIssuePrTextTasks(translatedEl);
         if (!tasks.length) {
             state.translatedSignature = signature;
@@ -625,12 +640,12 @@
         state.sourceHash = sourceHash;
         state.errorMessage = '';
 
-        if (complete) {
+        if (complete || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(cacheKey, {
                 repo: getCurrentRepoInfo()?.fullName || '',
                 sourceHash,
                 translatedHtml: translatedEl.innerHTML,
-                complete: true,
+                complete,
             }).catch((error) => {
                 console.warn('[Issue/PR翻译] 写入讨论缓存失败:', error);
             });

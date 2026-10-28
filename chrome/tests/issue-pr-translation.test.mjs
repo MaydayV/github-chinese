@@ -212,7 +212,7 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /function buildDiscussionCacheKey\(/);
   assert.match(content, /function getIssuePrRecordSourceType\(/);
   assert.match(content, /function getDiscussionRecordSourceType\(/);
-  assert.match(content, /getRepoCachedTranslation\(cacheKey,\s*\{\s*requireComplete:\s*true\s*\}\)/);
+  assert.match(content, /getRepoCachedTranslation\(cacheKey\)/);
   assert.match(content, /upsertRepoCachedTranslation\(cacheKey/);
   assert.match(content, /FeatureSet\.readme_enable_progressive/);
   assert.match(content, /appendReadmeTranslationRecord\(/);
@@ -228,7 +228,8 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /about_translated_nodes=/);
   assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
   assert.match(content, /const complete = translatedCount >= tasks\.length/);
-  assert.match(content, /if \(complete\) \{[\s\S]*upsertRepoCachedTranslation\(cacheKey/);
+  assert.match(content, /if \(complete \|\| translatedCount > 0 \|\| partialCacheApplied\)\s*\{[\s\S]*upsertRepoCachedTranslation\(cacheKey/);
+  assert.match(content, /translatedHtml: translatedEl\.innerHTML,[\s\S]*complete,/);
 });
 
 test('Issue and PR translation covers React comments and legacy PR timeline comments', () => {
@@ -487,8 +488,11 @@ test('selected optimizations: discussions support, tldr threshold, traverseNode 
     // 5. 设置变更防抖防闪烁
     assert.match(js, /applyBatchedFeatureToggles/, `${browser} content.js 应包含 applyBatchedFeatureToggles 批处理防抖`);
     assert.match(js, /pendingChangedKeys/, `${browser} content.js 应收集待处理的设置变更`);
-    assert.match(js, /getRepoCachedTranslation\(repoCacheKey,\s*\{\s*requireComplete:\s*true\s*\}\)/, `${browser} README 缓存命中必须要求完整结果`);
-    assert.match(js, /if \(!stillMissed\) \{[\s\S]*complete: true/, `${browser} README 只有完整结果才写入缓存`);
+    assert.match(js, /getRepoCachedTranslation\(repoCacheKey\)/, `${browser} README 应允许读取部分翻译缓存`);
+    assert.match(js, /partialCacheApplied/, `${browser} README 命中部分缓存后应保留已翻译节点`);
+    assert.match(js, /if \(!partialCacheApplied && readmeEl\.innerHTML !== state\.originalHtml\)/, `${browser} README 命中部分缓存后不应恢复原文覆盖译文`);
+    assert.match(js, /complete:\s*!stillMissed/, `${browser} README 应按剩余节点保存完整/部分缓存状态`);
+    assert.match(js, /partial_cache_hit/, `${browser} README 应记录部分缓存命中`);
     assert.match(js, /entry\.tldrContent && entry\.complete === true/, `${browser} TL;DR 兜底缓存必须要求完整结果`);
   });
 });

@@ -644,54 +644,69 @@
             providerConfig.signature,
         );
         let cacheKeyUsed = repoCacheKey;
-        let cacheHit = await getRepoCachedTranslation(repoCacheKey, { requireComplete: true }).catch((error) => {
+        let cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
             console.warn('[README翻译] 读取仓库缓存失败:', error);
             return null;
         });
         if (!cacheHit && legacyRepoCacheKey && legacyRepoCacheKey !== repoCacheKey) {
-            cacheHit = await getRepoCachedTranslation(legacyRepoCacheKey, { requireComplete: true }).catch((error) => {
+            cacheHit = await getRepoCachedTranslation(legacyRepoCacheKey).catch((error) => {
                 console.warn('[README翻译] 读取旧版仓库缓存失败:', error);
                 return null;
             });
             if (cacheHit) cacheKeyUsed = legacyRepoCacheKey;
         }
 
+        let partialCacheApplied = false;
         if (cacheHit?.translatedHtml) {
             if (containsObjectObjectArtifact(cacheHit.translatedHtml)) {
                 console.warn('[README翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
                 applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
-                state.translatedSignature = signature;
-                state.translatedHash = createHash(readmeEl.innerHTML);
-                state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
+                const cachedRemaining = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+                    .filter((task) => task.node?.isConnected);
+                if (!cachedRemaining.length) {
+                    state.translatedSignature = signature;
+                    state.translatedHash = createHash(readmeEl.innerHTML);
+                    state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
-                await appendReadmeTranslationRecord({
-                    sourceType: 'readme',
-                    status: 'cache_hit',
-                    tokens: 0,
-                    durationMs: performance.now() - startAt,
-                    sourceHash,
-                    detail: `cache_reason=${reason || 'unknown'}`,
-                }).catch((error) => {
-                    console.warn('[README翻译] 写入缓存命中记录失败:', error);
-                });
-                addReadmeDebugEvent(debugContext, 'cache_hit', {
+                    await appendReadmeTranslationRecord({
+                        sourceType: 'readme',
+                        status: 'cache_hit',
+                        tokens: 0,
+                        durationMs: performance.now() - startAt,
+                        sourceHash,
+                        detail: `cache_reason=${reason || 'unknown'}`,
+                    }).catch((error) => {
+                        console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                    });
+                    addReadmeDebugEvent(debugContext, 'cache_hit', {
+                        cacheKey: cacheKeyUsed,
+                        stableCacheKey: repoCacheKey,
+                        migrated: cacheKeyUsed !== repoCacheKey,
+                        htmlLength: cacheHit.translatedHtml.length,
+                        complete: true,
+                    });
+                    if (cacheKeyUsed !== repoCacheKey || cacheHit.complete !== true) {
+                        await upsertRepoCachedTranslation(repoCacheKey, {
+                            repo: repoInfo?.fullName || '',
+                            sourceHash,
+                            translatedHtml: cacheHit.translatedHtml,
+                            complete: true,
+                        }).catch((error) => {
+                            console.warn('[README翻译] 迁移/补全仓库缓存失败:', error);
+                        });
+                    }
+                    return;
+                }
+
+                partialCacheApplied = true;
+                addReadmeDebugEvent(debugContext, 'partial_cache_hit', {
                     cacheKey: cacheKeyUsed,
                     stableCacheKey: repoCacheKey,
                     migrated: cacheKeyUsed !== repoCacheKey,
+                    remaining: cachedRemaining.length,
                     htmlLength: cacheHit.translatedHtml.length,
                 });
-                if (cacheKeyUsed !== repoCacheKey) {
-                    await upsertRepoCachedTranslation(repoCacheKey, {
-                        repo: repoInfo?.fullName || '',
-                        sourceHash,
-                        translatedHtml: cacheHit.translatedHtml,
-                        complete: true,
-                    }).catch((error) => {
-                        console.warn('[README翻译] 迁移旧版仓库缓存失败:', error);
-                    });
-                }
-                return;
             }
         }
 
@@ -702,7 +717,7 @@
 
         pushReadmeDomMutationGuard();
         try {
-        if (readmeEl.innerHTML !== state.originalHtml) {
+        if (!partialCacheApplied && readmeEl.innerHTML !== state.originalHtml) {
             applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
@@ -879,20 +894,22 @@
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
             state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
+        } else {
+            // 部分结果也要持久化；刷新时先恢复已成功节点，再只补翻译剩余节点。
+            state.translatedSignature = '';
+            state.translatedHash = '';
+            state.translatedTextHash = '';
+        }
 
+        if (!stillMissed || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(repoCacheKey, {
                 repo: repoInfo?.fullName || '',
                 sourceHash,
                 translatedHtml: readmeEl.innerHTML,
-                complete: true,
+                complete: !stillMissed,
             }).catch((error) => {
                 console.warn('[README翻译] 写入仓库缓存失败:', error);
             });
-        } else {
-            // 部分结果不能标记为已完成，也不能写入仓库缓存；下一轮调度应继续补翻译。
-            state.translatedSignature = '';
-            state.translatedHash = '';
-            state.translatedTextHash = '';
         }
 
         await appendReadmeTranslationRecord({
