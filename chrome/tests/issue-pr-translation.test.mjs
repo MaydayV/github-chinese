@@ -295,6 +295,13 @@ test('history navigation refreshes the current body and keeps the observer attac
   assert.match(content, /refreshPageObserver = \(\) =>/);
 });
 
+test('initial lifecycle starts README translation even when storage loading misses DOMContentLoaded', () => {
+  assert.match(content, /let pageLifecycleStarted = false/);
+  assert.match(content, /function startPageLifecycle\(reason\)/);
+  assert.match(content, /if \(pageLifecycleStarted \|\| !document\.body\) return/);
+  assert.match(content, /if \(document\.readyState !== 'loading'\) \{[\s\S]*startPageLifecycle\('init:ready'\)/);
+});
+
 test('Copilot textarea aria labels are translated without touching user-entered text', () => {
   assert.match(content, /case 'TEXTAREA':[\s\S]*transElement\(node, 'placeholder'\)[\s\S]*transElement\(node, 'ariaLabel'\)/);
   assert.match(locals, /"Ask anything or type @ to add context": "询问任何问题或键入@以添加上下文"/);

@@ -6315,6 +6315,26 @@ Strict rules:
     /**
      * init 函数：初始化翻译功能。
      */
+    let pageLifecycleStarted = false;
+
+    function startPageLifecycle(reason) {
+        if (pageLifecycleStarted || !document.body) return;
+        pageLifecycleStarted = true;
+
+        updatePageConfig(reason);
+        if (FeatureSet.enable_extension && pageConfig.currentPageType) {
+            traverseNode(document.body);
+        }
+
+        // 配置读取可能在 DOMContentLoaded 之后完成；此时仍需立即安装观察器并触发 README 扫描。
+        watchUpdate();
+        watchReactHydration();
+        scheduleReadmeTranslation(reason);
+        scheduleIssuePrTranslationControls(reason);
+        scheduleCollaborationHelperControls(reason);
+        scheduleTldrCapsuleControls(reason);
+    }
+
     async function init() {
         if (typeof I18N === 'undefined') {
             throw new Error('词库文件 locals.js 未加载，脚本无法运行');
@@ -6362,20 +6382,14 @@ Strict rules:
 
         // 首次页面翻译
         window.addEventListener('DOMContentLoaded', () => {
-            // 获取当前页面的翻译规则
-            updatePageConfig('首次载入');
-            if (FeatureSet.enable_extension && pageConfig.currentPageType) {
-                traverseNode(document.body);
-            }
-
-            // 监视页面变化
-            watchUpdate();
-            watchReactHydration();
-            scheduleReadmeTranslation('DOMContentLoaded');
-            scheduleIssuePrTranslationControls('DOMContentLoaded');
-            scheduleCollaborationHelperControls('DOMContentLoaded');
-            scheduleTldrCapsuleControls('DOMContentLoaded');
+            startPageLifecycle('DOMContentLoaded');
         });
+
+        // content script 在 document_start 注入后读取 storage 可能错过 DOMContentLoaded，
+        // readyState 已经就绪时直接启动一次完整生命周期，避免 README 永久不触发翻译。
+        if (document.readyState !== 'loading') {
+            startPageLifecycle('init:ready');
+        }
     }
 
 })(window, document);
