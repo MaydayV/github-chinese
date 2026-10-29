@@ -49,6 +49,14 @@
         const words = input.split(/\s+/).filter(Boolean);
         if (!words.length || words.length > 8) return false;
 
+        const element = node?.parentElement;
+        const isLink = Boolean(element?.closest('a[href]'));
+        const isListLabel = Boolean(element?.closest('li, dt, code'));
+        const isHeading = Boolean(element?.closest('h1, h2, h3, h4, h5, h6'));
+        const isTableLink = isLink && Boolean(element?.closest('table'));
+        const titleCaseWords = words.filter((word) => /^[A-Z][A-Za-z0-9]*$/.test(word));
+        if (isTableLink && titleCaseWords.length === words.length) return true;
+
         // 普通句子不能因为首字母大写就被误判为产品名；这些词出现时仍需正常翻译。
         const sentenceWords = new Set([
             'a', 'an', 'and', 'are', 'as', 'at', 'about', 'build', 'by', 'can', 'changelog',
@@ -64,10 +72,6 @@
         if (normalizedWords.some((word) => sentenceWords.has(word))
             && !/\([A-Z0-9]{2,}\)/.test(input)) return false;
 
-        const element = node?.parentElement;
-        const isLink = Boolean(element?.closest('a[href]'));
-        const isListLabel = Boolean(element?.closest('li, dt, code'));
-        const isHeading = Boolean(element?.closest('h1, h2, h3, h4, h5, h6'));
         if (isHeading && words.length >= 2 && document.title.includes(input)) {
             return true;
         }
@@ -77,7 +81,6 @@
             || words.some((word) => /^[A-Z0-9]{2,}$/.test(word));
         if (hasOpaquePattern) return true;
 
-        const titleCaseWords = words.filter((word) => /^[A-Z][A-Za-z0-9]*$/.test(word));
         if ((isLink || isListLabel)
             && titleCaseWords.length === words.length
             && (words.some((word) => word.length > 2) || (isLink && words.length === 1 && !sentenceWords.has(normalizedWords[0])))) {
