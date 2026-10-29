@@ -146,6 +146,7 @@ node script/test-update-entry.js
 1. 修复 README 翻译初始化时序问题，确保配置读取完成后仍能触发 README 翻译
 1. 修复仓库页面类型短暂识别异常导致 README 翻译被跳过的问题
 1. 排除 GitHub 自动注入的代码复制按钮、命令、路径和技术标识，避免 README 被误判为“部分完成”
+1. 修复 GitHub README 外层容器 class 被误当成跳过区域，导致 README 任务数为 0 的问题
 1. 完善部分缓存恢复和失败节点补翻逻辑，刷新页面时只处理真正未翻译内容
 1. Chrome、Edge、Firefox 三端同步更新，并保持顶部搜索框翻译、展开效果和输入保护不变
 
