@@ -139,6 +139,12 @@ node script/test-update-entry.js
 
 ## 🔄 更新日志
 
+### v3.1.1 (2026-10-29)
+
+1. 修复 README 参数说明中的 `slug`、`tags`、`title`、`content` 等技术字段被误判为未翻译的问题
+1. 完成 VS Code、React、Kubernetes、PyTorch 等大型英文仓库的实际 README 翻译验证
+1. Chrome、Edge、Firefox 三端同步更新，并保持代码块、命令、路径和技术标识的原文保护
+
 ### v3.1.0 (2026-10-29)
 
 1. 修复 README 翻译初始化时序问题，确保配置读取完成后仍能触发 README 翻译
