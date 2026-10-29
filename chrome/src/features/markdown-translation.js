@@ -4,7 +4,8 @@
  */
 
     function isRepositoryPage() {
-        return typeof pageConfig.currentPageType === 'string' && pageConfig.currentPageType.startsWith('repository');
+        return (typeof pageConfig.currentPageType === 'string' && pageConfig.currentPageType.startsWith('repository'))
+            || Boolean(getCurrentRepoInfo());
     }
 
     function isReadmePage() {
