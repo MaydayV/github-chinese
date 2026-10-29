@@ -184,6 +184,7 @@ test('README translation debug switch records concurrent batches and remaining n
     assert.match(js, /DEBUG_LOGS:\s*'ghcn_readme_translation_debug_logs'/, `${browser} 应保存调试日志`);
   });
   browserContent.forEach(({ browser, js }) => {
+    assert.match(js, /return isRepositoryPage\(\) && Boolean\(getReadmeRootElement\(\)\)/, `${browser} README 应在仓库页面类型异常时使用 DOM 兜底`);
     assert.match(js, /batch_start/, `${browser} 应记录翻译批次开始事件`);
     assert.match(js, /remainingTasks:/, `${browser} 应记录最终未完成节点明细`);
     assert.match(js, /function collectReadmeUntranslatedTasks\(/, `${browser} 应按原始节点判断未翻译内容`);

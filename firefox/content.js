@@ -2488,9 +2488,15 @@
 
     function isReadmePage() {
         const pageType = pageConfig.currentPageType;
-        return pageType === 'repository'
+        if (pageType === 'repository'
             || pageType === 'repository/tree'
-            || pageType === 'repository/blob';
+            || pageType === 'repository/blob') {
+            return true;
+        }
+
+        // GitHub Turbo/React 页面类型偶尔会短暂带有未知后缀；只要当前是仓库页
+        // 且实际存在 README 根节点，就继续处理，避免 About 能翻译而 README 被跳过。
+        return isRepositoryPage() && Boolean(getReadmeRootElement());
     }
 
     function isReadmeTranslationEnabled() {
