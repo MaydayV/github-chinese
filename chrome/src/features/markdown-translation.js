@@ -723,7 +723,8 @@
 
         const runTranslationPass = async (passName) => {
             const tasks = collectReadmeTextTasks(readmeEl)
-                .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node));
+                .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node))
+                .filter((task) => !isLikelyTechnicalReadmeText(task.normalizedText, task.node));
             addReadmeDebugEvent(debugContext, 'pass_start', {
                 pass: passName,
                 taskCount: tasks.length,
@@ -961,6 +962,7 @@
         const counts = new Map();
 
         collectReadmeTextTasks(container).forEach((task) => {
+            if (isLikelyTechnicalReadmeText(task.normalizedText, task.node)) return;
             counts.set(task.normalizedText, (counts.get(task.normalizedText) || 0) + 1);
         });
         return counts;
@@ -970,6 +972,7 @@
         const originalCounts = collectReadmeOriginalTextCounts(originalHtml);
         return collectReadmeTextTasks(readmeEl)
             .filter((task) => {
+                if (isLikelyTechnicalReadmeText(task.normalizedText, task.node)) return false;
                 const remaining = originalCounts.get(task.normalizedText) || 0;
                 if (!remaining) return false;
 

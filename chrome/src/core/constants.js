@@ -77,6 +77,9 @@
             'script',
             'style',
             'textarea',
+            'button',
+            '.js-snippet-clipboard-copy-unpositioned',
+            '.snippet-clipboard-content',
             '.notranslate',
             '[translate="no"]',
             '[aria-hidden="true"]'

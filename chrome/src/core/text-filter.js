@@ -15,7 +15,18 @@
 
     function isLikelyTechnicalReadmeText(text, node = null) {
         const input = String(text || '').trim();
-        if (!input || input.length > 120) return false;
+        const element = node?.parentElement;
+        if (element?.closest('pre, code, kbd, samp, button, .js-snippet-clipboard-copy-unpositioned, .snippet-clipboard-content')) {
+            return true;
+        }
+        if (!input) return false;
+
+        // 有些 README 会把命令放在普通 p/div/span 中，不能只依赖 pre/code 标签判断。
+        if (/^(?:[$>#]\s*)?(?:npm|pnpm|yarn|bun|node|python(?:3)?|pip(?:3)?|uv|go|cargo|docker(?:\s+compose)?|podman|kubectl|helm|git|gh|curl|wget|make|cmake|brew|apt(?:-get)?|apk|dnf|yum|ssh|chmod|chown|mkdir|cd|export|set)\b(?:\s|$)/i.test(input)
+            || /^(?:\.\.?[\\/]|[A-Za-z]:[\\/])/.test(input)) {
+            return true;
+        }
+        if (input.length > 120) return false;
         if (isLikelyOpaqueReadmeLabel(input, node)) return true;
 
         // 版本号、文件名和纯标识符通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。

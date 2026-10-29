@@ -188,6 +188,8 @@ test('README translation debug switch records concurrent batches and remaining n
     assert.match(js, /remainingTasks:/, `${browser} 应记录最终未完成节点明细`);
     assert.match(js, /function collectReadmeUntranslatedTasks\(/, `${browser} 应按原始节点判断未翻译内容`);
     assert.match(js, /function isLikelyTechnicalReadmeText\(/, `${browser} 应排除技术标识误判`);
+    assert.match(js, /npm\|pnpm\|yarn\|bun\|node/, `${browser} 应识别普通文本中的命令前缀`);
+    assert.match(js, /'button'/, `${browser} README 任务收集应排除 GitHub 代码复制按钮`);
     assert.match(js, /function isLikelyOpaqueReadmeLabel\(/, `${browser} 应按文本形态识别需要保持原文的产品名和服务名`);
     assert.match(js, /A-Z0-9\]\{2,\}/, `${browser} 应识别带官方缩写的产品名`);
     assert.doesNotMatch(js, /amazon simple queue service|amazon cloudwatch|mechanicalturk/i, `${browser} 不应硬编码某个仓库的产品名列表`);
@@ -493,6 +495,7 @@ test('selected optimizations: discussions support, tldr threshold, traverseNode 
     assert.match(js, /if \(!partialCacheApplied && readmeEl\.innerHTML !== state\.originalHtml\)/, `${browser} README 命中部分缓存后不应恢复原文覆盖译文`);
     assert.match(js, /complete:\s*!stillMissed/, `${browser} README 应按剩余节点保存完整/部分缓存状态`);
     assert.match(js, /partial_cache_hit/, `${browser} README 应记录部分缓存命中`);
+    assert.match(js, /if \(isLikelyTechnicalReadmeText\(task\.normalizedText, task\.node\)\) return false;/, `${browser} 剩余节点判断应先排除命令和技术内容`);
     assert.match(js, /entry\.tldrContent && entry\.complete === true/, `${browser} TL;DR 兜底缓存必须要求完整结果`);
   });
 });
