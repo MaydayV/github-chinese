@@ -141,6 +141,12 @@ node script/test-update-entry.js
 
 ## 🔄 更新日志
 
+### v3.0.2 (2026-10-29)
+
+1. 修复 README 中 GitHub 自动注入的代码复制按钮文本被误计为未翻译节点的问题
+1. 增加常见命令、路径和技术内容识别，避免命令块导致 README 显示“部分完成”
+1. Chrome、Edge、Firefox 三端同步更新并保持顶部搜索框翻译、展开效果和输入保护不变
+
 ### v3.0.1 (2026-10-29)
 
 1. 修复 README、Issue、Pull Request 和 Release 部分翻译结果未写入缓存的问题，刷新页面时只重新请求失败或未翻译节点，避免重复消耗 Tokens
