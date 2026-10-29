@@ -195,6 +195,7 @@ test('README translation debug switch records concurrent batches and remaining n
     assert.match(js, /'button'/, `${browser} README 任务收集应排除 GitHub 代码复制按钮`);
     assert.doesNotMatch(js, /'\.js-snippet-clipboard-copy-unpositioned'/, `${browser} 不应把 README 外层容器误当成跳过区域`);
     assert.match(js, /function isLikelyOpaqueReadmeLabel\(/, `${browser} 应按文本形态识别需要保持原文的产品名和服务名`);
+    assert.match(js, /isHeading[\s\S]*document\.title\.includes\(input\)/, `${browser} 应保留与页面标题一致的 README 产品名`);
     assert.match(js, /A-Z0-9\]\{2,\}/, `${browser} 应识别带官方缩写的产品名`);
     assert.doesNotMatch(js, /amazon simple queue service|amazon cloudwatch|mechanicalturk/i, `${browser} 不应硬编码某个仓库的产品名列表`);
     assert.match(js, /getStableReadmeTextHash\(state\.originalHtml\)/, `${browser} README 缓存应使用稳定文本指纹`);

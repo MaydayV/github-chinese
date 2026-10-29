@@ -67,6 +67,10 @@
         const element = node?.parentElement;
         const isLink = Boolean(element?.closest('a[href]'));
         const isListLabel = Boolean(element?.closest('li, dt, code'));
+        const isHeading = Boolean(element?.closest('h1, h2, h3, h4, h5, h6'));
+        if (isHeading && words.length >= 2 && document.title.includes(input)) {
+            return true;
+        }
         const hasOpaquePattern = /[0-9_./+#@:-]/.test(input)
             || /[a-z][A-Z]/.test(input)
             || /\([A-Z0-9]{2,}\)/.test(input)
