@@ -80,7 +80,6 @@
             'style',
             'textarea',
             'button',
-            '.js-snippet-clipboard-copy-unpositioned',
             '.snippet-clipboard-content',
             '.notranslate',
             '[translate="no"]',
@@ -517,7 +516,7 @@
     function isLikelyTechnicalReadmeText(text, node = null) {
         const input = String(text || '').trim();
         const element = node?.parentElement;
-        if (element?.closest('pre, code, kbd, samp, button, .js-snippet-clipboard-copy-unpositioned, .snippet-clipboard-content')) {
+        if (element?.closest('pre, code, kbd, samp, button, .snippet-clipboard-content')) {
             return true;
         }
         if (!input) return false;
