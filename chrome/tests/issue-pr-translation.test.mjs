@@ -190,6 +190,8 @@ test('README translation debug switch records concurrent batches and remaining n
     assert.match(js, /function collectReadmeUntranslatedTasks\(/, `${browser} 应按原始节点判断未翻译内容`);
     assert.match(js, /function isLikelyTechnicalReadmeText\(/, `${browser} 应排除技术标识误判`);
     assert.match(js, /npm\|pnpm\|yarn\|bun\|node/, `${browser} 应识别普通文本中的命令前缀`);
+    assert.match(js, /a-z0-9_-.*1,24/, `${browser} 应识别列表/表格中的技术键名格式`);
+    assert.match(js, /closest\('li, dt, table'\)/, `${browser} 应按列表/表格上下文排除技术键名`);
     assert.match(js, /'button'/, `${browser} README 任务收集应排除 GitHub 代码复制按钮`);
     assert.doesNotMatch(js, /'\.js-snippet-clipboard-copy-unpositioned'/, `${browser} 不应把 README 外层容器误当成跳过区域`);
     assert.match(js, /function isLikelyOpaqueReadmeLabel\(/, `${browser} 应按文本形态识别需要保持原文的产品名和服务名`);

@@ -21,6 +21,12 @@
         }
         if (!input) return false;
 
+        // 参数说明列表/表格中的单词键名（如 slug、tags、title、content）应保持原文，
+        // 模型通常会原样返回，不能因此把 README 判为部分完成。
+        if (/^[a-z][a-z0-9_-]{1,24}$/.test(input) && element?.closest('li, dt, table')) {
+            return true;
+        }
+
         // 有些 README 会把命令放在普通 p/div/span 中，不能只依赖 pre/code 标签判断。
         if (/^(?:[$>#]\s*)?(?:npm|pnpm|yarn|bun|node|python(?:3)?|pip(?:3)?|uv|go|cargo|docker(?:\s+compose)?|podman|kubectl|helm|git|gh|curl|wget|make|cmake|brew|apt(?:-get)?|apk|dnf|yum|ssh|chmod|chown|mkdir|cd|export|set)\b(?:\s|$)/i.test(input)
             || /^(?:\.\.?[\\/]|[A-Za-z]:[\\/])/.test(input)) {
