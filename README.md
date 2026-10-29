@@ -139,6 +139,12 @@ node script/test-update-entry.js
 
 ## 🔄 更新日志
 
+### v3.1.2 (2026-10-29)
+
+1. 修复 README 表格中的 PowerToys、Cursor 等产品/工具链接被误判为未翻译的问题
+1. 完善品牌名、页面标题和技术字段的原文保护，减少无意义重试和 Token 消耗
+1. Chrome、Edge、Firefox 三端同步更新
+
 ### v3.1.1 (2026-10-29)
 
 1. 修复 README 参数说明中的 `slug`、`tags`、`title`、`content` 等技术字段被误判为未翻译的问题
