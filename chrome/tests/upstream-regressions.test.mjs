@@ -175,9 +175,15 @@ test('repository About descriptions support hashed SidebarAbout CSS-module class
     const content = readFileSync(file, 'utf8');
     assert.match(
       content,
-      /querySelectorAll\('p\[class\*="SidebarAbout-module"\]\[class\*="description"\]'\)/,
+      /ABOUT_SELECTORS[\s\S]*SidebarAbout-module[\s\S]*description/,
       `${browser}: About 描述选择器未兼容新版 CSS-module 哈希类`,
     );
+    assert.match(
+      content,
+      /ABOUT_SELECTORS[\s\S]*borderGrid__|borderGrid__.*description__/,
+      `${browser}: About 描述应兼容 BorderGrid/description 哈希类`,
+    );
+    assert.match(content, /\.f4\.tmp-my-3/, `${browser}: About 描述应保留经典 UI 选择器`);
     assert.match(content, /function getRepoAboutElements\(\)/, `${browser}: About 描述应支持多个动态侧栏节点`);
     assert.match(content, /function isRepoAboutTranslationEnabled\(\)/, `${browser}: About 描述独立触发条件缺失`);
     assert.match(content, /About 描述未翻译：/, `${browser}: About 配置失败时应输出诊断信息`);
@@ -199,6 +205,33 @@ test('selected PR #808 organization settings routes and labels are synchronized'
     assert.equal(zh['orgs/settings/issue-fields'].static['Manage issue fields for an organization.'], '管理组织的议题字段。', browser);
     assert.equal(zh['orgs/settings/copilot'].static['Internet access'], '访问互联网', browser);
     assert.equal(zh['settings/blocked_users'].static['For 30 days'], '30 天', browser);
+  }
+});
+
+test('selected upstream settings and Copilot additions are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    const blocked = zh['settings/blocked_users'].static;
+    assert.equal(blocked['Block settings'], '拉黑设置', browser);
+    assert.equal(blocked['Select one or more reasons for blocking.'], '请选择一项或多项拉黑原因。', browser);
+    assert.equal(blocked['Please don\'t include any personal information such as legal names or email addresses. Markdown is supported. This note will only be visible to you.'], '请勿包含法定姓名或电子邮箱地址等个人信息。支持 Markdown。此备注仅对您可见。', browser);
+
+    const packages = zh['settings/packages'].static;
+    assert.equal(packages['I understand the consequences, restore this package.'], '我了解后果，恢复此软件包。', browser);
+    assert.equal(packages['This will restore the package'], '这将恢复软件包', browser);
+
+    const repositorySettings = zh['repository/settings'].static;
+    assert.equal(repositorySettings['MCP servers'], 'MCP 服务器', browser);
+    assert.equal(repositorySettings['Agent suggestions for issues'], '议题智能体建议', browser);
+
+    const dashboard = zh['page-dashboard'].static;
+    assert.equal(dashboard['Give dashboard feedback'], '提供仪表板反馈', browser);
+    assert.equal(dashboard['Very dissatisfied'], '非常不满意', browser);
+
+    const copilot = zh.copilot.static;
+    assert.equal(copilot['Optimized for:'], '优化方向：', browser);
+    assert.equal(copilot['Balances speed and intelligence'], '兼顾速度和智能', browser);
+    assert.equal(copilot['Upgrade to Copilot Pro'], '升级到 Copilot Pro', browser);
   }
 });
 

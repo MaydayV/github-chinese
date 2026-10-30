@@ -67,6 +67,14 @@
             'article.markdown-body.entry-content.container-lg',
             'article.markdown-body[itemprop="text"]'
         ],
+        ABOUT_SELECTORS: [
+            // 经典 UI
+            '.f4.tmp-my-3',
+            // React CSS module 侧栏（当前常见结构）
+            'p[class*="SidebarAbout-module"][class*="description"]',
+            // GitHub 改版后可能只保留 BorderGrid/description 哈希类
+            '[class*="borderGrid__"] p[class*="description__"]',
+        ],
         SKIP_PARENT_SELECTOR: [
             'pre',
             'code',

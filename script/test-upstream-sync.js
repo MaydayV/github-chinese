@@ -75,8 +75,8 @@ assert.ok(
   'characterData 变更路径也应跳过用户输入',
 );
 assert.ok(
-  content.includes("replace(/^(\\s*)on\\b\\s*/, '$1')"),
-  'transTimeElement 应容忍 on 前的空白，避免残留',
+  content.includes("replace(/\\bon\\s+/gi, (match, offset) => offset === 0 ? ' ' : '')"),
+  'transTimeElement 应清理开头和句中残留的 on',
 );
 assert.ok(
   content.includes('function translateReactGlobalNavSearchPlaceholder()'),
@@ -91,8 +91,19 @@ assert.ok(
   '仓库页面识别应支持 octolytics 仓库元数据兜底',
 );
 assert.ok(
-  content.includes('const reservedFirstSegment ='),
+  content.includes('const reservedRoots = new Set(['),
   '仓库页面 URL 兜底应排除 GitHub 保留路径',
+);
+assert.ok(
+  content.includes('function isFallbackRepositoryPath(pathname)'),
+  '仓库页面 URL 兜底应使用严格的仓库路径判断',
+);
+for (const root of ['import', 'projects', 'sponsoring', 'github-copilot']) {
+  assert.ok(content.includes(`'${root}'`), `仓库页面 URL 兜底应排除 ${root} 路径`);
+}
+assert.ok(
+  content.includes("['enterprise_plan', 'sponsoring'].includes(repo.toLowerCase())"),
+  '组织 enterprise_plan/sponsoring 根路径不能误判为仓库',
 );
 
 // —— 三端共享文件保持一致 ——

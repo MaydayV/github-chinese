@@ -69,6 +69,14 @@
             'article.markdown-body.entry-content.container-lg',
             'article.markdown-body[itemprop="text"]'
         ],
+        ABOUT_SELECTORS: [
+            // 经典 UI
+            '.f4.tmp-my-3',
+            // React CSS module 侧栏（当前常见结构）
+            'p[class*="SidebarAbout-module"][class*="description"]',
+            // GitHub 改版后可能只保留 BorderGrid/description 哈希类
+            '[class*="borderGrid__"] p[class*="description__"]',
+        ],
         SKIP_PARENT_SELECTOR: [
             'pre',
             'code',
@@ -1515,6 +1523,31 @@
      * watchUpdate 函数：监视页面变化，根据变化的节点进行翻译
      */
 
+    function isFallbackRepositoryPath(pathname) {
+        const reservedRoots = new Set([
+            'home', 'dashboard', 'feed', 'copilot', 'spark', 'signup', 'account_verifications',
+            'login', 'logout', 'session', 'sessions', 'password_reset', 'orgs', 'organizations',
+            'explore', 'topics', 'notifications', 'watching', 'stars', 'issues', 'pulls', 'repos',
+            'search', 'trending', 'showcases', 'new', 'import', 'settings', 'installations',
+            'marketplace', 'apps', 'account', 'projects', 'redeem', 'discussions', 'collections',
+            'sponsors', 'sponsoring', 'github-copilot', 'codespaces', 'developer', 'features',
+            'security', 'sitemap', 'education', 'mcp', 'users', 'billing', 'plans',
+        ]);
+        const segments = pathname.split('/');
+        if (segments.length < 3) return false;
+
+        const owner = segments[1];
+        const repo = segments[2];
+        const isSegment = segment => /^[A-Za-z0-9._-]+$/.test(segment) && !/^\.+$/.test(segment);
+        if (!isSegment(owner) || !isSegment(repo) || reservedRoots.has(owner.toLowerCase())) return false;
+
+        const extra = segments.slice(3);
+        const isRoot = extra.length === 0 || (extra.length === 1 && extra[0] === '');
+        if (isRoot) return !['enterprise_plan', 'sponsoring'].includes(repo.toLowerCase());
+        if (extra.some(segment => segment === '' || segment === '.' || segment === '..')) return false;
+        return I18N.conf.rePagePathRepo.test(pathname);
+    }
+
     function detectPageType() {
         const url = new URL(window.location.href);
         const { PAGE_MAP, SPECIAL_SITES } = CONFIG;
@@ -1538,12 +1571,10 @@
         const hasRepositoryMetadata = hostname === 'github.com'
             && /^[^/]+\/[^/]+$/.test(repositoryNwo)
             && repositoryNwo.toLowerCase() === pathRepository.toLowerCase();
-        const reservedFirstSegment = /^\/(?:home|dashboard|feed|copilot|spark|signup|account_verifications|login|logout|sessions?|password_reset|orgs|organizations|explore|topics|notifications|watching|stars|issues|pulls|repos|search|discussions|gist|sponsors|marketplace|apps|codespaces|developer|features|status|education|sitemap|mcp|settings|account|new|redeem|trending|collections|showcases|about|pricing|security|enterprise|customer-stories|site|support|learn|events|tools|edu|campus|git|contact|users|installations|billing|plans)\//i;
         const isRepository = /\/<user-name>\/<repo-name>/.test(metaLocation)
             || hasRepositoryMetadata
             || (site === 'github'
-                && !reservedFirstSegment.test(pathname)
-                && /^\/[^\/@?#]+\/[^\/@?#]+(?:\/|$)/.test(pathname));
+                && isFallbackRepositoryPath(pathname));
         const isOrganization = /\/<org-login>/.test(metaLocation) || /^\/(?:orgs|organizations)/.test(pathname);
 
         // 正则配置 ================================================
@@ -1627,13 +1658,13 @@
         if (!FeatureSet.enable_extension || !el) return;
 
         // 时间文本形如 "on Jul 15"，中文语序里不需要这个 on。
-        // 前面可能带空白，所以不能只匹配 /^on/，否则会残留成「打开于 on 7月15日」。
+        // 前面可能带空白，且部分版本会把 "opened on" 合并到同一个文本节点。
         // 同时只改承载文本的那个节点，避免用 el.textContent 赋值抹掉同级节点。
         const target = el.childNodes.length > 0 ? el.lastChild : el;
         const text = target.textContent;
         if (!text) return;
 
-        const translatedText = text.replace(/^(\s*)on\b\s*/, '$1');
+        const translatedText = text.replace(/\bon\s+/gi, (match, offset) => offset === 0 ? ' ' : '');
         if (translatedText !== text) {
             target.textContent = translatedText;
         }
@@ -2537,12 +2568,18 @@
         return null;
     }
 
-    // 仓库侧栏 About 描述（React 组件，CSS-module 哈希类，用模块名和 description 子串匹配
-    // 同时兼容 SidebarAbout-module__description 与 SidebarAbout-module_<hash>_description）。
+    // 仓库侧栏 About 描述（兼容经典 UI、SidebarAbout CSS-module 和 BorderGrid 哈希类）。
     // 属仓库主自定义的自由文本，静态词库无法收录，故与 README 一样走 AI 内容翻译、就地替换。
     function getRepoAboutElements() {
-        return [...document.querySelectorAll('p[class*="SidebarAbout-module"][class*="description"]')]
-            .filter(element => !element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body'));
+        const elements = [];
+        README_CONFIG.ABOUT_SELECTORS.forEach(selector => {
+            document.querySelectorAll(selector).forEach(element => {
+                if (elements.includes(element)) return;
+                if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) return;
+                elements.push(element);
+            });
+        });
+        return elements;
     }
 
     function getRepoAboutElement() {
