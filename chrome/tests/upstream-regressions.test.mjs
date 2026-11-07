@@ -47,6 +47,29 @@ test('upstream relative-time regression keeps minutes and months distinct', () =
   }
 });
 
+test('relative-time rules do not rewrite duration-like words in ordinary text', () => {
+  for (const [browser, file] of locales) {
+    const rules = loadLocale(file)['zh-CN'].public.regexp;
+    for (const text of [
+      'Windows Search sometimes steals focus when I press the physical Windows key on a second monitor',
+      'Wait a second',
+      'A 2 minute delay',
+      'Support a secondhand monitor',
+    ]) {
+      assert.equal(translate(rules, text), text, `${browser}: ${text}`);
+    }
+    for (const [text, expected] of [
+      ['a second', '1 秒之前'],
+      ['7 months', '7 个月之前'],
+      ['2 hours ago', '2 小时之前'],
+      ['Updated about a day ago', 'Updated 大约 1 天之前'],
+      ['Expires in 6 minutes', 'Expires 6 分钟之内'],
+    ]) {
+      assert.equal(translate(rules, text), expected, `${browser}: ${text}`);
+    }
+  }
+});
+
 test('upstream issue and PR fixes exist in every browser build', () => {
   for (const [browser, file] of locales) {
     const locales = loadLocale(file);
@@ -271,6 +294,28 @@ test('dashboard onboarding terms are synchronized without changing search protec
     assert.ok(globalIgnore.includes('qbsearch-input'), `${browser}: 快速搜索组件保护规则缺失`);
     assert.ok(!globalIgnore.includes('input'), `${browser}: 不能通过全局规则跳过 input 属性翻译`);
     assert.ok(!globalIgnore.includes('textarea'), `${browser}: 不能通过全局规则跳过 textarea 属性翻译`);
+  }
+});
+
+test('selected upstream unauthenticated homepage workflow terms are synchronized', () => {
+  for (const [browser, file] of locales) {
+    const homepage = loadLocale(file)['zh-CN'].homepage.static;
+    for (const [source, expected] of Object.entries({
+      'Software still starts': '软件，依然',
+      'with you': '始于你',
+      'Review changes': '审查更改',
+      'Direct the fix': '指导修复',
+      'Check the results': '检查结果',
+      'Approve and merge': '批准并合并',
+      'See it shipped': '见证发布',
+      'GitHub Platform': 'GitHub 平台',
+      'Repository hosting, code review, and collaboration': '仓库托管、代码审查与协作',
+      'See plans and pricing': '查看计划与定价',
+      'More ways to use GitHub': '更多使用 GitHub 的方式',
+      'Join the world\'s largest developer community': '加入全球最大的开发者社区',
+    })) {
+      assert.equal(homepage[source], expected, `${browser}: ${source}`);
+    }
   }
 });
 

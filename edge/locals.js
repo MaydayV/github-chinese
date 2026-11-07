@@ -2096,7 +2096,11 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
          * 1. 修复 Bug: 意外的扩大了匹配范围(不带前缀与后缀的时间) 干扰了带有相对时间的其他规则
          *  7 months
          */
-         [/^just now|^now|^last month|^yesterday|(?:(over|about|almost|in) |)(an?|\d+)(?: |)(second|minute|hour|day|month|year)s?( ago|)/, function (all, prefix, count, unit, suffix) {
+         [/^just now|^now|^last month|^yesterday|\b(?:(over|about|almost|in) |)(an?|\d+) ?(second|minute|hour|day|month|year)s?\b( ago\b|)/, function (all, prefix, count, unit, suffix, offset, text) {
+            // 无 ago/in 的时长仅当整段文本就是时间值时才翻译，避免误伤 a second monitor 等普通句子。
+            if (!suffix && prefix !== 'in' && all !== text) {
+                return all;
+            }
             if (all === 'now') {
                 return '现在';
             }
@@ -20934,6 +20938,8 @@ I18N["zh-CN"]["homepage"] = { // 未登录的首页
         "Explore the latest tools from Universe '25": "探索 Universe '25 的最新工具",
         "The future of building happens together": "构建未来的方式是共同创造",
         "Tools and trends evolve, but collaboration endures. With GitHub, developers, agents, and code come together on one platform.": "工具与趋势不断演变，但协作永恒。有 GitHub在，开发者、智能体与代码在同一个平台汇聚。",
+        "Software still starts": "软件，依然",
+        "with you": "始于你",
 
         //"Email address": "电子邮箱地址",
         "Enter your email": "键入邮箱地址",
@@ -20946,6 +20952,32 @@ I18N["zh-CN"]["homepage"] = { // 未登录的首页
             "30 days free": "30天免费",
         "Free Enterprise trial": "免费试用企业版", // 已登录
         "Explore upcoming releases": "探索即将发布的产品", // 已登录
+
+        // 新版首页工作流与导航
+        "Review changes": "审查更改",
+        "Direct the fix": "指导修复",
+        "Check the results": "检查结果",
+        "Approve and merge": "批准并合并",
+        "See it shipped": "见证发布",
+        "GitHub Platform": "GitHub 平台",
+        "Repository hosting, code review, and collaboration": "仓库托管、代码审查与协作",
+        "AI coding agent for tasks, projects, and automated work": "用于任务、项目与自动化工作的 AI 编程智能体",
+        "See plans and pricing": "查看计划与定价",
+        "More ways to use GitHub": "更多使用 GitHub 的方式",
+        "CI/CD and automation": "CI/CD 与自动化",
+        "Explore Actions": "探索 Actions",
+        "Quality analysis, fixes, and enforcement": "质量分析、修复与强制执行",
+        "Explore Code Quality": "探索代码质量",
+        "Vulnerability detection and response": "漏洞检测与响应",
+        "Explore Code Security": "探索代码安全",
+        "Secret scanning and leak prevention": "机密扫描与防泄露",
+        "Explore Secret Protection": "探索机密保护",
+        "Cloud development environments": "云开发环境",
+        "Explore Codespaces": "探索代码空间",
+        "Whatever you're building, you can build it on GitHub": "无论您在构建什么，都能在 GitHub 上实现",
+        "Start Enterprise free trial": "开始企业版免费试用",
+        "Join the world's largest developer community": "加入全球最大的开发者社区",
+        "Every project adds something new to the community. Explore what developers are building across GitHub, then create an account and contribute your own.": "每个项目都为社区带来了新事物。探索开发者们在 GitHub 上的作品，然后创建账户并贡献一份力量。",
 
         // 代码
             "Write, test, and fix code quickly with GitHub Copilot, from simple boilerplate to complex features.": "使用 GitHub Copilot 快速编写、测试和修复代码，从简单的样板代码到复杂功能都能胜任。",
