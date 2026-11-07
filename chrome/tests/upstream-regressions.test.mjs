@@ -47,6 +47,14 @@ test('upstream relative-time regression keeps minutes and months distinct', () =
   }
 });
 
+test('Less programming language name stays unchanged while ordinary less labels translate', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    assert.equal(zh.public.static.Less, 'Less', `${browser}: Less 语言名称应保留原文`);
+    assert.equal(zh.public.static['Show less'], '显示更少', `${browser}: 普通 Show less 文案仍应翻译`);
+  }
+});
+
 test('relative-time rules do not rewrite duration-like words in ordinary text', () => {
   for (const [browser, file] of locales) {
     const rules = loadLocale(file)['zh-CN'].public.regexp;
