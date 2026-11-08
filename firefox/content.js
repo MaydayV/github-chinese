@@ -3876,30 +3876,45 @@
     function mountDiscussionToolbar(item) {
         const state = getIssuePrDiscussionState(item);
         const slotEl = findDiscussionActionsSlot(item);
-        if (state.toolbarEl?.isConnected) {
+        const existingToolbars = slotEl
+            ? [...slotEl.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]')]
+            : [];
+        const toolbar = state.toolbarEl?.isConnected
+            ? state.toolbarEl
+            : existingToolbars[0] || null;
+
+        if (toolbar) {
+            // React 可能替换正文节点但保留评论操作行；该新正文会有新的 WeakMap 状态，
+            // 因此先复用操作行中已有工具条，并清理旧扫描/旧状态留下的重复节点。
+            existingToolbars.forEach((existingToolbar) => {
+                if (existingToolbar !== toolbar) existingToolbar.remove();
+            });
+            const needsRender = state.toolbarEl !== toolbar;
+            state.toolbarEl = toolbar;
             // GitHub 的 Turbo/React 重绘可能保留旧工具条节点；每次扫描都把它
             // 重新归位到三个点所在的操作行，避免遗留在 header 顶部。
-            if (slotEl && state.toolbarEl.parentElement !== slotEl) {
-                slotEl.insertBefore(state.toolbarEl, slotEl.firstChild);
+            if (slotEl && toolbar.parentElement !== slotEl) {
+                slotEl.insertBefore(toolbar, slotEl.firstChild);
             }
+            if (needsRender) renderDiscussionToolbar(item);
             return;
         }
 
         if (!slotEl && item.sourceType !== 'release') return;
 
-        const toolbar = document.createElement('div');
-        toolbar.className = 'ghcn-discussion-translate-toolbar';
+        const newToolbar = document.createElement('div');
+        newToolbar.className = 'ghcn-discussion-translate-toolbar';
         if (item.sourceType === 'release') {
-            toolbar.classList.add('ghcn-discussion-translate-toolbar--release');
+            newToolbar.classList.add('ghcn-discussion-translate-toolbar--release');
         }
-        toolbar.dataset.ghcnDiscussionTranslate = 'toolbar';
+        newToolbar.dataset.ghcnDiscussionTranslate = 'toolbar';
 
-        state.toolbarEl = toolbar;
+        state.toolbarEl = newToolbar;
         renderDiscussionToolbar(item);
         if (slotEl) {
-            slotEl.insertBefore(toolbar, slotEl.firstChild);
+            slotEl.insertBefore(newToolbar, slotEl.firstChild);
         } else if (item.sourceType === 'release') {
-            item.viewerEl.insertBefore(toolbar, item.markdownEl);
+            item.viewerEl.insertBefore(newToolbar, item.markdownEl);
         } else {
             return;
         }

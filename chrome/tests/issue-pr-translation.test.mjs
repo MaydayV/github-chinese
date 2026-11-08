@@ -34,6 +34,12 @@ test('content script can identify and decorate Issue and PR discussions', () => 
   assert.doesNotMatch(content, /insertAdjacentElement\('beforebegin',\s*toolbar\)/);
 });
 
+test('discussion toolbar reuses an existing action-row control and removes duplicates', () => {
+  assert.match(content, /slotEl\.querySelectorAll\('\[data-ghcn-discussion-translate="toolbar"\]'\)/);
+  assert.match(content, /existingToolbars\.forEach\([\s\S]*existingToolbar\.remove\(\)/);
+  assert.match(content, /state\.toolbarEl = toolbar;[\s\S]*if \(needsRender\) renderDiscussionToolbar\(item\)/);
+});
+
 test('content script reuses discussion translation for Release notes', () => {
   assert.match(content, /function isReleaseNotesPage\(/);
   assert.match(content, /function isDiscussionTranslationTargetPage\(/);
@@ -42,7 +48,7 @@ test('content script reuses discussion translation for Release notes', () => {
   assert.match(content, /sourceType:\s*isReleaseNotes \? 'release'/);
   assert.match(content, /ghcn-discussion-translate-toolbar--release/);
   assert.match(content, /if \(!slotEl && item\.sourceType !== 'release'\) return/);
-  assert.match(content, /item\.viewerEl\.insertBefore\(toolbar,\s*item\.markdownEl\)/);
+  assert.match(content, /item\.viewerEl\.insertBefore\(newToolbar,\s*item\.markdownEl\)/);
   assert.match(content, /getDiscussionRecordSourceType\(item\)/);
 });
 
@@ -256,7 +262,7 @@ test('Issue and PR translation covers React comments and legacy PR timeline comm
   assert.match(content, /menuButton\?\.closest\('\.timeline-comment-actions'\)/);
   assert.match(content, /menuButton\?\.closest\('\[class\*="ActionsButtonsContainer"\]'\)/);
   assert.doesNotMatch(content, /menuButton\?\.closest\([^)]*\.d-flex\.flex-row[^)]*\)/);
-  assert.match(content, /state\.toolbarEl\.parentElement !== slotEl/);
+  assert.match(content, /toolbar\.parentElement !== slotEl/);
   assert.match(content, /\.timeline-comment-actions > \.d-flex/);
 });
 
