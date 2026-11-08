@@ -348,6 +348,21 @@ test('reported repository projects and split pull request empty-state text are t
   }
 });
 
+test('repository pull request sidebar filters use the repository pulls dictionary', () => {
+  for (const [browser, file] of locales) {
+    const pulls = loadLocale(file)['zh-CN']['repository/pulls'].static;
+    for (const [source, expected] of Object.entries({
+      'Authored by me': '由我创建',
+      'Assigned to me': '分配给我',
+      'Involves me': '涉及我',
+      'Review requests': '审查请求',
+      'Stacks': '堆叠',
+    })) {
+      assert.equal(pulls[source], expected, `${browser}: ${source}`);
+    }
+  }
+});
+
 test('two-factor authentication deadline accepts joined and spaced dates', () => {
   for (const [browser, file] of locales) {
     const publicLocale = loadLocale(file)['zh-CN'].public;
