@@ -327,6 +327,27 @@ test('selected upstream unauthenticated homepage workflow terms are synchronized
   }
 });
 
+test('reported repository projects and split pull request empty-state text are translated', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    assert.equal(
+      zh.public.static['There are no projects linked to this repository.'],
+      '尚无关联到此仓库的项目。',
+      `${browser}: 仓库项目空状态`
+    );
+    assert.equal(
+      zh.pulls.static['Learn more about searching and filtering'],
+      '了解更多关于搜索和筛选',
+      `${browser}: PR 页面拆分后的说明链接前缀`
+    );
+    assert.equal(
+      zh.pulls.static['Learn more about searching and filtering pull requests.'],
+      '了解更多关于搜索和过滤拉取请求的信息。',
+      `${browser}: PR 页面整句词条应保留`
+    );
+  }
+});
+
 test('two-factor authentication deadline accepts joined and spaced dates', () => {
   for (const [browser, file] of locales) {
     const publicLocale = loadLocale(file)['zh-CN'].public;

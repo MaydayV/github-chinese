@@ -1516,6 +1516,7 @@ I18N["zh-CN"]["public"] = { // 公共区域翻译
 
             "Repository projects": "仓库项目",
             "There are no projects linked to this repository yet.": "尚无链接到此仓库的项目。",
+            "There are no projects linked to this repository.": "尚无关联到此仓库的项目。",
             "Search by name…": "按名称搜索…",
             "Search by name...": "按名称搜索…",
             "No projects found": "未找到项目",
@@ -22489,6 +22490,8 @@ I18N["zh-CN"]["pulls"] = { // 拉取请求页面
             "No pull requests matched your search": "没有拉取请求匹配您的搜索",
             "Try a different search query.": "尝试不同的搜索查询。",
             "Learn more about searching and filtering pull requests.": "了解更多关于搜索和过滤拉取请求的信息。",
+            // GitHub 将链接句拆成多个文本节点时使用的前半段
+            "Learn more about searching and filtering": "了解更多关于搜索和筛选",
 
         // 视图
             "No saved views": "没有保存的视图",
