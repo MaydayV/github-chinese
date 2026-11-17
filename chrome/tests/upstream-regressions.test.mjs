@@ -78,6 +78,35 @@ test('relative-time rules do not rewrite duration-like words in ordinary text', 
   }
 });
 
+test('PAT permission preview has a scoped long-text limit and translations', () => {
+  for (const [browser, file] of locales) {
+    const data = loadLocale(file);
+    const zh = data['zh-CN'];
+    const page = zh['settings/personal-access-tokens'];
+    assert.ok(data.conf.characterDataPage.includes('settings/personal-access-tokens'), `${browser}: PAT 页应监听动态权限文本`);
+    assert.equal(data.conf.maxTextNodeLengthPage['settings/personal-access-tokens'], 2000, `${browser}: PAT 长文本上限`);
+    assert.equal(page.static['Delete this token'], '删除此令牌', browser);
+    assert.equal(page.static['This token does not have any user permissions.'], '此令牌没有任何用户权限。', browser);
+    assert.equal(
+      translate(page.regexp, 'Read and write access to contents, issues, and pull requests.'),
+      '内容、议题和拉取请求的读写访问权限。',
+      `${browser}: PAT 权限预览`
+    );
+  }
+});
+
+test('dynamic dialog and menu text is translated without enabling search-query echo', () => {
+  for (const [browser, file] of contentScripts) {
+    const source = readFileSync(file, 'utf8');
+    assert.match(source, /LIVE_SURFACE_SELECTOR[\s\S]*\[role="menu"\][\s\S]*\.dropdown-menu/);
+    assert.match(source, /SEARCH_QUERY_SELECTOR[\s\S]*#search-suggestions-dialog[\s\S]*#qb-input-query/);
+    assert.match(source, /pageConfig\.characterData \|\| isLiveSurfaceCharacterData\(target\)/);
+    assert.match(source, /!element\.closest\?\.\(pageConfig\.ignoreMutationSelectors\)/);
+    assert.match(source, /!isReactGlobalNavPortalNode\(element\)[\s\S]*isLiveSurfaceCharacterData\(node\)/);
+    assert.ok(loadLocale(locales.find(([name]) => name === browser)[1]).conf.ignoreMutationSelectorPage['*'].includes('qbsearch-input'), `${browser}: 顶部搜索保护仍在`);
+  }
+});
+
 test('upstream issue and PR fixes exist in every browser build', () => {
   for (const [browser, file] of locales) {
     const locales = loadLocale(file);
@@ -305,9 +334,10 @@ test('dashboard onboarding terms are synchronized without changing search protec
   }
 });
 
-test('selected upstream unauthenticated homepage workflow terms are synchronized', () => {
+test('selected upstream homepage and dashboard terms are synchronized', () => {
   for (const [browser, file] of locales) {
-    const homepage = loadLocale(file)['zh-CN'].homepage.static;
+    const zh = loadLocale(file)['zh-CN'];
+    const homepage = zh.homepage.static;
     for (const [source, expected] of Object.entries({
       'Software still starts': '软件，依然',
       'with you': '始于你',
@@ -324,6 +354,36 @@ test('selected upstream unauthenticated homepage workflow terms are synchronized
     })) {
       assert.equal(homepage[source], expected, `${browser}: ${source}`);
     }
+
+    const dashboard = zh['page-dashboard'].static;
+    assert.equal(dashboard['Make Home your homepage'], '将首页设为您的主页', browser);
+    assert.equal(dashboard['Make Feed your homepage'], '将动态设为您的主页', browser);
+    assert.equal(dashboard['Pin your homepage'], '固定您的主页', browser);
+    assert.equal(dashboard['Got it'], '知道了', browser);
+  }
+});
+
+test('selected new pull request and issue detail terms are present', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    const common = zh['repository/pull_issue_public'].static;
+    for (const [source, expected] of Object.entries({
+      'React': '添加表情回应',
+      'Select an item': '选择一项',
+      'Search saved replies': '搜索快捷回复',
+      'Create new': '新建',
+      'Comment can not be empty': '评论不能为空',
+    })) assert.equal(common[source], expected, `${browser}: ${source}`);
+
+    const issue = zh['repository/issues'].static;
+    assert.equal(issue['Convert to sub-issue'], '转换为子议题', browser);
+    assert.equal(issue['Add artifact'], '添加工件', browser);
+    assert.equal(issue['Edit Assignees'], '编辑受理人', browser);
+
+    const pull = zh['repository/pull'].static;
+    assert.equal(pull['Merging is currently blocked. Click to view details in the merge panel.'], '当前无法合并。点击可在合并面板中查看详情。', browser);
+    assert.equal(pull['No deployments yet'], '暂无部署', browser);
+    assert.equal(zh.public.static['New Pull Requests Overview'], '新版拉取请求概览', browser);
   }
 });
 

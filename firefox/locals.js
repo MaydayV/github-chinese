@@ -54,7 +54,12 @@ I18N.conf = {
     rePagePathOrg: /^\/[^\/]+\/[^\/]+\/(repositories\/new|repositories|sponsoring|discussions|projects|packages|teams|new-team|people|outside-collaborators|pending_collaborators|dashboard|billing_managers\/new|invitations?|settings\/(profile|billing|roles|member_privileges|teams|import-export|blocked_users|interaction_limits|code_review_limits|moderators|repository-defaults|rules|codespaces|copilot|actions|hooks|discussions|packages|pages|projects|security_analysis|security|dependabot_rules|domains|secrets|variables|oauth_application_policy|installations|personal-access-token|reminders|sponsors-log|audit-log|deleted_repositories|applications\/new|applications|apps\/new|apps|publisher|policies\/repositories|custom-properties|issue-fields|sandboxes)|topics|domain\/new|audit-log\/event_settings|billing\/(history|plans)|policies\/applications)|^\/[^\/]+\/(enterprise_plan|sponsoring)/,
 
     // 特定页面，启用`字符数据`监测
-    characterDataPage: ['repository', 'repository/tree', 'repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules', 'pulls'],
+    characterDataPage: ['repository', 'repository/tree', 'repository/new', 'repository/edit', 'new', 'new/import', 'orgs/repositories/new', 'repository/blob', 'repository/pull', 'marketplace', 'homepage', 'repository/issues', 'repository/commit', 'copilot', 'spark', 'repository/settings/rules', 'pulls', 'settings/personal-access-tokens'],
+
+    // 特定页面放宽长文本节点上限（默认 500）；精细化令牌权限预览会合并成长节点。
+    maxTextNodeLengthPage: {
+        'settings/personal-access-tokens': 2000,
+    },
 
     // 特定页面，忽略突变元素规则
     ignoreMutationSelectorPage: {
@@ -708,6 +713,8 @@ I18N["zh-CN"]["title"] = { // 标题翻译
 I18N["zh-CN"]["public"] = { // 公共区域翻译
     "static": { // 静态翻译
             "Try a different search query.": "请尝试其他搜索查询。",
+            "New Pull Requests Overview": "新版拉取请求概览",
+            "Try the new pull request landing page, which replaces Conversation, and is designed to help you gain context faster and understand what actions you need to take next.": "试用新版拉取请求概览页。它取代了 Conversation 页面，帮助您更快了解上下文和接下来的操作。",
             "Repository files navigation": "仓库文件导航",
             "Open more actions menu": "打开更多操作菜单",
             "Give me a high-level overview": "为我提供全局概览",
@@ -2301,6 +2308,11 @@ I18N["zh-CN"]["page-dashboard"] = { // 已登录的首页 - 仪表板（含组�
         "Ask": "询问",
         "Send": "发送",
         "Feedback": "反馈",
+        "Make Home your homepage": "将首页设为您的主页",
+        "Make Feed your homepage": "将动态设为您的主页",
+        "Pin your homepage": "固定您的主页",
+        "Choose whether github.com opens to Home or Feed. Select the pin next to either one.": "选择打开 github.com 时显示首页还是动态，然后点击对应项目旁的图钉。",
+        "Got it": "知道了",
             "Debug": "调试",
             "Model:": "模型：",
             "1 month": "1 个月",
@@ -8216,6 +8228,15 @@ I18N["zh-CN"]["settings/personal-access-tokens"] = { // 设置 - 开发者设置
             "Last used within the last week": "最后一次使用是最近 1 周之内",
             // [/Last used within/, "最后一次使用是"],
 
+            // 精细化访问令牌权限预览
+            "Delete token": "删除令牌",
+            "Confirm token deletion": "确认删除令牌",
+            "Delete this token": "删除此令牌",
+            "This token has access to all repositories owned by you.": "此令牌可以访问您拥有的所有仓库。",
+            "This token does not have any user permissions.": "此令牌没有任何用户权限。",
+            "This token does not have any repository permissions.": "此令牌没有任何仓库权限。",
+            "This token does not have access to any repositories.": "此令牌无法访问任何仓库。",
+
             "Loading expiration ...": "载入有效期 …",
                 "To set a new expiration date, you must regenerate the token.": "要设置新的有效期，您必须重新生成令牌。",
             "Regenerate": "重新生成",
@@ -8224,6 +8245,9 @@ I18N["zh-CN"]["settings/personal-access-tokens"] = { // 设置 - 开发者设置
                 "Make sure to copy your personal access token now as you will not be able to see this again.": "请务必立即复制您的个人访问令牌，因为您将无法再次看到它。",
 
             // 删除令牌对话框
+                "Delete token": "删除令牌",
+                "Confirm token deletion": "确认删除令牌",
+                "Delete this token": "删除此令牌",
                 "Are you sure you want to delete this token?": "您确定要删除此令牌吗？",
                 "Any applications or scripts using this token will no longer be able to access the GitHub API. You cannot undo this action.": "任何使用此令牌的应用或脚本将无法再访问 GitHub API。您无法撤消此操作。",
                 "I understand, delete this token": "我明白了，依然删除该令牌。",
@@ -8482,6 +8506,10 @@ I18N["zh-CN"]["settings/personal-access-tokens"] = { // 设置 - 开发者设置
                     "Manage the post-receive hooks for an organization.": "管理组织的接收后钩子。",
 
             "This token will be ready for use immediately.": "该令牌将立即就绪可用。",
+            "This token has access to all repositories owned by you.": "此令牌可以访问您拥有的所有仓库。",
+            "This token does not have any user permissions.": "此令牌没有任何用户权限。",
+            "This token does not have any repository permissions.": "此令牌没有任何仓库权限。",
+            "This token does not have access to any repositories.": "此令牌无法访问任何仓库。",
 
             "New personal access token": "新建个人访问令牌",
                 "Your new personal access token": "您的新个人访问令牌",
@@ -8643,6 +8671,106 @@ I18N["zh-CN"]["settings/personal-access-tokens"] = { // 设置 - 开发者设置
             };
 
             return '有效期至 ' + year + '年' + monthKey[month] + day + '日，' + weekKey[week];
+        }],
+        [/^(Read and write|Read|Admin) access to (.+?)(\.?)$/, (match, level, list, dot) => {
+            const accessLevel = { Read: '读取', 'Read and write': '读写', Admin: '管理' }[level] || level;
+            const permissionNames = {
+                'actions': 'Actions',
+                'actions variables': 'Actions 变量',
+                'administration': '管理',
+                'artifact metadata': '附件元数据',
+                'attestations api': '证书 API',
+                'checks': '检查',
+                'code': '代码',
+                'codespaces': '代码空间',
+                'codespaces lifecycle admin': '代码空间生命周期管理',
+                'codespaces metadata': '代码空间元数据',
+                'codespaces secrets': '代码空间机密',
+                'commit statuses': '提交状态',
+                'contents': '内容',
+                'custom properties for repositories': '仓库自定义属性',
+                'Dependabot alerts': 'Dependabot 警报',
+                'dependabot alerts': 'Dependabot 警报',
+                'Dependabot secrets': 'Dependabot 机密',
+                'dependabot secrets': 'Dependabot 机密',
+                'deployments': '部署',
+                'discussions': '讨论',
+                'environments': '环境',
+                'issues': '议题',
+                'merge queues': '合并队列',
+                'metadata': '元数据',
+                'packages': '软件包',
+                'pages': 'GitHub Pages',
+                'projects': '项目',
+                'pull requests': '拉取请求',
+                'repository advisories': '仓库公告',
+                'repository hooks': '仓库 Web 钩子',
+                'secret scanning alert dismissal requests': '机密扫描警报解除请求',
+                'secret scanning alerts': '机密扫描警报',
+                'secret scanning push protection bypass requests': '绕过机密扫描推送保护的请求',
+                'secrets': '机密',
+                'security events': '安全事件',
+                'statuses': '状态',
+                'variables': '变量',
+                'vulnerability alerts': '漏洞警报',
+                'webhooks': 'Web 钩子',
+                'workflows': '工作流',
+            };
+            const items = list.split(/, and |, | and /).map(item => permissionNames[item] || item);
+            const translatedList = items.length > 1
+                ? items.slice(0, -1).join('、') + '和' + items[items.length - 1]
+                : items[0];
+            return `${translatedList}的${accessLevel}访问权限${dot ? '。' : ''}`;
+        }],
+        [/^(Read and write|Read|Admin) access to (.+?)(\.?)$/, (match, level, list, dot) => {
+            const accessLevel = { Read: '读取', 'Read and write': '读写', Admin: '管理' }[level] || level;
+            const permissionNames = {
+                'actions': 'Actions',
+                'actions variables': 'Actions 变量',
+                'administration': '管理',
+                'artifact metadata': '附件元数据',
+                'attestations api': '证书 API',
+                'checks': '检查',
+                'code': '代码',
+                'codespaces': '代码空间',
+                'codespaces lifecycle admin': '代码空间生命周期管理',
+                'codespaces metadata': '代码空间元数据',
+                'codespaces secrets': '代码空间机密',
+                'commit statuses': '提交状态',
+                'contents': '内容',
+                'custom properties for repositories': '仓库自定义属性',
+                'Dependabot alerts': 'Dependabot 警报',
+                'dependabot alerts': 'Dependabot 警报',
+                'Dependabot secrets': 'Dependabot 机密',
+                'dependabot secrets': 'Dependabot 机密',
+                'deployments': '部署',
+                'discussions': '讨论',
+                'environments': '环境',
+                'issues': '议题',
+                'merge queues': '合并队列',
+                'metadata': '元数据',
+                'packages': '软件包',
+                'pages': 'GitHub Pages',
+                'projects': '项目',
+                'pull requests': '拉取请求',
+                'repository advisories': '仓库公告',
+                'repository hooks': '仓库 Web 钩子',
+                'secret scanning alert dismissal requests': '机密扫描警报解除请求',
+                'secret scanning alerts': '机密扫描警报',
+                'secret scanning push protection bypass requests': '绕过机密扫描推送保护的请求',
+                'secrets': '机密',
+                'security events': '安全事件',
+                'statuses': '状态',
+                'variables': '变量',
+                'vulnerability alerts': '漏洞警报',
+                'webhooks': 'Web 钩子',
+                'workflows': '工作流',
+            };
+            const items = list.split(/, and |, | and /).map(item => permissionNames[item] || item);
+            const translatedList = items.length > 1
+                ? items.slice(0, -1).join('、') + '和' + items[items.length - 1]
+                : items[0];
+            return `${translatedList}的${accessLevel}访问权限${dot ? '。' : ''}`;
         }],
         [/(\d+) days? \((.+)\)/, (match, d , p1) => {
             const dateRegExp = I18N["zh-CN"]["public"]["time-regexp"];
@@ -10054,6 +10182,11 @@ I18N["zh-CN"]["repository/milestone"] = I18N["zh-CN"]["repository/milestones"]; 
 
 I18N["zh-CN"]["repository/pull_issue_public"] = { // 仓库 - 议题和拉取请求页面公共部分
     "static": { // 静态翻译
+        "React": "添加表情回应",
+        "Select an item": "选择一项",
+        "Search saved replies": "搜索快捷回复",
+        "Create new": "新建",
+        "Comment can not be empty": "评论不能为空",
         // pull 与 request 公共词条
             "Filters": "筛选",
                 // 筛选下拉菜单
@@ -10857,6 +10990,22 @@ I18N["zh-CN"]["repository/issues"] = { // 仓库 - 议题页面
 
             "Edit": "编辑",
             "Issue body actions": "菜单", // 原文过于啰嗦，直接省略
+                "Block user": "拉黑用户",
+            "Move up": "上移",
+            "Move down": "下移",
+            "Edit Assignees": "编辑受理人",
+                "Select assignees": "选择受理人",
+            "Convert to issue": "转换为议题",
+            "Convert to sub-issue": "转换为子议题",
+                "Draft with Copilot": "使用 Copilot 起草",
+            "Add artifact": "添加工件",
+                "Add link": "添加链接",
+                    "Link title": "链接标题",
+                    "Use a full URL, like https://github.com/owner/repo.": "请输入完整网址，例如 https://github.com/owner/repo。",
+                "Create artifact": "创建工件",
+                "Create HTML artifact": "创建 HTML 工件",
+            "– with": "– 协同",
+            "Please follow this repository's": "请遵守此仓库的",
 
             // 状态词 同 /<user-name>/<repo-name>/pull/<id>
             "changed the title": "修改了标题",
@@ -11426,6 +11575,13 @@ I18N["zh-CN"]["repository/pull"] = { // 仓库 - 某个拉取请求页面
             "Merge conflicts": "合并冲突",
             "Not planning to merge?": "不打算合并吗？",
             "Awaiting approval": "等待批准",
+            "Turn off Overview preview": "关闭概况预览",
+            "Merging is currently blocked. Click to view details in the merge panel.": "当前无法合并。点击可在合并面板中查看详情。",
+            "merge conflicts": "合并冲突",
+            "Files with merge conflicts": "存在合并冲突的文件",
+            "Deployments": "部署",
+            "No deployments yet": "暂无部署",
+            "merge box": "合并框",
 
             // 代码 下拉菜单
                 "Code 55% faster with AI pair programming.": "与 AI 一起编程，写代码速度提高55%。",

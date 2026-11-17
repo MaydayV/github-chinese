@@ -219,6 +219,7 @@
             ].join(', '),
             // 字符数据监视开启规则（布尔值）
             characterData: I18N.conf.characterDataPage.includes(pageType),
+            maxTextNodeLength: I18N.conf.maxTextNodeLengthPage?.[pageType] ?? 500,
             // CSS 选择器规则
             tranSelectors: [
                 ...(I18N[CONFIG.LANG].public.selector || []),
@@ -245,6 +246,36 @@
 
         // textarea 可能位于 header.GlobalNav 等忽略祖先下，但其 placeholder 和 aria-label
         // 仍是控件文案；value、子文本和 contenteditable 内容继续保持不翻译。
+        const LIVE_SURFACE_SELECTOR = [
+            '[role="menu"]',
+            '[role="listbox"]',
+            '[role="dialog"]',
+            '[role="tooltip"]',
+            'details-menu',
+            '.Popover',
+            '.dropdown-menu',
+        ].join(', ');
+        const SEARCH_QUERY_SELECTOR = [
+            '#search-suggestions-dialog',
+            '[aria-label="Quick search"]',
+            '[aria-label="Search suggestions"]',
+            'header.GlobalNav [class*="Search-module__"]',
+            'qbsearch-input',
+            '.QueryBuilder-StyledInputContainer',
+            '#qb-input-query',
+            '.styled-input-content',
+            '[data-testid="quick-search-input-overlay"]',
+        ].join(', ');
+
+        const isLiveSurfaceCharacterData = node => {
+            if (node?.nodeType !== Node.TEXT_NODE || !node.parentElement) return false;
+            const parent = node.parentElement;
+            if (parent.closest?.(`textarea, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"], ${SEARCH_QUERY_SELECTOR}`)) {
+                return false;
+            }
+            return Boolean(parent.closest?.(LIVE_SURFACE_SELECTOR));
+        };
+
         const shouldTranslateTextareaChrome = (node, type, attributeName) => {
             if (node?.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'TEXTAREA') return false;
             if (type === 'childList') return true;
@@ -264,7 +295,8 @@
                     return [...addedNodes].map(node => ({ node, type, attributeName })); // 将新增节点转换为数组
                 }
                 // 处理属性和文本内容变更的情况
-                return (type === 'attributes' || (type === 'characterData' && pageConfig.characterData))
+                return (type === 'attributes'
+                    || (type === 'characterData' && (pageConfig.characterData || isLiveSurfaceCharacterData(target))))
                     ? [{ node: target, type, attributeName }] // 否则，仅处理目标节点
                     : [];
             })
@@ -273,7 +305,8 @@
                 const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
                 return shouldTranslateTextareaChrome(node, type, attributeName) || (element
                     && !element.closest?.(pageConfig.ignoreMutationSelectors)
-                    && !isReactGlobalNavPortalNode(element));
+                    && (!isReactGlobalNavPortalNode(element)
+                        || (type === 'characterData' && isLiveSurfaceCharacterData(node))));
             })
             // 处理每个变化
             .forEach(({ node }) =>
@@ -356,7 +389,7 @@
         if (!FeatureSet.enable_extension) return;
 
         const handleTextNode = node => {
-            if (node.length > 500) return;
+            if (node.length > (pageConfig.maxTextNodeLength ?? 500)) return;
             transElement(node, 'data');
         }
 
