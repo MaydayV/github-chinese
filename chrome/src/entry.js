@@ -49,12 +49,39 @@
 
         // 监听 Turbo 完成事件（延迟翻译）
         document.addEventListener('turbo:load', () => {
-            updatePageConfig('turbo:load');
+            const currentDocUrl = typeof getDocUrlNoHashFallback === 'function'
+                ? getDocUrlNoHashFallback()
+                : String(window?.location?.href || '').split('#')[0];
+            const docUrlChanged = Boolean(typeof lastHistoryDocUrl !== 'undefined' && lastHistoryDocUrl && currentDocUrl && currentDocUrl !== lastHistoryDocUrl);
+            if (typeof lastHistoryDocUrl !== 'undefined' && currentDocUrl) {
+                lastHistoryDocUrl = currentDocUrl;
+            }
+            if (docUrlChanged) {
+                if (typeof closeCollaborationModal === 'function') {
+                    closeCollaborationModal();
+                }
+                if (typeof resetTldrRuntimeForNavigation === 'function') {
+                    resetTldrRuntimeForNavigation();
+                }
+            }
+            if (typeof readmeRuntime === 'object') {
+                readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+            }
+            if (typeof issuePrRuntime === 'object') {
+                issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+            }
+            if (!FeatureSet.enable_extension) {
+                if (typeof restoreAllExtensionFeatures === 'function') {
+                    restoreAllExtensionFeatures();
+                }
+                return;
+            }
+            updatePageConfig('turbo:load', true);
             scheduleIssuePrTranslationControls('turbo:load');
             scheduleCollaborationHelperControls('turbo:load');
             scheduleTldrCapsuleControls('turbo:load');
             scheduleReadmeTranslation('turbo:load');
-            if (!FeatureSet.enable_extension || !pageConfig.currentPageType) return;
+            if (!pageConfig.currentPageType) return;
 
             // 软导航后必须全量扫描；仅靠 title/selector 会漏掉仓库顶栏等 React 文案
             scheduleTurboPageTranslation();

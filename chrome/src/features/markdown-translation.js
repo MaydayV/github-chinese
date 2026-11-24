@@ -33,14 +33,19 @@
 
     function getReadmeRootElement() {
         for (const selector of README_CONFIG.ROOT_SELECTORS) {
-            const element = document.querySelector(selector);
-            if (!element) continue;
-            // 避免在议题/PR 等页面误选普通 markdown 正文
-            if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) {
-                continue;
-            }
+            const elements = typeof document.querySelectorAll === 'function'
+                ? document.querySelectorAll(selector)
+                : [document.querySelector(selector)].filter(Boolean);
+            for (const element of elements) {
+                if (!element) continue;
+                if (element.closest?.('[data-ghcn-chinese-readme]')) continue;
+                // 避免在议题/PR 等页面误选普通 markdown 正文
+                if (element.closest?.('.js-comment-body, [data-testid="markdown-body"], .comment-body')) {
+                    continue;
+                }
 
-            return element;
+                return element;
+            }
         }
 
         return null;
@@ -76,11 +81,22 @@
         }
 
         const startAt = performance.now();
+        const expectedHref = window.location.href;
+        const runEpoch = readmeRuntime.runEpoch || 0;
+        const initialAboutEnabled = Boolean(FeatureSet.enable_readme_translation);
+        const isAboutRunValid = () => (readmeRuntime.runEpoch || 0) === runEpoch
+            && FeatureSet.enable_extension
+            && (!initialAboutEnabled || FeatureSet.enable_readme_translation)
+            && window.location.href === expectedHref
+            && aboutElements.some((el) => el.isConnected);
+
         const repoInfo = getCurrentRepoInfo();
         const elementsWithTasks = [];
 
         for (const aboutEl of aboutElements) {
-            const tasks = collectReadmeTextTasks(aboutEl);
+            const tasks = collectReadmeTextTasks(aboutEl)
+                .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node))
+                .filter((task) => !isLikelyTechnicalReadmeText(task.normalizedText, task.node));
             if (tasks.length) {
                 elementsWithTasks.push({ aboutEl, tasks });
             }
@@ -103,13 +119,19 @@
         let totalTokens = 0;
 
         if (cacheKey) {
-            const cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true }).catch(() => null);
+            const cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true }).catch((error) => {
+                if (isExtensionContextInvalidatedError(error)) throw error;
+                return null;
+            });
+            if (!isAboutRunValid()) return 0;
             if (cached?.translatedHtml) {
                 try {
                     const cachedData = JSON.parse(cached.translatedHtml);
                     if (cachedData?.translations && typeof cachedData.translations === 'object') {
+                        hydrateReadmePreservedCache(signature, cached.preservedTexts);
                         const translatedMap = new Map(Object.entries(cachedData.translations));
                         for (const { aboutEl, tasks } of elementsWithTasks) {
+                            if (!aboutEl.isConnected) continue;
                             const tasksByText = new Map();
                             tasks.forEach((task) => {
                                 if (!tasksByText.has(task.normalizedText)) {
@@ -131,7 +153,9 @@
                             sourceHash,
                             detail: 'about_cache_hit',
                         }).catch((error) => {
-                            console.warn('[About翻译] 写入缓存记录失败:', error);
+                            if (!isExtensionContextInvalidatedError(error)) {
+                                console.warn('[About翻译] 写入缓存记录失败:', error);
+                            }
                         });
 
                         return translatedCount;
@@ -142,13 +166,16 @@
             }
         }
 
+        if (!isAboutRunValid()) return 0;
         const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig, {
             debugContext,
             debugPhase: 'about',
         });
         totalTokens = tokens;
+        if (!isAboutRunValid()) return 0;
 
         for (const { aboutEl, tasks } of elementsWithTasks) {
+            if (!aboutEl.isConnected) continue;
             const tasksByText = new Map();
             tasks.forEach((task) => {
                 if (!tasksByText.has(task.normalizedText)) {
@@ -161,10 +188,26 @@
             aboutEl.setAttribute('data-ghcn-about-translated', 'true');
         }
 
+        const preservedAboutTexts = [];
+        let unresolvedAboutCount = 0;
+        allTasks.forEach((task) => {
+            if (!task.node?.isConnected) return;
+            const liveText = normalizeText(task.node.data || '');
+            if (liveText !== task.normalizedText) return;
+            if (readmeRuntime.preservedCache?.has(`${signature}|${task.normalizedText}`)) {
+                if (!preservedAboutTexts.includes(task.normalizedText)) {
+                    preservedAboutTexts.push(task.normalizedText);
+                }
+                return;
+            }
+            unresolvedAboutCount += 1;
+        });
+        const isAboutComplete = unresolvedAboutCount === 0;
+
         addReadmeDebugEvent(debugContext, 'about_end', { translatedCount });
 
-        if (translatedCount > 0) {
-            if (cacheKey) {
+        if (translatedCount > 0 || totalTokens > 0) {
+            if (cacheKey && isAboutComplete) {
                 const cachePayload = {
                     translations: Object.fromEntries(translatedMap),
                 };
@@ -172,21 +215,26 @@
                     repo: repoInfo?.fullName || '',
                     sourceHash,
                     translatedHtml: JSON.stringify(cachePayload),
-                    complete: translatedCount >= allTasks.length,
+                    complete: true,
+                    preservedTexts: preservedAboutTexts,
                 }).catch((error) => {
-                    console.warn('[About翻译] 写入缓存失败:', error);
+                    if (!isExtensionContextInvalidatedError(error)) {
+                        console.warn('[About翻译] 写入缓存失败:', error);
+                    }
                 });
             }
 
             await appendReadmeTranslationRecord({
                 sourceType: 'about',
-                status: 'success',
+                status: isAboutComplete ? 'success' : 'partial',
                 tokens: totalTokens,
                 durationMs: performance.now() - startAt,
                 sourceHash,
                 detail: `about_translated_nodes=${translatedCount}`,
             }).catch((error) => {
-                console.warn('[About翻译] 写入翻译记录失败:', error);
+                if (!isExtensionContextInvalidatedError(error)) {
+                    console.warn('[About翻译] 写入翻译记录失败:', error);
+                }
             });
         }
 
@@ -342,15 +390,39 @@
         };
 
         try {
-            const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, []);
-            const logs = Array.isArray(existing) ? existing : [];
-            logs.push(entry);
-            await setLocalValue(
-                README_LOCAL_STORAGE_KEYS.DEBUG_LOGS,
-                logs.slice(-README_CONFIG.DEBUG_LOG_MAX_ENTRIES),
-            );
+            const writeLogs = async () => {
+                const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, []);
+                const logs = Array.isArray(existing) ? [...existing] : [];
+                logs.push(entry);
+                const sliced = logs.slice(-README_CONFIG.DEBUG_LOG_MAX_ENTRIES);
+                const budgeted = typeof trimEntriesToByteBudget === 'function'
+                    ? (() => {
+                        const copy = [...sliced];
+                        while (copy.length > 1 && estimateJsonUtf8Bytes(copy) > DEBUG_LOGS_MAX_BYTES) {
+                            copy.shift();
+                        }
+                        return copy;
+                    })()
+                    : sliced;
+                if (typeof setLocalValueWithQuotaRetry === 'function') {
+                    await setLocalValueWithQuotaRetry(
+                        README_LOCAL_STORAGE_KEYS.DEBUG_LOGS,
+                        budgeted,
+                        (list) => list.slice(-Math.max(1, Math.floor(list.length / 2))),
+                    );
+                } else {
+                    await setLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, budgeted);
+                }
+            };
+            if (typeof enqueueLocalStorageWrite === 'function') {
+                await enqueueLocalStorageWrite(writeLogs);
+            } else {
+                await writeLogs();
+            }
         } catch (error) {
-            console.warn('[README翻译调试] 保存调试日志失败:', error);
+            if (!isExtensionContextInvalidatedError(error)) {
+                console.warn('[README翻译调试] 保存调试日志失败:', error);
+            }
         }
     }
 
@@ -382,23 +454,42 @@
     function refreshReadmeTextTaskNodes(rootEl, tasks) {
         if (!rootEl || !tasks.length) return tasks;
 
-        const liveTasks = collectReadmeTextTasks(rootEl);
-        const liveByText = new Map();
-        liveTasks.forEach((task) => {
-            if (!liveByText.has(task.normalizedText)) {
-                liveByText.set(task.normalizedText, []);
+        const usedNodes = new Set();
+        const resolved = tasks.map((task) => {
+            const node = task?.node;
+            const inRoot = typeof rootEl.contains !== 'function' || rootEl.contains(node);
+            const matchesText = node && normalizeText(node.data || '') === task.normalizedText;
+            if (node?.isConnected && inRoot && matchesText && !usedNodes.has(node)) {
+                usedNodes.add(node);
+                return task;
             }
-            liveByText.get(task.normalizedText).push(task);
+            return null;
         });
 
-        const usedNodes = new Set();
+        if (resolved.every(Boolean)) {
+            return resolved;
+        }
+
+        const liveByText = new Map();
+        collectReadmeTextTasks(rootEl)
+            .filter((liveTask) => !isLikelyTechnicalReadmeText(liveTask.normalizedText, liveTask.node))
+            .forEach((liveTask) => {
+                if (!liveByText.has(liveTask.normalizedText)) {
+                    liveByText.set(liveTask.normalizedText, []);
+                }
+                liveByText.get(liveTask.normalizedText).push(liveTask);
+            });
+
         const refreshed = [];
+        tasks.forEach((task, index) => {
+            const existing = resolved[index];
+            if (existing) {
+                refreshed.push(existing);
+                return;
+            }
 
-        tasks.forEach((task) => {
             const candidates = liveByText.get(task.normalizedText) || [];
-            const replacement = candidates.find((candidate) => !usedNodes.has(candidate.node))
-                || (task.node?.isConnected ? task : null);
-
+            const replacement = candidates.find((candidate) => !usedNodes.has(candidate.node));
             if (replacement?.node) {
                 usedNodes.add(replacement.node);
                 refreshed.push(replacement);
@@ -422,24 +513,108 @@
 
     function applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
         let translatedCount = 0;
+        const translatableTasks = [];
 
         texts.forEach((text) => {
             const translated = normalizeTranslationText(translatedMap.get(text));
             if (!isUsableTranslation(text, translated)) return;
+            (tasksByText.get(text) || []).forEach((task) => translatableTasks.push(task));
+        });
+        if (!translatableTasks.length) return 0;
 
-            const tasks = refreshReadmeTextTaskNodes(rootEl, tasksByText.get(text) || []);
-            tasks.forEach((task) => {
-                if (!task.node?.isConnected) return;
-                task.node.data = task.rawText.replace(task.trimmedText, translated);
-                translatedCount += 1;
-            });
+        refreshReadmeTextTaskNodes(rootEl, translatableTasks).forEach((task) => {
+            const translated = normalizeTranslationText(translatedMap.get(task.normalizedText));
+            if (!isUsableTranslation(task.normalizedText, translated)) return;
+            if (!task.node?.isConnected) return;
+            task.node.data = task.rawText.replace(task.trimmedText, () => translated);
+            translatedCount += 1;
         });
 
         return translatedCount;
     }
 
+    function sanitizeCachedHtmlTree(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') return;
+
+        root.querySelectorAll('script, style, iframe, object, embed, form, base, meta, link, template, turbo-frame, turbo-stream')
+            .forEach((node) => node.remove());
+
+        const baseHref = typeof window !== 'undefined' && window.location?.href
+            ? window.location.href
+            : 'https://github.com/';
+        const elements = root.nodeType === 1 ? [root, ...root.querySelectorAll('*')] : [...root.querySelectorAll('*')];
+        for (const el of elements) {
+            if (el.attributes && typeof el.attributes[Symbol.iterator] === 'function') {
+                for (const attr of [...el.attributes]) {
+                    const attrName = String(attr.name || '').toLowerCase();
+                    if (/^on/i.test(attrName)
+                        || attrName === 'srcdoc'
+                        || attrName === 'formaction'
+                        || attrName.startsWith('data-turbo-')
+                        || attrName === 'data-action'
+                        || attrName === 'data-remote'
+                        || attrName === 'data-method') {
+                        el.removeAttribute(attr.name);
+                    }
+                }
+            }
+
+            for (const urlAttr of ['href', 'src', 'xlink:href', 'poster']) {
+                if (!el.hasAttribute?.(urlAttr)) continue;
+                const raw = String(el.getAttribute(urlAttr) || '').trim();
+                if (!raw) {
+                    el.removeAttribute(urlAttr);
+                    continue;
+                }
+                if (raw.startsWith('#') && urlAttr === 'href') continue;
+                try {
+                    const resolved = new URL(raw, baseHref);
+                    const allowedProtocols = urlAttr === 'href'
+                        ? ['https:', 'http:', 'mailto:']
+                        : ['https:', 'http:'];
+                    if (!allowedProtocols.includes(resolved.protocol.toLowerCase())) {
+                        el.removeAttribute(urlAttr);
+                    }
+                } catch {
+                    el.removeAttribute(urlAttr);
+                }
+            }
+
+            if (el.hasAttribute?.('srcset')) {
+                const rawSrcset = String(el.getAttribute('srcset') || '');
+                const parts = rawSrcset.split(',').map((part) => part.trim()).filter(Boolean);
+                let validAll = parts.length > 0;
+                for (const part of parts) {
+                    const tokens = part.split(/\s+/);
+                    if (tokens.length > 2 || !tokens[0]) {
+                        validAll = false;
+                        break;
+                    }
+                    try {
+                        const resolved = new URL(tokens[0], baseHref);
+                        if (!['https:', 'http:'].includes(resolved.protocol.toLowerCase())) {
+                            validAll = false;
+                            break;
+                        }
+                        if (tokens[1] && !/^(?:\d+w|\d+(?:\.\d+)?x)$/i.test(tokens[1])) {
+                            validAll = false;
+                            break;
+                        }
+                    } catch {
+                        validAll = false;
+                        break;
+                    }
+                }
+                if (!validAll) {
+                    el.removeAttribute('srcset');
+                }
+            }
+        }
+    }
+
     function replaceElementChildrenFromHtml(element, html) {
         const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+        sanitizeCachedHtmlTree(parsed.body);
         const nodes = Array.from(parsed.body.childNodes, node => document.importNode(node, true));
         element.replaceChildren(...nodes);
     }
@@ -451,7 +626,7 @@
     }
 
     function applyReadmeTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
-        return applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap);
+        return withReadmeDomMutationGuard(() => applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap));
     }
 
     function applyTaskTranslations(rootEl, tasks, translatedMap) {
@@ -462,7 +637,7 @@
             if (!isUsableTranslation(task.normalizedText, translated)) return;
             if (!task.node?.isConnected) return;
 
-            task.node.data = task.rawText.replace(task.trimmedText, translated);
+            task.node.data = task.rawText.replace(task.trimmedText, () => translated);
             translatedCount += 1;
         });
 
@@ -470,7 +645,7 @@
     }
 
     function applyReadmeTaskTranslations(rootEl, tasks, translatedMap) {
-        return applyTaskTranslations(rootEl, tasks, translatedMap);
+        return withReadmeDomMutationGuard(() => applyTaskTranslations(rootEl, tasks, translatedMap));
     }
 
     async function waitForNextPaint() {
@@ -480,6 +655,7 @@
     }
 
     function restoreReadmeTranslation() {
+        readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
         const readmeEl = getReadmeRootElement();
         if (!readmeEl) return;
 
@@ -514,8 +690,10 @@
 
     async function runReadmeTranslation(reason) {
         const shouldTranslateReadme = isReadmeTranslationEnabled();
+        const shouldPreferChinese = FeatureSet.enable_extension && FeatureSet.prefer_chinese_readme && isReadmePage();
         const shouldTranslateAbout = isRepoAboutTranslationEnabled();
-        if (!shouldTranslateReadme && !shouldTranslateAbout) {
+        if (!shouldTranslateReadme && !shouldTranslateAbout && !shouldPreferChinese) {
+            restoreChineseReadme();
             restoreReadmeTranslation();
             return;
         }
@@ -526,6 +704,7 @@
         }
 
         const readmeEl = getReadmeRootElement();
+        if (!readmeEl) restoreChineseReadme();
         if (!readmeEl && !getRepoAboutElement()) return;
 
         readmeRuntime.inFlight = true;
@@ -542,6 +721,10 @@
             const translationTasks = [];
             if (shouldTranslateAbout) {
                 translationTasks.push(translateRepoAboutDescription(debugContext, reason).catch((error) => {
+                    if (isExtensionContextInvalidatedError(error)) {
+                        readmeRuntime.rerunRequested = false;
+                        return;
+                    }
                     addReadmeDebugEvent(debugContext, 'about_failed', {
                         message: normalizeRuntimeErrorMessage(error),
                     });
@@ -549,8 +732,19 @@
                 }));
             }
 
-            if (shouldTranslateReadme && readmeEl) {
-                translationTasks.push(translateReadmeElement(readmeEl, reason, debugContext));
+            if ((shouldTranslateReadme || shouldPreferChinese) && readmeEl) {
+                translationTasks.push((async () => {
+                    if (await preferChineseReadme()) {
+                        addReadmeDebugEvent(debugContext, 'readme_skipped', {
+                            reason: (typeof chineseReadme !== 'undefined' && chineseReadme?.state?.root === readmeEl)
+                                ? 'native_chinese_readme'
+                                : 'waiting_react_hydration',
+                        });
+                        return;
+                    }
+                    if (shouldTranslateReadme && FeatureSet.enable_extension && readmeEl.isConnected
+                        && readmeEl === getReadmeRootElement() && isReadmePage()) await translateReadmeElement(readmeEl, reason, debugContext);
+                })());
             }
 
             await Promise.all(translationTasks);
@@ -574,7 +768,9 @@
                 sourceHash,
                 detail: normalizeRuntimeErrorMessage(error),
             }).catch((recordError) => {
-                console.warn('[README翻译] 记录失败日志时出错:', recordError);
+                if (!isExtensionContextInvalidatedError(recordError)) {
+                    console.warn('[README翻译] 记录失败日志时出错:', recordError);
+                }
             });
             throw error;
         } finally {
@@ -595,6 +791,13 @@
     async function translateReadmeElement(readmeEl, reason, debugContext = null) {
         const startAt = performance.now();
         const expectedHref = window.location.href;
+        const initialReadmeEnabled = Boolean(FeatureSet.enable_readme_translation);
+        const runEpoch = readmeRuntime.runEpoch || 0;
+        const isRunValid = () => (readmeRuntime.runEpoch || 0) === runEpoch
+            && (typeof isPageExcluded !== 'function' || FeatureSet.enable_extension)
+            && (!initialReadmeEnabled || FeatureSet.enable_readme_translation)
+            && readmeEl.isConnected
+            && window.location.href === expectedHref;
         const state = getReadmeElementState(readmeEl);
         const currentHash = createHash(readmeEl.innerHTML);
         const currentTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
@@ -637,7 +840,10 @@
             return;
         }
 
-        const sourceText = normalizeText(readmeEl.textContent || '');
+        const sourceBody = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(state.originalHtml)
+            : readmeEl;
+        const sourceText = normalizeText(sourceBody.textContent || '');
         if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
             if (readmeEl.innerHTML !== state.originalHtml) {
                 applyReadmeHtml(readmeEl, state.originalHtml);
@@ -658,14 +864,18 @@
         );
         let cacheKeyUsed = repoCacheKey;
         let cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
+            if (isExtensionContextInvalidatedError(error)) throw error;
             console.warn('[README翻译] 读取仓库缓存失败:', error);
             return null;
         });
+        if (!isRunValid()) return;
         if (!cacheHit && legacyRepoCacheKey && legacyRepoCacheKey !== repoCacheKey) {
             cacheHit = await getRepoCachedTranslation(legacyRepoCacheKey).catch((error) => {
+                if (isExtensionContextInvalidatedError(error)) throw error;
                 console.warn('[README翻译] 读取旧版仓库缓存失败:', error);
                 return null;
             });
+            if (!isRunValid()) return;
             if (cacheHit) cacheKeyUsed = legacyRepoCacheKey;
         }
 
@@ -675,8 +885,11 @@
                 console.warn('[README翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
                 applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
-                const cachedRemaining = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
-                    .filter((task) => task.node?.isConnected);
+                hydrateReadmePreservedCache(providerConfig.signature, cacheHit.preservedTexts);
+                const cachedRemaining = cacheHit.complete === true
+                    ? []
+                    : collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                        .filter((task) => task.node?.isConnected);
                 if (!cachedRemaining.length) {
                     state.translatedSignature = signature;
                     state.translatedHash = createHash(readmeEl.innerHTML);
@@ -690,7 +903,9 @@
                         sourceHash,
                         detail: `cache_reason=${reason || 'unknown'}`,
                     }).catch((error) => {
-                        console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                        if (!isExtensionContextInvalidatedError(error)) {
+                            console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                        }
                     });
                     addReadmeDebugEvent(debugContext, 'cache_hit', {
                         cacheKey: cacheKeyUsed,
@@ -700,13 +915,17 @@
                         complete: true,
                     });
                     if (cacheKeyUsed !== repoCacheKey || cacheHit.complete !== true) {
+                        const preservedTexts = collectReadmePreservedTexts(readmeEl, providerConfig.signature);
                         await upsertRepoCachedTranslation(repoCacheKey, {
                             repo: repoInfo?.fullName || '',
                             sourceHash,
                             translatedHtml: cacheHit.translatedHtml,
                             complete: true,
+                            preservedTexts: preservedTexts.length ? preservedTexts : cacheHit.preservedTexts,
                         }).catch((error) => {
-                            console.warn('[README翻译] 迁移/补全仓库缓存失败:', error);
+                            if (!isExtensionContextInvalidatedError(error)) {
+                                console.warn('[README翻译] 迁移/补全仓库缓存失败:', error);
+                            }
                         });
                     }
                     return;
@@ -723,19 +942,19 @@
             }
         }
 
-        // 这三个计数在 finally 之后写翻译记录时仍要用，必须声明在 try 块外的函数作用域。
         let translatedCount = 0;
         let totalTokens = 0;
         let retryMissedCount = 0;
 
-        pushReadmeDomMutationGuard();
-        try {
         if (!partialCacheApplied && readmeEl.innerHTML !== state.originalHtml) {
             applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
         const runTranslationPass = async (passName) => {
-            const tasks = collectReadmeTextTasks(readmeEl)
+            if (!isRunValid()) return { translatedCount: 0, totalTokens: 0 };
+            const tasks = (partialCacheApplied
+                ? collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                : collectReadmeTextTasks(readmeEl))
                 .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node))
                 .filter((task) => !isLikelyTechnicalReadmeText(task.normalizedText, task.node));
             addReadmeDebugEvent(debugContext, 'pass_start', {
@@ -770,15 +989,18 @@
                     groups,
                     README_CONFIG.TRANSLATION_CONCURRENCY,
                     async (group, index) => {
+                        if (!isRunValid()) {
+                            return { applied: 0, tokens: 0 };
+                        }
                         const groupTexts = [...new Set(group.map(task => task.normalizedText))];
                         const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(
                             groupTexts,
                             providerConfig,
-                            { debugContext, debugPhase: passName, debugBatchIndex: index },
+                            { debugContext, debugPhase: passName, debugBatchIndex: index, concurrency: 1 },
                         );
 
-                        // 软导航防重入校验：若网络请求期间用户已跳转或节点已卸载，安全放弃本次 DOM 回填
-                        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+                        // 软导航与开关防重入校验：若网络请求期间用户已跳转、关闭开关或节点已卸载，安全放弃本次 DOM 回填
+                        if (!readmeEl.isConnected || window.location.href !== expectedHref || !isRunValid()) {
                             return { applied: 0, tokens: groupTokens };
                         }
 
@@ -790,7 +1012,7 @@
                             applied,
                             tokens: groupTokens,
                         });
-                        if (index < groups.length - 1) await waitForNextPaint();
+                        if (index < groups.length - 1 && isRunValid()) await waitForNextPaint();
                         return { applied, tokens: groupTokens };
                     },
                 );
@@ -806,7 +1028,7 @@
                 );
                 passTokens += tokens;
 
-                if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+                if (!isRunValid()) {
                     return { translatedCount: 0, totalTokens: passTokens };
                 }
 
@@ -825,7 +1047,7 @@
         translatedCount += firstPass.translatedCount;
         totalTokens += firstPass.totalTokens;
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+        if (!isRunValid()) {
             return;
         }
 
@@ -833,9 +1055,9 @@
         // 逐条重试收尾。以“无进展即停止 + 最多 maxRetryPasses 轮”双重保险避免空转。
         const maxRetryPasses = 2;
         for (let attempt = 0; attempt < maxRetryPasses; attempt += 1) {
-            if (!readmeEl.isConnected || window.location.href !== expectedHref) break;
+            if (!isRunValid()) break;
 
-            const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+            const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
                 .filter((task) => task.node?.isConnected);
             addReadmeDebugEvent(debugContext, 'retry_scan', {
                 attempt,
@@ -854,6 +1076,7 @@
                 retryTasksByText.get(task.normalizedText).push(task);
             });
 
+            if (!isRunValid()) break;
             const { translatedMap, totalTokens: retryTokens } = await translateTextsWithProvider(
                 retryTexts,
                 providerConfig,
@@ -861,7 +1084,7 @@
             );
             totalTokens += retryTokens;
 
-            if (!readmeEl.isConnected || window.location.href !== expectedHref) break;
+            if (!isRunValid()) break;
 
             const applied = applyReadmeTextGroupTranslations(readmeEl, retryTasksByText, retryTexts, translatedMap);
             translatedCount += applied;
@@ -874,26 +1097,20 @@
             if (!applied) break;
         }
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+        if (!isRunValid()) {
             return;
         }
 
-        if (!translatedCount && !collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
-            .some((task) => task.node?.isConnected)) {
+        if (!translatedCount && !totalTokens && !partialCacheApplied
+            && !collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                .some((task) => task.node?.isConnected)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
             state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
             return;
         }
-        } finally {
-            popReadmeDomMutationGuard();
-        }
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
-            return;
-        }
-
-        const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+        const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
             .filter((task) => task.node?.isConnected);
         const stillMissed = remainingTasks.length;
         addReadmeDebugEvent(debugContext, 'readme_end', {
@@ -904,16 +1121,9 @@
             remainingTasks: remainingTasks.slice(0, 24)
                 .map((task) => describeReadmeDebugTask(task, readmeEl)),
         });
-        if (!stillMissed) {
-            state.translatedSignature = signature;
-            state.translatedHash = createHash(readmeEl.innerHTML);
-            state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
-        } else {
-            // 部分结果也要持久化；刷新时先恢复已成功节点，再只补翻译剩余节点。
-            state.translatedSignature = '';
-            state.translatedHash = '';
-            state.translatedTextHash = '';
-        }
+        state.translatedSignature = signature;
+        state.translatedHash = createHash(readmeEl.innerHTML);
+        state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
         if (!stillMissed || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(repoCacheKey, {
@@ -921,8 +1131,11 @@
                 sourceHash,
                 translatedHtml: readmeEl.innerHTML,
                 complete: !stillMissed,
+                preservedTexts: collectReadmePreservedTexts(readmeEl, providerConfig.signature),
             }).catch((error) => {
-                console.warn('[README翻译] 写入仓库缓存失败:', error);
+                if (!isExtensionContextInvalidatedError(error)) {
+                    console.warn('[README翻译] 写入仓库缓存失败:', error);
+                }
             });
         }
 
@@ -934,7 +1147,9 @@
             sourceHash,
             detail: `translated_nodes=${translatedCount};retry_missed=${retryMissedCount};remaining=${stillMissed}`,
         }).catch((error) => {
-            console.warn('[README翻译] 写入翻译记录失败:', error);
+            if (!isExtensionContextInvalidatedError(error)) {
+                console.warn('[README翻译] 写入翻译记录失败:', error);
+            }
         });
     }
 
@@ -948,13 +1163,24 @@
 
     function collectReadmeTextTasks(readmeEl) {
         const tasks = [];
-        const walker = document.createTreeWalker(readmeEl, NodeFilter.SHOW_TEXT);
+        const showMask = (NodeFilter.SHOW_ELEMENT || 1) | NodeFilter.SHOW_TEXT;
+        const walker = document.createTreeWalker(readmeEl, showMask, {
+            acceptNode(node) {
+                if (node.nodeType === 1) {
+                    return node.matches?.(README_CONFIG.SKIP_PARENT_SELECTOR)
+                        ? (NodeFilter.FILTER_REJECT || 2)
+                        : (NodeFilter.FILTER_ACCEPT || 1);
+                }
+                return (NodeFilter.FILTER_ACCEPT || 1);
+            },
+        });
 
         let node;
         while ((node = walker.nextNode())) {
+            if (node.nodeType !== 3) continue;
             const parent = node.parentElement;
             if (!parent) continue;
-            if (parent.closest(README_CONFIG.SKIP_PARENT_SELECTOR)) continue;
+            if (parent.closest?.(README_CONFIG.SKIP_PARENT_SELECTOR)) continue;
 
             const rawText = node.data;
             const trimmedText = rawText.trim();
@@ -970,8 +1196,13 @@
 
 
     function collectReadmeOriginalTextCounts(originalHtml) {
-        const container = document.createElement('div');
-        container.innerHTML = String(originalHtml || '');
+        const container = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(originalHtml)
+            : (() => {
+                const div = document.createElement('div');
+                div.innerHTML = String(originalHtml || '');
+                return div;
+            })();
         const counts = new Map();
 
         collectReadmeTextTasks(container).forEach((task) => {
@@ -981,16 +1212,44 @@
         return counts;
     }
 
-    function collectReadmeUntranslatedTasks(readmeEl, originalHtml) {
+    function hydrateReadmePreservedCache(providerSignature, preservedTexts) {
+        if (!providerSignature || !Array.isArray(preservedTexts) || !readmeRuntime.preservedCache) return;
+
+        preservedTexts.forEach((item) => {
+            if (typeof item !== 'string') return;
+            const normalized = normalizeText(item);
+            if (!normalized) return;
+            readmeRuntime.preservedCache.add(`${providerSignature}|${normalized}`);
+        });
+    }
+
+    function collectReadmePreservedTexts(readmeEl, providerSignature) {
+        if (!readmeEl || !providerSignature || !readmeRuntime.preservedCache?.size) return [];
+
+        const seen = new Set();
+        const preservedTexts = [];
+        collectReadmeTextTasks(readmeEl).forEach((task) => {
+            if (!readmeRuntime.preservedCache.has(`${providerSignature}|${task.normalizedText}`)) return;
+            if (seen.has(task.normalizedText)) return;
+            seen.add(task.normalizedText);
+            preservedTexts.push(task.normalizedText);
+        });
+        return preservedTexts;
+    }
+
+    function collectReadmeUntranslatedTasks(readmeEl, originalHtml, providerSignature = '') {
         const originalCounts = collectReadmeOriginalTextCounts(originalHtml);
         return collectReadmeTextTasks(readmeEl)
             .filter((task) => {
                 if (isLikelyTechnicalReadmeText(task.normalizedText, task.node)) return false;
+                if (providerSignature && readmeRuntime.preservedCache?.has(`${providerSignature}|${task.normalizedText}`)) {
+                    return false;
+                }
                 const remaining = originalCounts.get(task.normalizedText) || 0;
                 if (!remaining) return false;
 
                 originalCounts.set(task.normalizedText, remaining - 1);
-                return !isLikelyTechnicalReadmeText(task.normalizedText, task.node);
+                return true;
             });
     }
 

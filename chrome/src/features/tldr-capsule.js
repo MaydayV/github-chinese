@@ -9,6 +9,14 @@
 - **💡 选型考量**：说明同类对比或适用场景（如：“相比 XX 更轻量，适合小型集群”）。
 输出纯 Markdown 列表，严格不要包含额外前缀、礼貌客套或总结废话。`;
 
+    function isTldrContextInvalidated(error) {
+        if (typeof isExtensionContextInvalidatedError === 'function') {
+            return isExtensionContextInvalidatedError(error);
+        }
+        const message = String(error?.message || error || '');
+        return /extension context invalidated|context invalidated|插件上下文已失效/i.test(message);
+    }
+
     function isTldrCapsuleEnabled() {
         return FeatureSet.enable_extension && FeatureSet.enable_repo_tldr && isReadmePage();
     }
@@ -46,10 +54,44 @@
         }
 
         injectTldrCapsuleStyles();
-        mountTldrCapsule(readmeRoot, repoInfo);
+        mountTldrCapsule(readmeRoot, repoInfo).catch((error) => {
+            if (!isTldrContextInvalidated(error)) {
+                console.warn('[速读胶囊] 挂载失败:', error);
+            }
+        });
+    }
+
+    function getTldrDocUrl() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        try {
+            const parsed = new URL(href);
+            parsed.hash = '';
+            return parsed.href;
+        } catch {
+            return href.split('#')[0];
+        }
+    }
+
+    function resetTldrRuntimeForNavigation() {
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        tldrRuntime.isBusy = false;
+        tldrRuntime.busyDocUrl = '';
+        tldrRuntime.busyCard = null;
+        document.querySelectorAll('[data-ghcn-tldr="capsule"]').forEach((el) => el.remove());
     }
 
     function restoreTldrCapsuleControls() {
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        tldrRuntime.isBusy = false;
+        tldrRuntime.busyDocUrl = '';
+        tldrRuntime.busyCard = null;
+        tldrRuntime.activeDocUrl = '';
         document.querySelectorAll('[data-ghcn-tldr]').forEach((el) => el.remove());
     }
 
@@ -67,19 +109,31 @@
 
     function extractReadmeIntroText(readmeRoot, maxChars = 2400) {
         const state = typeof getReadmeElementState === 'function' ? getReadmeElementState(readmeRoot) : null;
-        let sourceEl = readmeRoot;
+        let clone;
         if (state?.originalHtml) {
-            sourceEl = document.createElement('div');
-            sourceEl.innerHTML = state.originalHtml;
+            clone = typeof parseInertHtmlBody === 'function'
+                ? parseInertHtmlBody(state.originalHtml)
+                : (() => {
+                    const div = document.createElement('div');
+                    div.innerHTML = state.originalHtml;
+                    return div;
+                })();
+        } else {
+            clone = readmeRoot.cloneNode(true);
         }
-        const clone = sourceEl.cloneNode(true);
-        clone.querySelectorAll('pre, code, svg, img, table, .notranslate, [translate="no"]').forEach((el) => el.remove());
+        clone.querySelectorAll?.('pre, code, svg, img, table, .notranslate, [translate="no"]').forEach((el) => el.remove());
         const text = normalizeText(clone.textContent || '');
         return text.slice(0, maxChars);
     }
 
     function findTldrMountPoint(readmeRoot) {
         if (!readmeRoot) return null;
+
+        if (typeof chineseReadme !== 'undefined'
+            && chineseReadme?.state?.root === readmeRoot
+            && chineseReadme.state.controls?.parentElement) {
+            return { parent: chineseReadme.state.controls.parentElement, before: chineseReadme.state.controls };
+        }
 
         // 如果处于 .Box-body 内部，优先挂载在 .Box-body 之前（紧贴 .Box-header 之后，贴紧上边和左右）
         const boxBody = readmeRoot.closest('.Box-body');
@@ -148,9 +202,13 @@
         const mountPoint = findTldrMountPoint(readmeRoot);
         if (!mountPoint) return null;
 
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
         const oldCard = document.querySelector('[data-ghcn-tldr="capsule"]');
         if (oldCard) {
-            if (oldCard.dataset.sourceHash === sourceHash && oldCard.parentElement === mountPoint.parent && oldCard.nextElementSibling === mountPoint.before) {
+            if (oldCard.dataset.sourceHash === sourceHash
+                && oldCard.dataset.pathname === currentPathname
+                && oldCard.parentElement === mountPoint.parent
+                && oldCard.nextElementSibling === mountPoint.before) {
                 oldCard.style.display = '';
                 return oldCard;
             }
@@ -161,6 +219,7 @@
         card.className = 'ghcn-tldr-card';
         card.dataset.ghcnTldr = 'capsule';
         card.dataset.sourceHash = sourceHash;
+        card.dataset.pathname = currentPathname;
 
         mountPoint.parent.insertBefore(card, mountPoint.before);
         return card;
@@ -174,6 +233,8 @@
 
         let btn = document.querySelector('[data-ghcn-tldr="header-btn"]');
         if (btn) {
+            btn.__ghcnTldrOnToggle = onToggle;
+            btn.dataset.sourceHash = sourceHash;
             if (btn.parentElement === headerActions.container && btn.nextElementSibling === headerActions.beforeEl) {
                 return btn;
             }
@@ -190,14 +251,19 @@
         btn.dataset.ghcnTldr = 'header-btn';
         btn.dataset.sourceHash = sourceHash;
         btn.innerHTML = `<span class="ghcn-tldr-header-icon" aria-hidden="true">${TLDR_ICONS.sparkle}</span><span class="ghcn-tldr-header-text">AI 速读</span>`;
+        btn.__ghcnTldrOnToggle = onToggle;
 
         headerActions.container.insertBefore(btn, headerActions.beforeEl);
 
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (typeof onToggle === 'function') {
-                onToggle(btn);
+            if (typeof btn.__ghcnTldrOnToggle === 'function') {
+                Promise.resolve(btn.__ghcnTldrOnToggle(btn)).catch((error) => {
+                    if (!isTldrContextInvalidated(error)) {
+                        console.warn('[速读胶囊] 交互失败:', error);
+                    }
+                });
             }
         });
 
@@ -205,18 +271,55 @@
     }
 
     async function mountTldrCapsule(readmeRoot, repoInfo) {
+        const expectedDocUrl = getTldrDocUrl();
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+        if (tldrRuntime.activeDocUrl && tldrRuntime.activeDocUrl !== expectedDocUrl) {
+            resetTldrRuntimeForNavigation();
+        }
+        tldrRuntime.activeDocUrl = expectedDocUrl;
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        const mountSeq = tldrRuntime.mountSeq;
+        const isMountValid = () => mountSeq === tldrRuntime.mountSeq
+            && getTldrDocUrl() === expectedDocUrl
+            && readmeRoot.isConnected
+            && isTldrCapsuleEnabled();
+
         const sourceHash = getTldrSourceHash(readmeRoot);
         const cacheKey = buildTldrCacheKey(repoInfo, sourceHash);
 
         // 1. 精确匹配当前 hash 缓存
-        let cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true });
+        let cached = null;
+        try {
+            cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true });
+        } catch (error) {
+            if (isTldrContextInvalidated(error)) return;
+            console.warn('[速读胶囊] 读取缓存失败:', error);
+        }
+        if (!isMountValid()) {
+            return;
+        }
 
-        // 2. 兜底匹配该仓库最新生成的速读缓存（防止 README 翻译后 DOM 变动导致 hash 微小变化）
+        // 2. 兜底匹配该仓库当前路径最新生成的速读缓存（防止 README 翻译后 DOM 变动导致 hash 微小变化）
         if (!cached?.tldrContent && FeatureSet.readme_enable_repo_cache && repoInfo?.fullName) {
-            await ensureRepoCacheLoaded();
+            try {
+                await ensureRepoCacheLoaded();
+            } catch (error) {
+                if (isTldrContextInvalidated(error)) return;
+                console.warn('[速读胶囊] 加载仓库缓存失败:', error);
+            }
+            if (!isMountValid()) {
+                return;
+            }
             const prefix = `${repoInfo.fullName.toLowerCase()}|tldr|`;
+            const repoRootPathLower = `/${repoInfo.fullName.toLowerCase()}`;
+            const currentPathLower = currentPathname.toLowerCase();
             for (const [key, entry] of readmeRuntime.repoCacheMap.entries()) {
-                if (key.startsWith(prefix) && entry.tldrContent && entry.complete === true) {
+                const entryPathLower = entry?.pathname ? (String(entry.pathname).replace(/\/+$/, '') || '/').toLowerCase() : '';
+                const matchesPath = entryPathLower
+                    ? entryPathLower === currentPathLower
+                    : currentPathLower === repoRootPathLower;
+                if (key.startsWith(prefix) && matchesPath
+                    && entry.tldrContent && entry.complete === true) {
                     cached = entry;
                     break;
                 }
@@ -224,10 +327,19 @@
         }
 
         const headerActions = findReadmeHeaderActions(readmeRoot);
+        const isMatchingCard = (targetCard) => Boolean(
+            targetCard
+            && targetCard.dataset.sourceHash === sourceHash
+            && targetCard.dataset.pathname === currentPathname,
+        );
 
         // 挂载或更新头部按钮（位于 Copilot 图标左侧）
         const headerBtn = mountTldrHeaderButton(readmeRoot, repoInfo, async (btn) => {
             let card = document.querySelector('[data-ghcn-tldr="capsule"]');
+            if (card && !isMatchingCard(card)) {
+                card.remove();
+                card = null;
+            }
 
             // 如果卡片已经存在且可见，点击则折叠/收起卡片
             if (card && card.style.display !== 'none') {
@@ -266,17 +378,29 @@
         });
 
         // 默认不主动展示下方的总结内容卡片，保持 README 清爽，待用户点击头部「AI 速读」按钮后再展开
-        const existingCard = document.querySelector('[data-ghcn-tldr="capsule"]');
-        if (existingCard && !headerBtn?.classList.contains('is-active')) {
+        let existingCard = document.querySelector('[data-ghcn-tldr="capsule"]');
+        if (existingCard && !isMatchingCard(existingCard)) {
+            existingCard.remove();
+            existingCard = null;
+        }
+        const isExistingCardVisible = Boolean(
+            existingCard
+            && isMatchingCard(existingCard)
+            && existingCard.style.display !== 'none',
+        );
+        if (existingCard && (!isExistingCardVisible || !headerBtn?.classList.contains('is-active'))) {
             existingCard.style.display = 'none';
         }
 
         if (headerBtn) {
-            headerBtn.classList.remove('is-active');
-            headerBtn.setAttribute('aria-expanded', 'false');
+            const keepActive = Boolean(existingCard && isExistingCardVisible && headerBtn.classList.contains('is-active'));
+            headerBtn.classList.toggle('is-active', keepActive);
+            headerBtn.setAttribute('aria-expanded', keepActive ? 'true' : 'false');
             if (cached?.tldrContent) {
                 headerBtn.setAttribute('data-has-cache', 'true');
                 headerBtn.title = 'AI 项目速读 (TL;DR) - 点击展开速读卡片';
+            } else {
+                headerBtn.removeAttribute('data-has-cache');
             }
         } else if (!headerActions) {
             // 极低概率：若找不到任何头部按钮挂载点，降级在 README 顶部展示初始提炼条
@@ -341,7 +465,7 @@
                 <div class="ghcn-tldr-title-wrap">
                     <span class="ghcn-tldr-error-icon" aria-hidden="true">${TLDR_ICONS.alert}</span>
                     <strong class="Box-title ghcn-tldr-title">生成速读失败</strong>
-                    <span class="ghcn-tldr-error-msg">${decodeHtmlEntities(message || '接口调用异常')}</span>
+                    <span class="ghcn-tldr-error-msg">${escapeHtml(message || '接口调用异常')}</span>
                 </div>
                 <div class="ghcn-tldr-actions">
                     <button type="button" class="btn btn-sm ghcn-tldr-btn" data-ghcn-tldr-action="retry">重试</button>
@@ -538,8 +662,19 @@
     }
 
     async function executeTldrGeneration(card, repoInfo, readmeRoot, sourceHash) {
-        if (tldrRuntime.isBusy) return;
+        const expectedDocUrl = getTldrDocUrl();
+        if (tldrRuntime.isBusy && tldrRuntime.busyDocUrl === expectedDocUrl && tldrRuntime.busyCard?.isConnected) return;
         tldrRuntime.isBusy = true;
+        tldrRuntime.busyDocUrl = expectedDocUrl;
+        tldrRuntime.busyCard = card;
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        const genSeq = tldrRuntime.genSeq;
+        const isGenValid = () => genSeq === tldrRuntime.genSeq
+            && getTldrDocUrl() === expectedDocUrl
+            && card.isConnected
+            && FeatureSet.enable_extension
+            && FeatureSet.enable_repo_tldr;
         renderTldrLoading(card);
 
         const headerBtn = document.querySelector('[data-ghcn-tldr="header-btn"]');
@@ -583,15 +718,21 @@
                 };
                 applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                if (providerConfig.key) {
+                    headers.Authorization = `Bearer ${providerConfig.key}`;
+                }
+
                 const data = await proxyFetchJson({
                     url: providerConfig.url,
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${providerConfig.key}`,
-                    },
+                    headers,
                     body: JSON.stringify(payload),
                 });
+
+                if (!isGenValid()) return;
 
                 const firstChoice = data?.choices?.[0] || {};
                 summaryText = stripOpenAiReasoningBlocks(extractChatMessageContent(firstChoice));
@@ -602,17 +743,24 @@
                 throw new Error('速读胶囊生成结果为空，请重试或检查接口配置。');
             }
 
+            if (!isGenValid()) return;
+
             const durationMs = performance.now() - startAt;
 
             // Save to repo cache
             await upsertRepoCachedTranslation(cacheKey, {
                 repo: repoInfo.fullName,
+                pathname: currentPathname,
                 sourceHash: activeSourceHash,
                 tldrContent: summaryText,
                 complete: true,
             }).catch((err) => {
-                console.warn('[速读胶囊] 写入缓存失败:', err);
+                if (!isTldrContextInvalidated(err)) {
+                    console.warn('[速读胶囊] 写入缓存失败:', err);
+                }
             });
+
+            if (!isGenValid()) return;
 
             // Append record
             await appendReadmeTranslationRecord({
@@ -624,8 +772,12 @@
                 sourceHash: activeSourceHash,
                 detail: 'tldr_generated',
             }).catch((err) => {
-                console.warn('[速读胶囊] 写入翻译记录失败:', err);
+                if (!isTldrContextInvalidated(err)) {
+                    console.warn('[速读胶囊] 写入翻译记录失败:', err);
+                }
             });
+
+            if (!isGenValid()) return;
 
             renderTldrContent(card, summaryText, repoInfo, readmeRoot, activeSourceHash, false);
             if (headerBtn) {
@@ -634,13 +786,20 @@
                 headerBtn.setAttribute('aria-expanded', 'true');
             }
         } catch (error) {
-            console.error('[速读胶囊] 生成失败:', error);
+            if (!isTldrContextInvalidated(error)) {
+                console.error('[速读胶囊] 生成失败:', error);
+            }
+            if (!isGenValid()) return;
             renderTldrError(card, normalizeRuntimeErrorMessage(error), repoInfo, readmeRoot, activeSourceHash);
             if (headerBtn) {
                 headerBtn.classList.remove('is-loading');
             }
         } finally {
-            tldrRuntime.isBusy = false;
+            if (genSeq === tldrRuntime.genSeq) {
+                tldrRuntime.isBusy = false;
+                tldrRuntime.busyDocUrl = '';
+                tldrRuntime.busyCard = null;
+            }
         }
     }
 

@@ -31,7 +31,7 @@
     "alternateName": ["GitHub Chinese", "GitHub 中文化插件", "GitHub 汉化插件"],
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome, Edge, Firefox",
-    "softwareVersion": "3.1.4",
+    "softwareVersion": "3.1.5",
     "url": "https://maydayv.github.io/github-chinese/",
     "downloadUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
     "installUrl": "https://chromewebstore.google.com/detail/emoeojemgbjcogiodobkpeohoailphgg",
@@ -138,7 +138,7 @@
         "name": "支持哪些翻译与 AI 服务商接口？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "全面支持 DeepSeek（推荐，高性价比）、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。"
+          "text": "默认选用哔哩哔哩翻译（Bilibili Index-Translate，免费免 Key，搭配 Win/macOS 一键本地托盘代理），同时全面支持 DeepSeek、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。"
         }
       },
       {
@@ -1183,7 +1183,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
         <img class="hero-icon" src="chrome/assets/icons/icon128.png" width="86" height="86" alt="GitHub 中文汉化翻译插件图标">
-        <p class="eyebrow">GitHub Chinese · v3.1.4</p>
+        <p class="eyebrow">GitHub Chinese · v3.1.5</p>
         <h1 id="hero-title">让 GitHub 用中文呈现，让开源距离每个人更近。</h1>
         <p class="hero-copy">本地词库深度汉化全站界面，按需双语翻译正文与讨论区。全新支持开源协作 AI 润色助手与仓库速读胶囊，无障碍融入全球开源社区。</p>
         <div class="hero-actions" aria-label="主要操作">
@@ -1196,7 +1196,7 @@
           <span class="developer-dot" aria-hidden="true"></span>
           <a href="https://github.com/MaydayV" rel="noopener">MaydayV</a>
         </div>
-        <p class="hero-note">v3.1.4 补强弹层动态翻译、议题/拉取请求详情和访问令牌权限预览。</p>
+        <p class="hero-note">v3.1.5 新增原生中文 README 优先显示、「词库与维护」面板，默认选用哔哩哔哩翻译（Index-Translate 免费免 Key，附 Win/macOS 托盘代理），全面加固内容翻译、速读胶囊与代理安全边界。</p>
       </div>
     </section>
 
@@ -1284,7 +1284,7 @@
           <article class="card">
             <span class="card-label">智能与生态</span>
             <h3>仓库速读 & 多模型支持</h3>
-            <p>README 头部一键提炼核心定位与技术选型（TL;DR）；全面支持 DeepSeek、OpenAI、Qwen、Azure、DeepL 等主流服务商与兼容接口。</p>
+            <p>README 头部一键提炼核心定位与技术选型（TL;DR）；默认选用哔哩哔哩翻译（免费免 Key，含桌面托盘代理），同时支持 DeepSeek、OpenAI、Qwen、Azure、DeepL 等主流服务商与兼容接口。</p>
           </article>
         </div>
       </div>
@@ -1329,6 +1329,20 @@
         </div>
         <!-- CHANGELOG:START -->
         <ol class="changelog-list">
+          <li class="changelog-item" id="v3-1-5">
+            <div class="changelog-meta">
+              <span class="changelog-version">v3.1.5</span>
+              <time class="changelog-date" datetime="2026-11-24">2026-11-24</time>
+            </div>
+            <ul class="changelog-points">
+              <li>新增“优先显示仓库已有中文 README”（默认开启）：自动识别仓库中文 README 并在安全净化后展示，完整保留中文目录锚点，支持一键切换英文原文或改用 API 翻译</li>
+              <li>新增“词库与维护”面板及弹窗快捷排除：支持按页面范围管理/导入导出自定义精确词条、排除指定页面或路径、可选本地界面漏译记录与导出，以及配置备份与恢复（默认不含 API Key，变更接口域名自动清空旧密钥）</li>
+              <li>内置并默认选用哔哩哔哩翻译（Bilibili Index-Translate 免费免 Key 服务，默认本地桥接 <code>http://127.0.0.1:8080/v1</code>，提供免安装 Python 的 Win <code>.exe</code> / macOS <code>.app</code> 一键托盘代理，支持可选 API Key、协作润色、AI 速读与自定义端口保留），适配异常响应、瞬态 502/503/504 重试与本地代理断连提示，修复设置页保存前“测试连通性”被拦截及接口地址含空白字符的问题；精简冗余顶层主机权限并强化后台代理来源与域名校验</li>
+              <li>全面加固 README、AI 速读胶囊（TL;DR）、Issue/PR/Release 讨论区翻译与开源协作润色助手：修复品牌/技术栈/架构标签误判重翻、渐进式翻译并发控制与 Token 统计、Monorepo 子目录缓存隔离、跨仓库软导航状态残留及行内编辑失效问题</li>
+              <li>补强 React 顶部全局导航防重入与自定义词条写入保护，修复多处内置词库正则遮蔽与未锚定误译（PR、Release、Forks、Gist、Marketplace、Codespaces 等）及页面路由边界识别</li>
+              <li>Chrome、Edge、Firefox 三端同步更新</li>
+            </ul>
+          </li>
           <li class="changelog-item" id="v3-1-4">
             <div class="changelog-meta">
               <span class="changelog-version">v3.1.4</span>
@@ -1366,21 +1380,21 @@
               <li>Chrome、Edge、Firefox 三端同步更新</li>
             </ul>
           </li>
-          <li class="changelog-item" id="v3-1-1">
-            <div class="changelog-meta">
-              <span class="changelog-version">v3.1.1</span>
-              <time class="changelog-date" datetime="2026-10-29">2026-10-29</time>
-            </div>
-            <ul class="changelog-points">
-              <li>修复 README 参数说明中的 <code>slug</code>、<code>tags</code>、<code>title</code>、<code>content</code> 等技术字段被误判为未翻译的问题</li>
-              <li>完成 VS Code、React、Kubernetes、PyTorch 等大型英文仓库的实际 README 翻译验证</li>
-              <li>Chrome、Edge、Firefox 三端同步更新，并保持代码块、命令、路径和技术标识的原文保护</li>
-            </ul>
-          </li>
         </ol>
         <details class="changelog-more">
-          <summary>查看更早的 36 个版本</summary>
+          <summary>查看更早的 37 个版本</summary>
           <ol class="changelog-list">
+            <li class="changelog-item" id="v3-1-1">
+              <div class="changelog-meta">
+                <span class="changelog-version">v3.1.1</span>
+                <time class="changelog-date" datetime="2026-10-29">2026-10-29</time>
+              </div>
+              <ul class="changelog-points">
+                <li>修复 README 参数说明中的 <code>slug</code>、<code>tags</code>、<code>title</code>、<code>content</code> 等技术字段被误判为未翻译的问题</li>
+                <li>完成 VS Code、React、Kubernetes、PyTorch 等大型英文仓库的实际 README 翻译验证</li>
+                <li>Chrome、Edge、Firefox 三端同步更新，并保持代码块、命令、路径和技术标识的原文保护</li>
+              </ul>
+            </li>
             <li class="changelog-item" id="v3-1-0">
               <div class="changelog-meta">
                 <span class="changelog-version">v3.1.0</span>
@@ -1861,7 +1875,7 @@
         <dt>和浏览器自带翻译有什么区别？</dt>
         <dd>插件针对 GitHub 界面维护专用本地离线词库，汉化零延迟且完全保持原有交互和动态状态；正文翻译采用精准 DOM 解析与段落级双语对照，严格保留 Markdown 结构、代码高亮和图片链接；同时具备浏览器翻译所没有的开源协作润色助手、仓库速读胶囊与 Discussions 讨论区双向翻译能力。</dd>
         <dt>支持哪些翻译与 AI 服务商接口？</dt>
-        <dd>全面支持 DeepSeek（推荐，高性价比）、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。</dd>
+        <dd>默认选用哔哩哔哩翻译（Bilibili Index-Translate，免费免 Key，搭配 Win/macOS 一键本地托盘代理），同时全面支持 DeepSeek、OpenAI 官方接口、通义千问（Qwen-MT / Qwen）、Azure Translator、Google Cloud Translation、DeepL，以及任意兼容 OpenAI 规范的第三方接口或本地自建模型服务（如 Ollama、OneAPI、NewAPI）。</dd>
         <dt>界面汉化是否需要配置 API Key？是否收费？</dt>
         <dd>界面汉化完全免费，且基于本地打包的离线词库运行，不需要配置 API Key 或联网调用接口；正文翻译、润色助手与速读胶囊是否产生费用，仅取决于用户自行配置的第三方 API 服务商（如 DeepSeek、OpenAI 等）的计费规则。</dd>
         <dt>会上传或收集用户数据吗？API Key 安全吗？</dt>

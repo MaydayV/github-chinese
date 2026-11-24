@@ -164,12 +164,14 @@ Strict rules:
 
     function restoreCollaborationHelperControls() {
         document.querySelectorAll('[data-ghcn-collab-btn]').forEach((btn) => btn.remove());
+        document.querySelectorAll('.ghcn-collab-fallback-bar').forEach((bar) => bar.remove());
         closeCollaborationModal();
     }
 
     function isValidCollaborationTextarea(el) {
         if (!el || !el.isConnected) return false;
         if (el.tagName !== 'TEXTAREA') return false;
+        if (el.disabled || el.readOnly) return false;
         if (el.closest('.ghcn-collab-modal')) return false;
         if (el.type === 'hidden' || el.hasAttribute('hidden')) return false;
 
@@ -191,7 +193,7 @@ Strict rules:
         });
 
         // 2. 由 markdown-toolbar 的 for 属性反查绑定的 textarea (精确 1:1 关系)
-        document.querySelectorAll('markdown-toolbar[for], [data-for]').forEach((toolbar) => {
+        document.querySelectorAll('markdown-toolbar[for], markdown-toolbar[data-for], [role="toolbar"][data-for]').forEach((toolbar) => {
             const targetId = toolbar.getAttribute('for') || toolbar.getAttribute('data-for');
             if (targetId) {
                 const targetEl = document.getElementById(targetId);
@@ -232,15 +234,32 @@ Strict rules:
             '.tabnav',
         ];
 
+        const belongsToTextarea = (el) => {
+            if (!el) return false;
+            const targetFor = el.getAttribute?.('for') || el.getAttribute?.('data-for');
+            if (targetFor && (!textarea.id || targetFor !== textarea.id)) return false;
+            const formGroup = el.closest?.('.form-group');
+            if (formGroup && !formGroup.contains(textarea)) return false;
+            const editor = el.closest?.('[data-testid="markdown-editor"], [data-component="MarkdownEditor"], .js-previewable-comment-form');
+            if (editor && !editor.contains(textarea)) return false;
+            return true;
+        };
+
         let toolbar = null;
 
         // 1. 优先通过 textarea.id 与 markdown-toolbar[for] 进行精确 1:1 匹配
         if (textarea.id) {
+            let escapedId = textarea.id;
             try {
-                toolbar = document.querySelector(`markdown-toolbar[for="${CSS.escape(textarea.id)}"]`)
-                       || document.querySelector(`[data-for="${CSS.escape(textarea.id)}"]`);
-            } catch {
-                toolbar = document.querySelector(`markdown-toolbar[for="${textarea.id}"]`);
+                if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                    escapedId = CSS.escape(textarea.id);
+                }
+            } catch { /* 保留原始 id */ }
+            toolbar = document.querySelector(`markdown-toolbar[for="${escapedId}"]`)
+                   || document.querySelector(`markdown-toolbar[data-for="${escapedId}"]`)
+                   || document.querySelector(`[role="toolbar"][data-for="${escapedId}"]`);
+            if (toolbar && !belongsToTextarea(toolbar)) {
+                toolbar = null;
             }
         }
 
@@ -253,7 +272,7 @@ Strict rules:
             if (localScope) {
                 for (const selector of toolbarSelectors) {
                     const el = localScope.querySelector(selector);
-                    if (el) {
+                    if (el && belongsToTextarea(el)) {
                         toolbar = el;
                         break;
                     }
@@ -261,15 +280,18 @@ Strict rules:
             }
         }
 
-        // 3. 兜底在所属表单范围查找
+        // 3. 兜底在所属表单范围查找（仅限同一独立作用域内的工具栏）
         if (!toolbar) {
             const formScope = textarea.closest('form') || textarea.parentElement;
             if (formScope) {
                 for (const selector of toolbarSelectors) {
                     const el = formScope.querySelector(selector);
-                    if (el) {
-                        toolbar = el;
-                        break;
+                    if (el && belongsToTextarea(el)) {
+                        const validAreas = [...formScope.querySelectorAll('textarea')].filter(isValidCollaborationTextarea);
+                        if (validAreas.length <= 1) {
+                            toolbar = el;
+                            break;
+                        }
                     }
                 }
             }
@@ -318,14 +340,17 @@ Strict rules:
         ) || textarea.parentElement;
 
         if (editorContainer) {
-            const tabList = editorContainer.querySelector('[role="tablist"], [data-testid="markdown-editor-tab-bar"], [data-testid="markdown-editor-tabs"], ul.tabnav-tabs');
-            if (tabList && tabList.parentElement) {
-                const nextSibling = tabList.nextElementSibling;
-                if (nextSibling) {
-                    return {
-                        container: nextSibling,
-                        beforeEl: nextSibling.firstElementChild,
-                    };
+            const validAreas = [...editorContainer.querySelectorAll('textarea')].filter(isValidCollaborationTextarea);
+            if (validAreas.length <= 1) {
+                const tabList = editorContainer.querySelector('[role="tablist"], [data-testid="markdown-editor-tab-bar"], [data-testid="markdown-editor-tabs"], ul.tabnav-tabs');
+                if (tabList && tabList.parentElement) {
+                    const nextSibling = tabList.nextElementSibling;
+                    if (nextSibling && belongsToTextarea(nextSibling)) {
+                        return {
+                            container: nextSibling,
+                            beforeEl: nextSibling.firstElementChild,
+                        };
+                    }
                 }
             }
         }
@@ -345,6 +370,7 @@ Strict rules:
             const existingBtn = mountPoint.container.querySelector('[data-ghcn-collab-btn]');
             if (existingBtn) {
                 if (existingBtn === mountPoint.beforeEl?.previousElementSibling || (existingBtn === mountPoint.container.firstElementChild && !mountPoint.beforeEl)) {
+                    existingBtn.__ghcnTargetTextarea = textarea;
                     textarea.__ghcnCollabBtn = existingBtn;
                     return;
                 }
@@ -377,10 +403,11 @@ Strict rules:
         btn.setAttribute('data-ghcn-collab-btn', 'true');
         btn.title = '将中文草稿润色为规范、地道的英文 Markdown';
         btn.innerHTML = `<span class="ghcn-collab-btn-icon" aria-hidden="true">${COLLAB_ICONS.sparkle}</span><span class="ghcn-collab-btn-label">润色转为英文</span>`;
+        btn.__ghcnTargetTextarea = textarea;
         btn.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            openCollaborationModal(textarea);
+            openCollaborationModal(btn.__ghcnTargetTextarea || textarea);
         });
         textarea.__ghcnCollabBtn = btn;
         return btn;
@@ -414,6 +441,12 @@ Strict rules:
     }
 
     function closeCollaborationModal() {
+        if (typeof collabRuntime.modalCleanup === 'function') {
+            try {
+                collabRuntime.modalCleanup();
+            } catch { /* 忽略弹窗清理异常 */ }
+            collabRuntime.modalCleanup = null;
+        }
         if (collabRuntime.modalEl) {
             collabRuntime.modalEl.remove();
             collabRuntime.modalEl = null;
@@ -599,15 +632,17 @@ Strict rules:
             copyBtn.disabled = !hasText;
         });
 
+        let copyResetTimer = 0;
         copyBtn.addEventListener('click', async () => {
             const text = previewArea.value;
             if (!text) return;
             try {
                 await navigator.clipboard.writeText(text);
-                const originalText = copyBtn.textContent;
+                window.clearTimeout(copyResetTimer);
                 copyBtn.textContent = '已复制';
-                window.setTimeout(() => {
-                    copyBtn.textContent = originalText;
+                copyResetTimer = window.setTimeout(() => {
+                    copyResetTimer = 0;
+                    copyBtn.textContent = '复制英文';
                 }, 1500);
             } catch {
                 previewArea.select();
@@ -618,7 +653,12 @@ Strict rules:
         applyBtn.addEventListener('click', () => {
             const text = previewArea.value;
             if (!text) return;
-            applyPolishedTextToTextarea(textarea, text);
+            const applied = applyPolishedTextToTextarea(textarea, text);
+            if (!applied) {
+                statusEl.className = 'ghcn-collab-status is-error';
+                statusEl.textContent = '原输入框已失效或不可编辑，请点击“复制英文”手动粘贴。';
+                return;
+            }
             closeCollaborationModal();
         });
 
@@ -632,6 +672,10 @@ Strict rules:
         });
 
         const keyHandler = (event) => {
+            if (!overlay.isConnected) {
+                closeCollaborationModal();
+                return;
+            }
             if (event.key === 'Escape') {
                 event.preventDefault();
                 closeCollaborationModal();
@@ -639,12 +683,18 @@ Strict rules:
         };
         window.addEventListener('keydown', keyHandler);
 
+        const cleanupListeners = () => {
+            window.clearTimeout(copyResetTimer);
+            copyResetTimer = 0;
+            window.removeEventListener('keydown', keyHandler);
+        };
         const originalRemove = overlay.remove.bind(overlay);
         overlay.remove = () => {
-            window.removeEventListener('keydown', keyHandler);
+            cleanupListeners();
             originalRemove();
         };
 
+        collabRuntime.modalCleanup = cleanupListeners;
         collabRuntime.modalEl = overlay;
         document.body.appendChild(overlay);
 
@@ -682,13 +732,17 @@ Strict rules:
             };
             applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (providerConfig.key) {
+                headers.Authorization = `Bearer ${providerConfig.key}`;
+            }
+
             const data = await proxyFetchJson({
                 url: providerConfig.url,
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${providerConfig.key}`,
-                },
+                headers,
                 body: JSON.stringify(payload),
             });
 
@@ -714,7 +768,12 @@ Strict rules:
             durationMs,
             detail: `collab_mode=${mode}`,
         }).catch((err) => {
-            console.warn('[协作润色助手] 记录写入失败:', err);
+            const isInvalidated = typeof isExtensionContextInvalidatedError === 'function'
+                ? isExtensionContextInvalidatedError(err)
+                : /extension context invalidated|context invalidated|插件上下文已失效/i.test(String(err?.message || err || ''));
+            if (!isInvalidated) {
+                console.warn('[协作润色助手] 记录写入失败:', err);
+            }
         });
 
         return {
@@ -725,7 +784,7 @@ Strict rules:
     }
 
     function applyPolishedTextToTextarea(textarea, text) {
-        if (!textarea) return;
+        if (!textarea || !textarea.isConnected || textarea.disabled || textarea.readOnly) return false;
         textarea.focus();
         textarea.select();
 
@@ -746,6 +805,7 @@ Strict rules:
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
             textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        return true;
     }
 
     function injectCollaborationControlStyles() {

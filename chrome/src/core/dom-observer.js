@@ -3,18 +3,43 @@
  * DOM 监听与 SPA 路由跳转守卫：MutationObserver、Turbo 监听与 DOM 遍历
  */
 
+    function getDocUrlNoHashFallback() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        if (typeof URL === 'function') {
+            try {
+                const parsed = new URL(href);
+                parsed.hash = '';
+                return parsed.href;
+            } catch { /* 忽略非法 URL */ }
+        }
+        return href.split('#')[0];
+    }
+
+    let lastHistoryDocUrl = typeof window !== 'undefined' ? getDocUrlNoHashFallback() : '';
+
     // 初始化
     init().catch(err => {
+        if (typeof isExtensionContextInvalidatedError === 'function' && isExtensionContextInvalidatedError(err)) return;
         console.error('初始化失败:', err);
     });
 
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (message?.type === 'ghcn-current-page') {
+            const scope = window.location.hostname + window.location.pathname;
+            sendResponse({ scope, excluded: isPageExcluded(), inheritedExclusion: maintenanceData.excluded.some(rule => rule !== scope && GhcnMaintenance.matches(rule, window.location)) });
+            return false;
+        }
         if (message?.type === 'refresh-page') {
             window.location.reload();
         }
     });
 
     async function loadFeatureSet() {
+        await loadMaintenanceSettings();
         const result = await chrome.storage.sync.get(STORAGE_DEFAULTS);
         Object.assign(FeatureSet, result);
     }
@@ -31,11 +56,26 @@
         scheduleTldrCapsuleControls('refreshCurrentPageTranslations');
     }
 
+    function restoreAllExtensionFeatures() {
+        if (typeof readmeRuntime === 'object') {
+            readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+        }
+        if (typeof issuePrRuntime === 'object') {
+            issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+        }
+        if (typeof restoreChineseReadme === 'function') restoreChineseReadme();
+        if (typeof restoreReadmeTranslation === 'function') restoreReadmeTranslation();
+        if (typeof restoreIssuePrTranslations === 'function') restoreIssuePrTranslations();
+        if (typeof restoreCollaborationHelperControls === 'function') restoreCollaborationHelperControls();
+        if (typeof restoreTldrCapsuleControls === 'function') restoreTldrCapsuleControls();
+    }
+
     /**
      * Turbo 软导航后整页/片段可能被替换为未翻译英文，且返回时 react-partial
      * 往往已是 .loaded，hydration watcher 不会再触发。MutationObserver 也可能
      * 输给随后的 React reconcile。因此在 turbo:load 后做短延迟全量扫描。
      */
+    let turboPageTimers = [];
     function translateTurboSettledDom() {
         if (!FeatureSet.enable_extension || !pageConfig.currentPageType || !document.body) return;
         traverseNode(document.body);
@@ -44,10 +84,12 @@
     }
 
     function scheduleTurboPageTranslation() {
+        turboPageTimers.forEach(id => window.clearTimeout(id));
+        turboPageTimers = [];
         translateTurboSettledDom();
         scheduleReactGlobalNavRefresh();
         [80, 250, 800, 1800].forEach(delay => {
-            window.setTimeout(translateTurboSettledDom, delay);
+            turboPageTimers.push(window.setTimeout(translateTurboSettledDom, delay));
         });
     }
 
@@ -64,6 +106,10 @@
 
     function applyBatchedFeatureToggles(changedKeys) {
         if (!changedKeys.length) return;
+        if (changedKeys.includes('prefer_chinese_readme')) {
+            if (!FeatureSet.prefer_chinese_readme) restoreChineseReadme();
+            scheduleReadmeTranslation('setting:prefer_chinese_readme');
+        }
 
         // 1. 全局开关状态变化处理
         if (changedKeys.includes('enable_extension')) {
@@ -72,20 +118,28 @@
                 document.documentElement.lang = CONFIG.LANG;
                 refreshCurrentPageTranslations();
             } else {
-                restoreReadmeTranslation();
-                restoreIssuePrTranslations();
-                restoreCollaborationHelperControls();
-                restoreTldrCapsuleControls();
+                restoreAllExtensionFeatures();
             }
         }
 
         // 2. 批量处理 README / AI 设置变更，单批次仅执行一次重置与调度
         const hasReadmeSettingsChange = changedKeys.some(isReadmeSettingKey);
         if (hasReadmeSettingsChange) {
+            readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+            if (typeof issuePrRuntime === 'object') {
+                issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+            }
             readmeRuntime.translationCache.clear();
+            readmeRuntime.preservedCache.clear();
             if (changedKeys.includes('readme_enable_repo_cache') && !FeatureSet.readme_enable_repo_cache) {
                 readmeRuntime.repoCacheMap.clear();
                 readmeRuntime.repoCacheLoaded = false;
+            }
+
+            const hasProviderSettingChange = changedKeys.some(key => key.startsWith('readme_')
+                && !['readme_enable_token_record', 'readme_enable_repo_cache', 'readme_enable_progressive', 'readme_enable_debug'].includes(key));
+            if (hasProviderSettingChange && typeof restoreReadmeTranslation === 'function') {
+                restoreReadmeTranslation();
             }
 
             const triggerKey = changedKeys.find(isReadmeSettingKey) || 'batch';
@@ -123,12 +177,39 @@
 
     function watchFeatureChanges() {
         chrome.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName === 'local' && changes[README_LOCAL_STORAGE_KEYS.REPO_CACHE]) {
+                readmeRuntime.repoCacheMap.clear();
+                readmeRuntime.repoCacheLoaded = false;
+                if (FeatureSet.readme_enable_repo_cache && typeof normalizeRepoCacheEntries === 'function') {
+                    const normalizedEntries = normalizeRepoCacheEntries(changes[README_LOCAL_STORAGE_KEYS.REPO_CACHE].newValue);
+                    normalizedEntries.forEach((entry) => {
+                        readmeRuntime.repoCacheMap.set(entry.key, entry);
+                    });
+                    readmeRuntime.repoCacheLoaded = true;
+                }
+                return;
+            }
+            if (areaName === 'local' && changes[GhcnMaintenance.DATA_KEY]) {
+                try { maintenanceData = GhcnMaintenance.validateData(changes[GhcnMaintenance.DATA_KEY].newValue || {}); }
+                catch { return; }
+                pageConfig.textCache?.clear();
+                customWrites = new WeakMap();
+                if (!FeatureSet.enable_extension) {
+                    restoreAllExtensionFeatures();
+                } else {
+                    refreshCurrentPageTranslations();
+                }
+                return;
+            }
             if (areaName !== 'sync') return;
 
             let hasValidChange = false;
             Object.entries(changes).forEach(([key, change]) => {
                 if (!(key in FeatureSet)) return;
-                FeatureSet[key] = change.newValue;
+                const nextValue = Object.hasOwn(change, 'newValue') && change.newValue !== undefined
+                    ? change.newValue
+                    : STORAGE_DEFAULTS[key];
+                FeatureSet[key] = nextValue;
                 pendingChangedKeys.add(key);
                 hasValidChange = true;
             });
@@ -152,7 +233,11 @@
     // 更新页面设置
     function updatePageConfig(currentPageChangeTrigger, force = false) {
         const newType = detectPageType();
-        if (newType && (force || newType !== pageConfig.currentPageType)) {
+        if (!newType) {
+            pageConfig = {};
+            return;
+        }
+        if (force || newType !== pageConfig.currentPageType) {
             pageConfig = buildPageConfig(newType);
             scheduleReadmeTranslation(`${currentPageChangeTrigger}:pageTypeChanged`);
             scheduleIssuePrTranslationControls(`${currentPageChangeTrigger}:pageTypeChanged`);
@@ -162,8 +247,26 @@
     }
 
     function refreshAfterHistoryNavigation(trigger = '历史导航') {
-        if (!FeatureSet.enable_extension || !document.body) return;
+        const currentDocUrl = getDocUrlNoHashFallback();
+        const docUrlChanged = Boolean(lastHistoryDocUrl && currentDocUrl && currentDocUrl !== lastHistoryDocUrl);
+        if (currentDocUrl) lastHistoryDocUrl = currentDocUrl;
+        if (docUrlChanged) {
+            if (typeof closeCollaborationModal === 'function') {
+                closeCollaborationModal();
+            }
+            if (typeof resetTldrRuntimeForNavigation === 'function') {
+                resetTldrRuntimeForNavigation();
+            }
+        }
+        if (!FeatureSet.enable_extension || !document.body) {
+            restoreAllExtensionFeatures();
+            return;
+        }
 
+        readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+        if (typeof issuePrRuntime === 'object') {
+            issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+        }
         updatePageConfig(trigger, true);
         refreshPageObserver();
         scheduleTurboPageTranslation();
@@ -174,6 +277,10 @@
     }
 
     function scheduleHistoryRefresh(event) {
+        const currentDocUrl = getDocUrlNoHashFallback();
+        if (event?.type === 'popstate' && lastHistoryDocUrl && currentDocUrl === lastHistoryDocUrl) {
+            return;
+        }
         if (historyRefreshTimer !== null) window.clearTimeout(historyRefreshTimer);
         historyRefreshTimer = window.setTimeout(() => {
             historyRefreshTimer = null;
@@ -187,6 +294,7 @@
             // 当前页面类型
             currentPageType: pageType,
             textCache: new Map(),
+            attributeTranslations: I18N[CONFIG.LANG][pageType]?.attributes || [],
             // 页面标题静态词库
             titleStaticDict: {
                 ...I18N[CONFIG.LANG].public.title.static,
@@ -229,18 +337,66 @@
     }
 
 
+    function getPageObserverConfig() {
+        return {
+            ...CONFIG.OBSERVER_CONFIG,
+            attributeFilter: [...new Set([
+                ...CONFIG.OBSERVER_CONFIG.attributeFilter,
+                ...(pageConfig.attributeTranslations || []).map(([, name]) => name),
+            ])],
+        };
+    }
+
     function watchUpdate() {
-        // 缓存当前页面的 URL
-        let previousURL = window.location.href;
+        const readDocUrlWithoutHash = () => {
+            if (typeof getDocumentUrlWithoutHash === 'function') {
+                return getDocumentUrlWithoutHash();
+            }
+            const href = String(window?.location?.href || '');
+            if (!href) return '';
+            if (typeof URL === 'function') {
+                try {
+                    const parsed = new URL(href);
+                    parsed.hash = '';
+                    return parsed.href;
+                } catch { /* 忽略非法 URL */ }
+            }
+            return href.split('#')[0];
+        };
+        // 缓存当前页面的 URL（忽略 #hash 锚点变化）
+        let previousURL = readDocUrlWithoutHash();
         let observer = null;
         let observedBody = null;
+        let observedAttributes = '';
 
         const handleUrlChange = () => {
-            const currentURL = window.location.href;
-            // 如果页面的 URL 发生变化
+            const currentURL = readDocUrlWithoutHash();
+            // 如果页面的文档 URL（不含 #hash）发生变化
             if (currentURL !== previousURL) {
                 previousURL = currentURL;
-                updatePageConfig('DOM变化');
+                if (typeof lastHistoryDocUrl !== 'undefined') {
+                    lastHistoryDocUrl = currentURL;
+                }
+                if (typeof closeCollaborationModal === 'function') {
+                    closeCollaborationModal();
+                }
+                if (typeof resetTldrRuntimeForNavigation === 'function') {
+                    resetTldrRuntimeForNavigation();
+                }
+                if (typeof readmeRuntime === 'object') {
+                    readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+                }
+                if (typeof issuePrRuntime === 'object') {
+                    issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+                }
+                if (!FeatureSet.enable_extension) {
+                    if (typeof restoreAllExtensionFeatures === 'function') {
+                        restoreAllExtensionFeatures();
+                    }
+                    return;
+                }
+                updatePageConfig('DOM变化', true);
+                refreshPageObserver();
             }
         }
 
@@ -309,9 +465,9 @@
                         || (type === 'characterData' && isLiveSurfaceCharacterData(node))));
             })
             // 处理每个变化
-            .forEach(({ node }) =>
-                // 递归遍历节点树进行处理
-                traverseNode(node)
+            .forEach(({ node, type }) =>
+                // 递归遍历节点树进行处理；属性变化仅更新目标元素自身属性，避免误扫整棵子树
+                traverseNode(node, type === 'attributes')
             );
         }
 
@@ -319,10 +475,29 @@
         const processMutationBatch = mutations => {
             if (!FeatureSet.enable_extension) return;
             handleUrlChange();
+            if (!FeatureSet.enable_extension) return;
             if (readmeRuntime.isApplyingTranslation) return;
             if (pageConfig.currentPageType) processMutations(mutations);
             if (FeatureSet.enable_readme_translation) {
                 scheduleReadmeTranslation('mutation');
+            } else if (FeatureSet.prefer_chinese_readme && typeof isReadmePage === 'function' && isReadmePage()) {
+                const currentReadmeRoot = typeof getReadmeRootElement === 'function' ? getReadmeRootElement() : null;
+                const currentUrl = readDocUrlWithoutHash();
+                const mountedForPage = typeof chineseReadme !== 'undefined'
+                    && chineseReadme.state?.root === currentReadmeRoot
+                    && (!chineseReadme.state?.pageUrl || !currentUrl || chineseReadme.state.pageUrl === currentUrl);
+                const hasMapBypass = typeof chineseReadme !== 'undefined' && typeof chineseReadme.bypass?.get === 'function';
+                const bypassEntry = (hasMapBypass && currentReadmeRoot) ? chineseReadme.bypass.get(currentReadmeRoot) : undefined;
+                const bypassed = typeof chineseReadme !== 'undefined' && Boolean(
+                    hasMapBypass
+                        ? (bypassEntry && (!currentUrl || bypassEntry === currentUrl))
+                        : (currentReadmeRoot && chineseReadme.bypass?.has?.(currentReadmeRoot)),
+                );
+                if (currentReadmeRoot
+                    ? (!mountedForPage && !bypassed)
+                    : Boolean(typeof chineseReadme !== 'undefined' && chineseReadme.state)) {
+                    scheduleReadmeTranslation('mutation');
+                }
             }
             if (FeatureSet.enable_issue_pr_translation) {
                 scheduleIssuePrTranslationControls('mutation');
@@ -338,13 +513,17 @@
         const observeCurrentBody = () => {
             if (observer) observer.disconnect();
             observedBody = document.body;
-            if (observedBody) observer.observe(observedBody, CONFIG.OBSERVER_CONFIG);
+            const observerConfig = getPageObserverConfig();
+            observedAttributes = observerConfig.attributeFilter.join(',');
+            if (observedBody) observer.observe(observedBody, observerConfig);
         };
 
         observer = new MutationObserver(processMutationBatch);
         observeCurrentBody();
         refreshPageObserver = () => {
-            if (document.body !== observedBody) observeCurrentBody();
+            if (document.body !== observedBody
+                || getPageObserverConfig().attributeFilter.join(',') !== observedAttributes) observeCurrentBody();
+            if (typeof refreshHydrationObserver === 'function') refreshHydrationObserver();
         };
     }
 
@@ -353,40 +532,52 @@
      * 在此之前改写文本会造成 hydration 失败，并让组件交互失效。
      */
     function watchReactHydration() {
+        const handledLoadedRoots = new WeakSet();
         const handleLoadedReactRoot = element => {
             if (
                 !FeatureSet.enable_extension
                 || !pageConfig.currentPageType
                 || !element.matches?.('react-app.loaded, react-partial.loaded')
+                || handledLoadedRoots.has(element)
             ) {
                 return;
             }
+            handledLoadedRoots.add(element);
 
             traverseNode(element);
+            scheduleReadmeTranslation('react:hydrated');
         };
 
+        let observedHydrationBody = null;
         const observer = new MutationObserver(mutations => {
             mutations.forEach(({ target, type }) => {
                 if (type === 'attributes') handleLoadedReactRoot(target);
             });
         });
 
-        observer.observe(document.body, {
-            attributes: true,
-            subtree: true,
-            attributeFilter: ['class'],
-        });
+        const observeHydrationBody = () => {
+            if (!document.body || document.body === observedHydrationBody) return;
+            observer.disconnect();
+            observedHydrationBody = document.body;
+            observer.observe(observedHydrationBody, {
+                attributes: true,
+                subtree: true,
+                attributeFilter: ['class'],
+            });
+            document.querySelectorAll('react-app.loaded, react-partial.loaded').forEach(handleLoadedReactRoot);
+        };
 
-        // 避免组件恰好在观察器启动前完成 hydration 而漏翻译
-        document.querySelectorAll('react-app.loaded, react-partial.loaded').forEach(handleLoadedReactRoot);
+        refreshHydrationObserver = observeHydrationBody;
+        observeHydrationBody();
     }
 
     /**
      * traverseNode 函数：遍历指定的节点，并对节点进行翻译。
-     * @param {Node} node - 需要遍历的节点。
+     * @param {Node} rootNode - 需要遍历的节点。
+     * @param {boolean} [attributesOnly=false] - 仅同步根节点属性（用于属性变更回调）。
      */
-    function traverseNode(rootNode) {
-        if (!FeatureSet.enable_extension) return;
+    function traverseNode(rootNode, attributesOnly = false) {
+        if (!FeatureSet.enable_extension || !rootNode) return;
 
         const handleTextNode = node => {
             if (node.length > (pageConfig.maxTextNodeLength ?? 500)) return;
@@ -398,30 +589,15 @@
         // 否则 handleElement 里的 placeholder / value 属性翻译会被一并跳过。
         const isUserInputText = node => node.parentElement?.tagName === 'TEXTAREA';
 
-        // 如果 rootNode 是文本节点，直接处理
+        // 如果 rootNode 是文本节点，先检查 ignoreSelectors 再处理
         if (rootNode.nodeType === Node.TEXT_NODE) {
+            if (pageConfig.ignoreSelectors && rootNode.parentElement?.closest?.(pageConfig.ignoreSelectors)) return;
             if (!isUserInputText(rootNode)) handleTextNode(rootNode);
             return; // 文本节点没有子节点，直接返回
         }
 
-        const treeWalker = document.createTreeWalker(
-            rootNode,
-            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-            node => {
-                // 跳过用户输入内容
-                if (node.nodeType === Node.TEXT_NODE) {
-                    return isUserInputText(node)
-                        ? NodeFilter.FILTER_REJECT
-                        : NodeFilter.FILTER_ACCEPT;
-                }
-                // 跳过忽略的节点
-                return node.matches?.(pageConfig.ignoreSelectors)
-                    ? NodeFilter.FILTER_REJECT
-                    : NodeFilter.FILTER_ACCEPT;
-            },
-        );
-
         const handleElement = node => {
+            applyCustomAttributes(node);
             // 处理不同标签的元素属性翻译
             switch (node.tagName) {
                 case 'RELATIVE-TIME': // 翻译时间元素
@@ -473,6 +649,38 @@
             return;
         }
 
+        if (pageConfig.ignoreSelectors && rootNode.closest?.(pageConfig.ignoreSelectors)) {
+            return;
+        }
+
+        // 属性变化的目标本身不会被 TreeWalker.nextNode() 访问，非 TEXTAREA 根节点也需检查其属性和自身标签。
+        const attributeTranslations = pageConfig.attributeTranslations;
+        const translateAttributes = Boolean(attributeTranslations?.length);
+        if (rootNode.nodeType === Node.ELEMENT_NODE) {
+            if (translateAttributes) {
+                transPageAttributes(rootNode, attributeTranslations);
+            }
+            handleElement(rootNode);
+            if (attributesOnly) return;
+        }
+
+        const treeWalker = document.createTreeWalker(
+            rootNode,
+            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+            node => {
+                // 跳过用户输入内容
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return isUserInputText(node)
+                        ? NodeFilter.FILTER_REJECT
+                        : NodeFilter.FILTER_ACCEPT;
+                }
+                // 跳过忽略的节点
+                return node.matches?.(pageConfig.ignoreSelectors)
+                    ? NodeFilter.FILTER_REJECT
+                    : NodeFilter.FILTER_ACCEPT;
+            },
+        );
+
         // 预绑定处理函数提升性能
         const handlers = {
             [Node.ELEMENT_NODE]: handleElement,
@@ -481,6 +689,9 @@
 
         let currentNode;
         while ((currentNode = treeWalker.nextNode())) {
+            if (translateAttributes && currentNode.nodeType === Node.ELEMENT_NODE) {
+                transPageAttributes(currentNode, attributeTranslations);
+            }
             handlers[currentNode.nodeType]?.(currentNode);
         }
     }

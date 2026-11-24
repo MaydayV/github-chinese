@@ -78,9 +78,17 @@ async function init() {
     updateStateText(el.checked);
 
     el.addEventListener('change', async () => {
-      await chrome.storage.sync.set({ [key]: el.checked });
-      updateStateText(el.checked);
-      await refreshActiveGithubPage();
+      const nextChecked = el.checked;
+      try {
+        await chrome.storage.sync.set({ [key]: nextChecked });
+        updateStateText(nextChecked);
+        await refreshActiveGithubPage();
+      } catch (error) {
+        el.checked = !nextChecked;
+        updateStateText(!nextChecked);
+        const status = byId('status');
+        if (status) status.textContent = error?.message || '开关状态保存失败，请重试。';
+      }
     });
   });
 
@@ -89,6 +97,56 @@ async function init() {
   });
 
   await initUpdateNotice();
+  const exclude = byId('excludeCurrent');
+  const excludeStatus = byId('excludeStatus');
+  const showExcludeStatus = (message) => {
+    if (excludeStatus) {
+      excludeStatus.textContent = message;
+      excludeStatus.hidden = !message;
+    } else if (byId('status')) {
+      byId('status').textContent = message;
+    }
+  };
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const current = tab?.id ? await chrome.tabs.sendMessage(tab.id, { type: 'ghcn-current-page' }) : null;
+    if (!current?.scope) { exclude.disabled = true; return; }
+    if (current.inheritedExclusion) {
+      exclude.textContent = '此页被范围排除（设置）';
+      exclude.addEventListener('click', () => chrome.runtime.openOptionsPage());
+      return;
+    }
+    let normalizedScope = '';
+    if (!current.excluded) {
+      try {
+        normalizedScope = GhcnMaintenance.scope(current.scope);
+      } catch (error) {
+        exclude.disabled = true;
+        showExcludeStatus(error.message);
+        return;
+      }
+    }
+    exclude.textContent = current.excluded ? '恢复当前页面翻译' : '排除当前页面';
+    exclude.addEventListener('click', async () => {
+      exclude.disabled = true;
+      showExcludeStatus('');
+      try {
+        const key = GhcnMaintenance.DATA_KEY;
+        const data = GhcnMaintenance.validateData((await chrome.storage.local.get(key))[key] || {});
+        if (current.excluded) {
+          const slash = current.scope.indexOf('/');
+          const hostname = slash >= 0 ? current.scope.slice(0, slash) : current.scope;
+          const pathname = slash >= 0 ? current.scope.slice(slash) : '/';
+          data.excluded = data.excluded.filter(rule => !GhcnMaintenance.matches(rule, { hostname, pathname }));
+        } else {
+          data.excluded.push(normalizedScope);
+        }
+        await chrome.storage.local.set({ [key]: GhcnMaintenance.validateData(data) });
+        await refreshActiveGithubPage();
+        window.close();
+      } catch (error) { showExcludeStatus(error.message); exclude.disabled = false; }
+    });
+  } catch { if (exclude) exclude.disabled = true; }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

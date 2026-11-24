@@ -86,6 +86,26 @@
                 };
             }
 
+            case 'index_translate': {
+                const rawUrl = normalizeUrl(FeatureSet.readme_index_translate_api_url);
+                const url = normalizeOpenAiEndpoint(rawUrl);
+                const key = (FeatureSet.readme_index_translate_api_key || '').trim();
+                const model = (FeatureSet.readme_index_translate_model || '').trim();
+                if (!url || !model) {
+                    return { ok: false, message: '哔哩哔哩翻译需要 API 地址与模型名（API Key 可留空）。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    model,
+                    signature: `${provider}|${targetLang}|${url}|${model}|${createHash(key)}`,
+                };
+            }
+
             case 'openai':
             case 'openai_compatible':
             case 'deepseek':
@@ -135,15 +155,16 @@
 
         const hostname = parsedUrl.hostname.toLowerCase();
         const path = parsedUrl.pathname.replace(/\/+$/, '');
+        const search = parsedUrl.search || '';
         if (/\/chat\/completions$/i.test(path)) {
-            return `${parsedUrl.origin}${path}`;
+            return `${parsedUrl.origin}${path}${search}`;
         }
 
         if (!path) {
-            return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions`;
+            return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions${search}`;
         }
 
-        return `${parsedUrl.origin}${path}/chat/completions`;
+        return `${parsedUrl.origin}${path}/chat/completions${search}`;
     }
 
     function parseApiUrl(url) {

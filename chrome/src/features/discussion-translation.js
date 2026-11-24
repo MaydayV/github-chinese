@@ -38,6 +38,21 @@
         return item?.sourceType || getIssuePrRecordSourceType();
     }
 
+    function getDiscussionDocUrl() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        try {
+            const parsed = new URL(href);
+            parsed.hash = '';
+            return parsed.href;
+        } catch {
+            return href.split('#')[0];
+        }
+    }
+
     function getIssuePrDiscussionState(item) {
         const keyEl = item?.markdownEl || item;
         if (!issuePrRuntime.stateByElement.has(keyEl)) {
@@ -46,6 +61,7 @@
                 translatedHash: '',
                 translatedSignature: '',
                 isBusy: false,
+                runSeq: 0,
                 translatedEl: null,
                 toolbarEl: null,
                 mode: 'original',
@@ -68,6 +84,7 @@
                 if (!markdownEl || seen.has(markdownEl)) return null;
                 seen.add(markdownEl);
                 if (markdownEl.closest('.ghcn-discussion-translation-panel')) return null;
+                if (markdownEl.closest('.js-preview-body, form, [data-testid="markdown-editor"]')) return null;
 
                 if (!isReleaseNotes && markdownEl.parentElement?.closest('[data-testid="markdown-body"]')) {
                     return null;
@@ -143,6 +160,8 @@
                 'svg.octicon-kebab-horizontal',
                 'button[aria-label*="More" i]',
                 'button[aria-label*="Actions" i]',
+                'button[aria-label*="更多"]',
+                'button[aria-label*="操作"]',
             ];
             for (const selector of menuSelectors) {
                 const menuNode = scope.querySelector(selector);
@@ -152,51 +171,69 @@
             return null;
         };
 
+        const belongsToItem = (candidate) => {
+            if (!candidate) return false;
+            const nestedBodies = candidate.querySelectorAll?.('.markdown-body:not(.ghcn-discussion-translation-panel), [data-testid="markdown-body"]:not(.ghcn-discussion-translation-panel)');
+            if (nestedBodies && nestedBodies.length > 1) return false;
+            const ownerComment = candidate.closest?.('[data-testid="issue-body"], [data-testid="comment-body"], [data-testid^="comment-viewer-outer-box"], .react-issue-comment, .timeline-comment, .js-comment');
+            if (ownerComment && !ownerComment.contains(item.markdownEl)) return false;
+            return true;
+        };
+
         // 回复评论可能嵌套在同一个 timeline-comment-group 中；从正文向上查找，
         // 优先使用当前评论自己的操作菜单，避免误用父评论或标题区域的 flex 容器。
         let menuButton = null;
         let scope = item.markdownEl?.parentElement;
         while (scope && rootEl.contains(scope)) {
             menuButton = findMenuButton(scope);
-            if (menuButton) break;
+            if (menuButton && belongsToItem(menuButton)) break;
+            menuButton = null;
             if (scope === rootEl) break;
             scope = scope.parentElement;
         }
         menuButton ||= findMenuButton(rootEl);
+        if (menuButton && !belongsToItem(menuButton)) menuButton = null;
 
         // 新版 GitHub 把三个点放在 .timeline-comment-actions 内层的 flex 行中；
         // 优先使用该行，避免插入块级外层后被换到上一行。
         const actionRow = menuButton?.closest('comment-actions-container')?.parentElement;
-        if (actionRow) return actionRow;
+        if (belongsToItem(actionRow)) return actionRow;
 
         // 兼容旧版直接把菜单放在 .timeline-comment-actions 下的结构。
         const actionGroup = menuButton?.closest('.timeline-comment-actions');
-        if (actionGroup) return actionGroup;
+        if (belongsToItem(actionGroup)) return actionGroup;
 
         // 当前 React 评论头部会把三点按钮包在 ActionsButtonsContainer 中；
         // 直接挂到该容器，才能让翻译按钮紧挨三点左侧，而不是排在贡献者标签之前。
         const menuButtonsContainer = menuButton?.closest('[class*="ActionsButtonsContainer"]');
-        if (menuButtonsContainer) return menuButtonsContainer;
+        if (belongsToItem(menuButtonsContainer)) return menuButtonsContainer;
 
         const menuRow = menuButton?.closest('[data-testid="comment-header-right-side-items"], .timeline-comment-actions > .d-flex');
-        if (menuRow) return menuRow;
+        if (belongsToItem(menuRow)) return menuRow;
 
         const commentActionsRow = rootEl.querySelector('comment-actions-container')?.parentElement;
-        if (commentActionsRow) return commentActionsRow;
+        if (belongsToItem(commentActionsRow)) return commentActionsRow;
 
-        return rootEl.querySelector('[data-testid="comment-header-right-side-items"] [class*="ActionsButtonsContainer"]')
-            || rootEl.querySelector('[data-testid="comment-header-right-side-items"] [data-testid="comment-header-hamburger"]')?.parentElement
-            || rootEl.querySelector('[data-testid="comment-header-right-side-items"]')
-            || rootEl.querySelector('.timeline-comment-actions')
-            || rootEl.querySelector('.timeline-comment-header .timeline-comment-actions')
-            || rootEl.querySelector('[class*="actionsSection"]')
-            || rootEl.querySelector('[class*="actionsWrapper"]')
-            || rootEl.querySelector('[aria-label="Discussion actions"]')?.parentElement
-            || rootEl.querySelector('[aria-label="Discussion comment actions"]')?.parentElement
-            || rootEl.querySelector('[data-testid="discussion-comment-actions"]')
-            || rootEl.querySelector('[aria-label="Issue body actions"]')?.parentElement
-            || rootEl.querySelector('[aria-label="Comment actions"]')?.parentElement
-            || rootEl.querySelector('[data-testid="issue-body-header-author"]')?.closest('[class*="activityHeader"]');
+        const slotCandidates = [
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"] [class*="ActionsButtonsContainer"]'),
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"] [data-testid="comment-header-hamburger"]')?.parentElement,
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"]'),
+            rootEl.querySelector('.timeline-comment-actions'),
+            rootEl.querySelector('.timeline-comment-header .timeline-comment-actions'),
+            rootEl.querySelector('[class*="actionsSection"]'),
+            rootEl.querySelector('[class*="actionsWrapper"]'),
+            rootEl.querySelector('[aria-label="Discussion actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="Discussion comment actions"]')?.parentElement,
+            rootEl.querySelector('[data-testid="discussion-comment-actions"]'),
+            rootEl.querySelector('[aria-label="Issue body actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="Comment actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="讨论操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="讨论评论操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="议题正文操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="评论操作"]')?.parentElement,
+            rootEl.querySelector('[data-testid="issue-body-header-author"]')?.closest('[class*="activityHeader"]'),
+        ];
+        return slotCandidates.find(belongsToItem) || null;
     }
 
     function buildDiscussionCacheKey(item, sourceHash, signature) {
@@ -361,7 +398,9 @@
         const slotEl = findDiscussionActionsSlot(item);
         const existingToolbars = slotEl
             ? [...slotEl.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]')]
-            : [];
+            : (item.sourceType === 'release' && item.viewerEl
+                ? [...item.viewerEl.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]')]
+                : []);
         const toolbar = state.toolbarEl?.isConnected
             ? state.toolbarEl
             : existingToolbars[0] || null;
@@ -372,7 +411,15 @@
             existingToolbars.forEach((existingToolbar) => {
                 if (existingToolbar !== toolbar) existingToolbar.remove();
             });
-            const needsRender = state.toolbarEl !== toolbar;
+            let contentChanged = false;
+            if (!state.isBusy && state.translatedEl && state.translatedHash) {
+                const liveHash = createHash(item.markdownEl.innerHTML);
+                if (liveHash !== state.translatedHash) {
+                    contentChanged = true;
+                    restoreIssuePrBody(item);
+                }
+            }
+            const needsRender = contentChanged || state.toolbarEl !== toolbar;
             state.toolbarEl = toolbar;
             // GitHub 的 Turbo/React 重绘可能保留旧工具条节点；每次扫描都把它
             // 重新归位到三个点所在的操作行，避免遗留在 header 顶部。
@@ -420,7 +467,10 @@
             button.disabled = state.isBusy;
             button.addEventListener('click', () => {
                 handleIssuePrTranslateButton(item).catch((error) => {
-                    console.error('[Issue/PR翻译] 执行失败:', error);
+                    if (error?.__ghcnStaleRun) return;
+                    if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                        console.error('[Issue/PR翻译] 执行失败:', error);
+                    }
                     state.errorMessage = normalizeRuntimeErrorMessage(error);
                     state.isBusy = false;
                     renderDiscussionToolbar(item);
@@ -467,6 +517,11 @@
         const state = getIssuePrDiscussionState(item);
         if (state.isBusy) return;
 
+        const runEpoch = issuePrRuntime.runEpoch || 0;
+        const runId = (state.runSeq || 0) + 1;
+        state.runSeq = runId;
+        const isCurrentRun = () => state.runSeq === runId && (issuePrRuntime.runEpoch || 0) === runEpoch;
+
         clearIssuePrError(state.toolbarEl);
         state.errorMessage = '';
 
@@ -474,14 +529,24 @@
         renderDiscussionToolbar(item);
 
         try {
-            await translateIssuePrBody(item);
-            setDiscussionViewMode(item, 'translated');
+            const completed = await translateIssuePrBody(item, { runEpoch, runId });
+            if (completed && isCurrentRun() && state.translatedEl) {
+                setDiscussionViewMode(item, 'translated');
+            }
         } catch (error) {
+            if (!isCurrentRun()) {
+                if (error && typeof error === 'object') {
+                    error.__ghcnStaleRun = true;
+                }
+                throw error;
+            }
             state.errorMessage = normalizeRuntimeErrorMessage(error);
             throw error;
         } finally {
-            state.isBusy = false;
-            renderDiscussionToolbar(item);
+            if (isCurrentRun()) {
+                state.isBusy = false;
+                renderDiscussionToolbar(item);
+            }
         }
     }
 
@@ -502,27 +567,50 @@
     function restoreIssuePrBody(itemOrBodyEl) {
         const item = itemOrBodyEl?.markdownEl ? itemOrBodyEl : { markdownEl: itemOrBodyEl };
         const state = getIssuePrDiscussionState(item);
+        state.runSeq = (state.runSeq || 0) + 1;
+        state.isBusy = false;
         state.translatedEl?.remove();
         state.translatedEl = null;
+        if (state.toolbarEl && !state.toolbarEl.isConnected) {
+            state.toolbarEl = null;
+        }
         state.mode = 'original';
+        state.originalHtml = '';
         state.translatedHash = '';
+        state.translatedSignature = '';
         item.markdownEl?.removeAttribute('data-ghcn-discussion-hidden');
         item.markdownEl?.removeAttribute('data-ghcn-discussion-view-mode');
         renderDiscussionToolbar(item);
     }
 
     function restoreIssuePrTranslations() {
+        issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
         document.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]').forEach((toolbar) => toolbar.remove());
+        document.querySelectorAll('.ghcn-discussion-translation-panel').forEach((panel) => panel.remove());
+        document.querySelectorAll('[data-ghcn-discussion-hidden]').forEach((el) => {
+            el.removeAttribute('data-ghcn-discussion-hidden');
+            el.removeAttribute('data-ghcn-discussion-view-mode');
+            delete el.dataset.ghcnDiscussionTranslate;
+        });
         findDiscussionItems().forEach((item) => {
             restoreIssuePrBody(item);
             delete item.markdownEl.dataset.ghcnDiscussionTranslate;
         });
     }
 
-    async function translateIssuePrBody(item) {
+    async function translateIssuePrBody(item, options = {}) {
         const startAt = performance.now();
+        const expectedDocUrl = getDiscussionDocUrl();
         const state = getIssuePrDiscussionState(item);
         const markdownEl = item.markdownEl;
+        const runEpoch = options.runEpoch ?? (issuePrRuntime.runEpoch || 0);
+        const runId = options.runId ?? (state.runSeq || 0);
+        const isCurrentRun = () => (issuePrRuntime.runEpoch || 0) === runEpoch && (state.runSeq || 0) === runId;
+        const isRunValid = () => isCurrentRun()
+            && getDiscussionDocUrl() === expectedDocUrl
+            && markdownEl.isConnected
+            && FeatureSet.enable_extension
+            && FeatureSet.enable_issue_pr_translation;
 
         if (!state.originalHtml || (state.translatedHash && createHash(markdownEl.innerHTML) !== state.translatedHash)) {
             state.originalHtml = markdownEl.innerHTML;
@@ -542,21 +630,25 @@
         const sourceHash = createHash(state.originalHtml);
         const signature = createHash(`${providerConfig.signature}\n${state.originalHtml}`);
         if (state.translatedSignature === signature && state.translatedEl?.isConnected) {
-            return;
+            return true;
         }
 
         const sourceText = normalizeText(markdownEl.textContent || '');
         if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(markdownEl.innerHTML);
-            return;
+            return false;
         }
 
         const cacheKey = buildDiscussionCacheKey(item, sourceHash, providerConfig.signature);
         const cacheHit = await getRepoCachedTranslation(cacheKey).catch((error) => {
+            if (typeof isExtensionContextInvalidatedError === 'function' && isExtensionContextInvalidatedError(error)) {
+                throw error;
+            }
             console.warn('[Issue/PR翻译] 读取讨论缓存失败:', error);
             return null;
         });
+        if (!isRunValid()) return false;
 
         let translatedEl = createTranslatedClone(markdownEl);
         let partialCacheApplied = false;
@@ -565,7 +657,13 @@
                 console.warn('[Issue/PR翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
                 replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
-                const cachedRemaining = collectIssuePrTextTasks(translatedEl);
+                if (cacheHit.preservedTexts && typeof hydrateReadmePreservedCache === 'function') {
+                    hydrateReadmePreservedCache(providerConfig.signature, cacheHit.preservedTexts);
+                }
+                const cachedRemaining = cacheHit.complete === true
+                    ? []
+                    : collectIssuePrTextTasks(translatedEl)
+                        .filter((task) => !readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${task.normalizedText}`));
                 if (!cachedRemaining.length) {
                     state.translatedEl?.remove();
                     state.translatedEl = translatedEl;
@@ -583,19 +681,30 @@
                         sourceHash,
                         detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
                     }).catch((error) => {
-                        console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                        if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                            console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                        }
                     });
+                    if (!isRunValid()) return false;
                     if (cacheHit.complete !== true) {
+                        const preservedTexts = [...new Set(
+                            collectIssuePrTextTasks(translatedEl)
+                                .map((task) => task.normalizedText)
+                                .filter((text) => readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${text}`)),
+                        )];
                         await upsertRepoCachedTranslation(cacheKey, {
                             repo: getCurrentRepoInfo()?.fullName || '',
                             sourceHash,
                             translatedHtml: cacheHit.translatedHtml,
                             complete: true,
+                            preservedTexts,
                         }).catch((error) => {
-                            console.warn('[Issue/PR翻译] 补全讨论缓存状态失败:', error);
+                            if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                                console.warn('[Issue/PR翻译] 补全讨论缓存状态失败:', error);
+                            }
                         });
                     }
-                    return;
+                    return true;
                 }
 
                 partialCacheApplied = true;
@@ -626,34 +735,66 @@
         markdownEl.insertAdjacentElement('afterend', translatedEl);
         setDiscussionViewMode(item, 'translated');
 
-        if (FeatureSet.readme_enable_progressive) {
-            const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
-            const groupSize = usesAiBatchLimits
-                ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
-                : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
-            const groups = buildProgressiveTaskGroupsByBlock(translatedEl, tasks, groupSize, ISSUE_PR_CONFIG.BLOCK_SELECTOR);
+        try {
+            if (FeatureSet.readme_enable_progressive) {
+                const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+                const groupSize = usesAiBatchLimits
+                    ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
+                    : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
+                const groups = buildProgressiveTaskGroupsByBlock(translatedEl, tasks, groupSize, ISSUE_PR_CONFIG.BLOCK_SELECTOR);
 
-            for (let index = 0; index < groups.length; index += 1) {
-                const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
-                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
-                totalTokens += groupTokens;
-                translatedCount += applyTaskTranslations(translatedEl, groups[index], translatedMap);
+                for (let index = 0; index < groups.length; index += 1) {
+                    if (!isRunValid()) {
+                        if (isCurrentRun()) restoreIssuePrBody(item);
+                        return false;
+                    }
+                    const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
+                    const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
+                    if (!isRunValid()) {
+                        if (isCurrentRun()) restoreIssuePrBody(item);
+                        return false;
+                    }
+                    totalTokens += groupTokens;
+                    translatedCount += applyTaskTranslations(translatedEl, groups[index], translatedMap);
 
-                if (index < groups.length - 1) {
-                    await waitForNextPaint();
+                    if (index < groups.length - 1) {
+                        await waitForNextPaint();
+                    }
                 }
+            } else {
+                const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+                if (!isRunValid()) {
+                    if (isCurrentRun()) restoreIssuePrBody(item);
+                    return false;
+                }
+                totalTokens += tokens;
+                translatedCount += applyTextGroupTranslations(translatedEl, tasksByText, uniqueTexts, translatedMap);
             }
-        } else {
-            const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
-            totalTokens += tokens;
-            translatedCount += applyTextGroupTranslations(translatedEl, tasksByText, uniqueTexts, translatedMap);
+        } catch (error) {
+            if (isCurrentRun()) {
+                restoreIssuePrBody(item);
+            }
+            throw error;
         }
 
-        const complete = translatedCount >= tasks.length;
+        if (!isRunValid()) {
+            if (isCurrentRun()) restoreIssuePrBody(item);
+            return false;
+        }
+
+        const remainingTasks = collectIssuePrTextTasks(translatedEl)
+            .filter((task) => !readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${task.normalizedText}`));
+        const complete = !remainingTasks.length;
         state.translatedSignature = complete ? signature : '';
         state.translatedHash = complete ? createHash(markdownEl.innerHTML) : '';
         state.sourceHash = sourceHash;
         state.errorMessage = '';
+
+        const preservedTexts = [...new Set(
+            collectIssuePrTextTasks(translatedEl)
+                .map((task) => task.normalizedText)
+                .filter((text) => readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${text}`)),
+        )];
 
         if (complete || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(cacheKey, {
@@ -661,8 +802,11 @@
                 sourceHash,
                 translatedHtml: translatedEl.innerHTML,
                 complete,
+                preservedTexts,
             }).catch((error) => {
-                console.warn('[Issue/PR翻译] 写入讨论缓存失败:', error);
+                if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                    console.warn('[Issue/PR翻译] 写入讨论缓存失败:', error);
+                }
             });
         }
 
@@ -674,13 +818,17 @@
             sourceHash,
             detail: `${getDiscussionRecordSourceType(item)}_translated_nodes=${translatedCount}`,
         }).catch((error) => {
-            console.warn('[Issue/PR翻译] 写入翻译记录失败:', error);
+            if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                console.warn('[Issue/PR翻译] 写入翻译记录失败:', error);
+            }
         });
+        return true;
     }
 
     function createTranslatedClone(markdownEl) {
         const translatedEl = markdownEl.cloneNode(true);
         translatedEl.classList.add('ghcn-discussion-translation-panel');
+        translatedEl.removeAttribute('id');
         translatedEl.removeAttribute('data-ghcn-discussion-translate');
         translatedEl.setAttribute('data-ghcn-discussion-view-mode', 'translated');
         translatedEl.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
@@ -726,7 +874,8 @@
             const trimmedText = rawText.trim();
             const normalizedText = normalizeText(trimmedText);
 
-            if (shouldSkipReadmeText(normalizedText)) continue;
+            if (shouldSkipReadmeText(normalizedText)
+                || (typeof isLikelyTechnicalReadmeText === 'function' && isLikelyTechnicalReadmeText(normalizedText, node))) continue;
 
             tasks.push({ node, rawText, trimmedText, normalizedText });
         }

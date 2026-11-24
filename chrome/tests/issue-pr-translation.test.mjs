@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createContext, runInContext } from 'node:vm';
 import test from 'node:test';
 
 const content = readFileSync(new URL('../content.js', import.meta.url), 'utf8');
@@ -124,13 +125,18 @@ test('README provider requests use official JSON payloads and optional Azure reg
   });
 });
 
-test('settings recommend DeepSeek and keep the three tabs copy consistent', () => {
+test('settings default to index_translate and keep the tabs copy consistent', () => {
   browserOptions.forEach(({ browser, html, js }) => {
-    assert.match(js, /readme_provider:\s*'deepseek'/, `${browser}: 默认翻译服务应为 DeepSeek`);
+    assert.match(js, /readme_provider:\s*'index_translate'/, `${browser}: 默认翻译服务应为 index_translate`);
     assert.match(js, /deepseek:\s*\{[^}]*model:\s*'deepseek-flash'/, `${browser}: DeepSeek 默认模型应使用官方模型 ID`);
-    assert.match(html, /<option value="deepseek">DeepSeek（推荐）<\/option>/, `${browser}: 服务列表应标记 DeepSeek 推荐`);
+    assert.match(html, /<option value="index_translate">哔哩哔哩翻译（免费免 Key · 推荐）<\/option>/, `${browser}: 服务列表应默认推荐哔哩哔哩翻译`);
+    assert.equal((html.match(/<option value="index_translate">/g) || []).length, 1, `${browser}: 服务列表不应重复 index_translate`);
     assert.equal((html.match(/<option value="deepseek">/g) || []).length, 1, `${browser}: 服务列表不应重复 DeepSeek`);
-    assert.match(html, /推荐使用 DeepSeek：速度快、配置简单/, `${browser}: 接口页应说明推荐服务`);
+    assert.ok(
+      html.indexOf('<option value="index_translate">') < html.indexOf('<option value="deepseek">'),
+      `${browser}: 哔哩哔哩翻译应排在下拉列表首位`,
+    );
+    assert.match(html, /默认选用哔哩哔哩翻译/, `${browser}: 接口页应说明默认服务`);
     assert.match(html, /Issue \/ Pull Request \/ Release/, `${browser}: 功能页标题应使用完整名称`);
     assert.match(html, /刷新记录/, `${browser}: 记录页刷新按钮文案应明确`);
     assert.match(html, /清空仓库缓存/, `${browser}: 记录页缓存按钮文案应明确范围`);
@@ -241,7 +247,7 @@ test('Issue and PR translation follows README progressive cache and record setti
   assert.match(content, /sourceType:\s*'about'/);
   assert.match(content, /about_translated_nodes=/);
   assert.match(content, /detail: `\$\{getDiscussionRecordSourceType\(item\)\}_translated_nodes=\$\{translatedCount\}`/);
-  assert.match(content, /const complete = translatedCount >= tasks\.length/);
+  assert.match(content, /const complete = !remainingTasks\.length;/);
   assert.match(content, /if \(complete \|\| translatedCount > 0 \|\| partialCacheApplied\)\s*\{[\s\S]*upsertRepoCachedTranslation\(cacheKey/);
   assert.match(content, /translatedHtml: translatedEl\.innerHTML,[\s\S]*complete,/);
 });
@@ -453,7 +459,7 @@ test('copilot repository prompts and tldr caching persistence are implemented', 
   assert.match(locals, /"Summarize latest changes":\s*"总结最新变更"/);
 
   browserContent.forEach(({ browser, js }) => {
-    assert.match(js, /tldrContent:\s*item\.tldrContent/, `${browser} content.js 应在缓存规范化中保留 tldrContent`);
+    assert.match(js, /tldrContent:\s*sanitizeCachedPayloadText\(item\.tldrContent\)/, `${browser} content.js 应在缓存规范化中净化并保留 tldrContent`);
     assert.match(js, /hasTldr\s*=\s*typeof value\?\.tldrContent === 'string'/, `${browser} content.js upsert 应支持 tldrContent`);
     assert.match(js, /function getTldrSourceHash\(/, `${browser} content.js 应包含 getTldrSourceHash`);
     assert.match(js, /return\s*\{\s*parent:\s*readmeRoot\.parentElement,\s*before:\s*readmeRoot\s*\};/, `${browser} content.js 应在 README 容器内部顶部挂载胶囊`);
@@ -527,4 +533,644 @@ test('tldr capsule action buttons are unified with icon-only refresh and close b
     assert.match(js, /data-ghcn-tldr-action="close"[\s\S]*?TLDR_ICONS\.close/, `${browser} content.js 关闭按钮应使用原生关闭图标`);
     assert.match(js, /\.ghcn-tldr-tool-btn[\s\S]*?width:\s*28px !important;[\s\S]*?height:\s*28px !important;/, `${browser} content.js 操作按钮应采用 28x28 方形标准图标按钮样式`);
   });
+});
+
+function readSrc(rel) {
+  return readFileSync(new URL(`../src/${rel}`, import.meta.url), 'utf8');
+}
+
+function makeMiniEl(tagName = 'div', attrs = {}) {
+  const el = {
+    tagName: tagName.toUpperCase(),
+    nodeType: 1,
+    attributes: new Map(Object.entries(attrs)),
+    dataset: {},
+    classList: (() => {
+      const set = new Set();
+      return {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (x, f) => (f === undefined ? (set.has(x) ? set.delete(x) : set.add(x)) : (f ? set.add(x) : set.delete(x))),
+        contains: (x) => set.has(x),
+      };
+    })(),
+    style: {},
+    children: [],
+    childNodes: [],
+    listeners: {},
+    isConnected: true,
+    innerHTML: '',
+    textContent: '',
+    disabled: Boolean(attrs.disabled),
+    readOnly: Boolean(attrs.readOnly),
+    parentElement: null,
+    get firstChild() { return this.children[0] || null; },
+    get firstElementChild() { return this.children[0] || null; },
+    get nextElementSibling() {
+      const siblings = this.parentElement?.children || [];
+      return siblings[siblings.indexOf(this) + 1] || null;
+    },
+    get previousElementSibling() {
+      const siblings = this.parentElement?.children || [];
+      return siblings[siblings.indexOf(this) - 1] || null;
+    },
+    getAttribute(n) { return this.attributes.get(n) ?? null; },
+    setAttribute(n, v) { this.attributes.set(n, String(v)); },
+    hasAttribute(n) { return this.attributes.has(n); },
+    removeAttribute(n) { this.attributes.delete(n); },
+    addEventListener(t, fn) { (this.listeners[t] ||= []).push(fn); },
+    dispatch(t, ev = {}) { (this.listeners[t] || []).forEach((fn) => fn({ preventDefault() {}, stopPropagation() {}, ...ev })); },
+    append(...nodes) { this.appendChild(...nodes); },
+    appendChild(...nodes) {
+      for (const n of nodes) {
+        if (!n) continue;
+        if (typeof n === 'object') n.parentElement = this;
+        this.children.push(n);
+        this.childNodes.push(n);
+      }
+      return nodes[0];
+    },
+    insertBefore(node, ref) {
+      if (!node) return node;
+      node.parentElement = this;
+      const idx = ref ? this.children.indexOf(ref) : -1;
+      if (idx >= 0) this.children.splice(idx, 0, node);
+      else this.children.push(node);
+      return node;
+    },
+    prepend(node) { return this.insertBefore(node, this.children[0] || null); },
+    remove() {
+      if (this.parentElement) {
+        this.parentElement.children = this.parentElement.children.filter((c) => c !== this);
+        this.parentElement.childNodes = this.parentElement.childNodes.filter((c) => c !== this);
+      }
+      this.isConnected = false;
+    },
+    closest() { return null; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+  return el;
+}
+
+test('TL;DR escapes errors, mounts above native Chinese controls, refreshes reused button handlers, and guards genSeq races', async () => {
+  const readmeRoot = makeMiniEl('article');
+  readmeRoot.textContent = 'This project provides a complete toolkit with over eighty characters of clear English introduction.';
+  readmeRoot.cloneNode = () => ({ textContent: readmeRoot.textContent, querySelectorAll: () => [] });
+  const controls = makeMiniEl('div');
+  const readmeWrapper = makeMiniEl('div');
+  readmeWrapper.appendChild(controls);
+  readmeWrapper.appendChild(readmeRoot);
+
+  const headerBtnContainer = makeMiniEl('div');
+  const copilotBtn = makeMiniEl('button');
+  headerBtnContainer.appendChild(copilotBtn);
+  const existingHeaderBtn = makeMiniEl('button');
+  existingHeaderBtn.dataset.ghcnTldr = 'header-btn';
+  headerBtnContainer.insertBefore(existingHeaderBtn, copilotBtn);
+
+  const card = makeMiniEl('section');
+  const ctx = {
+    console, URL, Math, Date,
+    performance: { now: () => 10 },
+    isPageExcluded: () => false,
+    getStableReadmeTextHash: (s) => `h:${String(s || '').length}`,
+    normalizeText: (s) => String(s || '').replace(/\s+/g, ' ').trim(),
+    normalizeRuntimeErrorMessage: (err) => String(err?.message || err || ''),
+    window: { location: { href: 'https://github.com/o/r', pathname: '/o/r' }, setTimeout, clearTimeout },
+    chrome: { storage: { local: { get: async () => ({}), set: async () => {} } } },
+    chineseReadme: { state: { root: readmeRoot, controls } },
+    getProviderConfig: () => ({ ok: true, provider: 'deepseek', model: 'deepseek-flash', url: 'https://api.deepseek.com/chat/completions', key: 'k' }),
+    applyOpenAiCompatibleRequestOptions: () => {},
+    proxyFetchJson: async () => {
+      runInContext('tldrRuntime.genSeq++;', ctx);
+      return { choices: [{ message: { content: '- **🎯 核心定位**：不应写入陈旧 DOM' } }] };
+    },
+    getRepoCachedTranslation: async () => null,
+    upsertRepoCachedTranslation: async () => { throw new Error('stale run must not write cache'); },
+    appendReadmeTranslationRecord: async () => { throw new Error('stale run must not record'); },
+    isReadmePage: () => true,
+    findReadmeHeaderActions: () => ({ container: headerBtnContainer, beforeEl: copilotBtn }),
+    document: {
+      querySelector: (sel) => (sel === '[data-ghcn-tldr="header-btn"]' ? existingHeaderBtn : null),
+      querySelectorAll: () => [],
+      createElement: (tag) => makeMiniEl(tag),
+      getElementById: () => null,
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('core/utils.js')}\n${readSrc('providers/provider-config.js')}\n${readSrc('providers/cloud-translators.js')}\n${readSrc('features/tldr-capsule.js')}`, ctx);
+  runInContext('FeatureSet.enable_extension = true; FeatureSet.enable_repo_tldr = true; FeatureSet.readme_enable_repo_cache = false;', ctx);
+  ctx.getProviderConfig = () => ({ ok: true, provider: 'deepseek', model: 'deepseek-flash', url: 'https://api.deepseek.com/chat/completions', key: 'k' });
+  ctx.chineseReadme = { state: { root: readmeRoot, controls } };
+  let fetchCalled = false;
+  ctx.proxyFetchJson = async () => {
+    fetchCalled = true;
+    runInContext('tldrRuntime.genSeq++;', ctx);
+    return { choices: [{ message: { content: '- **🎯 核心定位**：陈旧响应' } }] };
+  };
+  ctx.findReadmeHeaderActions = () => ({ container: headerBtnContainer, beforeEl: copilotBtn });
+  ctx.upsertRepoCachedTranslation = async () => { throw new Error('stale run must not write cache'); };
+
+  const errCard = makeMiniEl('section');
+  ctx.renderTldrError(errCard, '<img src=x onerror=alert(1)> & bad', { fullName: 'o/r' }, readmeRoot, 'h1');
+  assert.doesNotMatch(errCard.innerHTML, /<img\s+src=x/i, 'renderTldrError 必须转义错误消息中的 HTML 标签');
+  assert.match(errCard.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
+
+  const mp = ctx.findTldrMountPoint(readmeRoot);
+  assert.strictEqual(mp.before, controls, '挂载中文 README 时 TL;DR 应位于提示控制条之上');
+
+  const firstCalls = [];
+  const secondCalls = [];
+  const reusedBtn = ctx.mountTldrHeaderButton(readmeRoot, { fullName: 'o/r' }, () => firstCalls.push(1));
+  assert.strictEqual(reusedBtn, existingHeaderBtn);
+  existingHeaderBtn.addEventListener('click', (e) => { existingHeaderBtn.__ghcnTldrOnToggle?.(existingHeaderBtn, e); });
+  ctx.mountTldrHeaderButton(readmeRoot, { fullName: 'o/r' }, () => secondCalls.push(2));
+  existingHeaderBtn.dispatch('click');
+  assert.deepStrictEqual(firstCalls, []);
+  assert.deepStrictEqual(secondCalls, [2], '复用头部按钮后点击应调用最新页面的闭包回调');
+
+  let contentRendered = false;
+  let errorRendered = false;
+  ctx.renderTldrContent = () => { contentRendered = true; };
+  ctx.renderTldrError = () => { errorRendered = true; };
+  await ctx.executeTldrGeneration(card, { fullName: 'o/r' }, readmeRoot, 'a'.repeat(100));
+  assert.strictEqual(fetchCalled, true, 'executeTldrGeneration 应发起请求后检测 genSeq 失效');
+  assert.strictEqual(contentRendered, false, 'genSeq 过期后不得渲染陈旧响应');
+  assert.strictEqual(errorRendered, false, 'genSeq 过期后不得写入陈旧错误');
+});
+
+test('Discussion translation skips preview forms, cleans orphans on restore, and rolls back on fatal error', async () => {
+  const previewBody = makeMiniEl('div');
+  previewBody.closest = (sel) => (sel.includes('.js-preview-body') ? previewBody : null);
+  const validMd = makeMiniEl('div');
+  validMd.textContent = 'Please check the failing integration test.';
+  validMd.cloneNode = () => {
+    const clone = makeMiniEl('div');
+    clone.textContent = validMd.textContent;
+    clone.querySelectorAll = () => [];
+    return clone;
+  };
+  validMd.insertAdjacentElement = (pos, node) => {
+    if (pos === 'afterend' && validMd.parentElement) validMd.parentElement.appendChild(node);
+  };
+  const commentRoot = makeMiniEl('div');
+  const toolbar = makeMiniEl('div');
+  toolbar.dataset.ghcnDiscussionTranslate = 'toolbar';
+  commentRoot.appendChild(toolbar);
+  commentRoot.appendChild(validMd);
+  validMd.closest = (sel) => (sel.includes('.ghcn-discussion-translation-panel') || sel.includes('.js-preview-body') ? null : commentRoot);
+
+  const orphanPanel = makeMiniEl('div');
+  const hiddenBody = makeMiniEl('div', { 'data-ghcn-discussion-hidden': 'true' });
+  const ctx = {
+    console, URL, performance: { now: () => 5 },
+    isPageExcluded: () => false,
+    window: { location: { href: 'https://github.com/o/r/issues/1', pathname: '/o/r/issues/1' }, setTimeout, clearTimeout },
+    chrome: { storage: { local: { get: async () => ({}), set: async () => {} } } },
+    NodeFilter: { SHOW_TEXT: 4 },
+    document: {
+      querySelectorAll: (sel) => {
+        if (sel.includes('[data-testid="markdown-body"]')) return [previewBody, validMd];
+        if (sel === '[data-ghcn-discussion-translate="toolbar"]') return [toolbar];
+        if (sel === '.ghcn-discussion-translation-panel') return [orphanPanel];
+        if (sel === '[data-ghcn-discussion-hidden]') return [hiddenBody];
+        return [];
+      },
+      createTreeWalker: (el) => {
+        const nodes = [{ data: el.textContent || '', parentElement: el }];
+        return { nextNode: () => nodes.shift() || null };
+      },
+      createElement: (tag) => makeMiniEl(tag),
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('core/utils.js')}\n${readSrc('core/storage-cache.js')}\n${readSrc('core/text-filter.js')}\n${readSrc('features/markdown-translation.js')}\n${readSrc('features/discussion-translation.js')}`, ctx);
+  runInContext('FeatureSet.enable_extension = true; FeatureSet.enable_issue_pr_translation = true; FeatureSet.readme_enable_progressive = false;', ctx);
+  ctx.getProviderConfig = () => ({ ok: true, provider: 'deepseek', targetLang: 'zh-CN', signature: 'sig' });
+  ctx.getCurrentRepoInfo = () => ({ fullName: 'o/r' });
+  ctx.getRepoCachedTranslation = async () => null;
+  ctx.translateTextsWithProvider = async () => { throw new Error('network boom'); };
+
+  const items = ctx.findDiscussionItems();
+  assert.strictEqual(items.length, 1, 'findDiscussionItems 应忽略预览框中的 markdown');
+  assert.strictEqual(items[0].markdownEl, validMd);
+
+  await assert.rejects(() => ctx.translateIssuePrBody(items[0]), /network boom/);
+  assert.strictEqual(validMd.hasAttribute('data-ghcn-discussion-hidden'), false, '翻译异常回滚后必须恢复显示原文并保留重试入口');
+
+  ctx.restoreIssuePrTranslations();
+  assert.strictEqual(orphanPanel.isConnected, false, 'restoreIssuePrTranslations 应清理残留译文面板');
+  assert.strictEqual(hiddenBody.hasAttribute('data-ghcn-discussion-hidden'), false, 'restoreIssuePrTranslations 应解除残留隐藏属性');
+});
+
+test('Collaboration helper skips disabled/readOnly textareas, updates reused target bindings, and runs modalCleanup', () => {
+  const disabledArea = makeMiniEl('textarea', { disabled: true });
+  const readonlyArea = makeMiniEl('textarea', { readOnly: true });
+  const editableArea = makeMiniEl('textarea');
+  const fallbackBar = makeMiniEl('div');
+  fallbackBar.className = 'ghcn-collab-fallback-bar';
+
+  const ctx = {
+    console, URL,
+    isPageExcluded: () => false,
+    window: { location: { href: 'https://github.com/o/r/issues/new', pathname: '/o/r/issues/new', hostname: 'github.com' }, setTimeout, clearTimeout },
+    chrome: { storage: { local: { get: async () => ({}), set: async () => {} } } },
+    document: {
+      querySelectorAll: (sel) => (sel === '.ghcn-collab-fallback-bar' ? [fallbackBar] : []),
+      addEventListener() {},
+      createElement: (tag) => makeMiniEl(tag),
+      getElementById: () => null,
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('features/collaboration-helper.js')}`, ctx);
+  assert.strictEqual(ctx.isValidCollaborationTextarea(disabledArea), false, '应跳过 disabled 文本框');
+  assert.strictEqual(ctx.isValidCollaborationTextarea(readonlyArea), false, '应跳过 readOnly 文本框');
+  assert.strictEqual(ctx.isValidCollaborationTextarea(editableArea), true);
+  assert.strictEqual(ctx.applyPolishedTextToTextarea(readonlyArea, 'hi'), false);
+
+  const btn = ctx.createCollaborationButton(editableArea);
+  assert.strictEqual(btn.__ghcnTargetTextarea, editableArea);
+
+  runInContext('collabRuntime.modalCleanup = () => { globalThis.__cleaned = true; };', ctx);
+  ctx.restoreCollaborationHelperControls();
+  assert.strictEqual(fallbackBar.isConnected, false, '关闭润色助手时应移除 fallback bar');
+  assert.strictEqual(ctx.__cleaned, true, 'restoreCollaborationHelperControls 应触发 modalCleanup 清理监听器');
+});
+
+test('GlobalNav skips identity labels, notranslate subtrees, and avoids re-entrant loops', () => {
+  const ctx = {
+    console,
+    Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
+    NodeFilter: { SHOW_ELEMENT: 1, SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
+    CONFIG: { LANG: 'zh-CN' },
+    I18N: { conf: { reactGlobalNavLabels: { Issues: 'Issues', Repositories: '仓库' }, reactGlobalNavRegexpRules: [] }, 'zh-CN': { public: { regexp: [] } } },
+    GhcnMaintenance: { lookup: () => undefined },
+    maintenanceData: { entries: [] },
+    document: {
+      createTreeWalker: () => ({ nextNode: () => null }),
+      querySelectorAll: () => [],
+      body: null,
+    },
+    window: { location: { hostname: 'github.com', pathname: '/' } },
+  };
+  createContext(ctx);
+  const uiSrc = readSrc('features/ui-localization.js');
+  const extractNav = (name) => {
+    const start = uiSrc.indexOf(`function ${name}(`);
+    let depth = 0;
+    for (let i = uiSrc.indexOf('{', start); i < uiSrc.length; i++) {
+      if (uiSrc[i] === '{') depth++;
+      else if (uiSrc[i] === '}' && --depth === 0) return uiSrc.slice(start, i + 1);
+    }
+    throw new Error(name);
+  };
+  const preamble = `
+    const labels = I18N.conf.reactGlobalNavLabels || {};
+    const unsafeTextSelector = 'textarea, [contenteditable=""], .notranslate';
+    const navLabelCache = new Map();
+    let cachedNavPageType = '';
+    let globalNavStaticIndex = null;
+    ${extractNav('getGlobalNavStaticIndex')}
+    ${extractNav('findStaticGlobalNavLabel')}
+    ${extractNav('findRegexpGlobalNavLabel')}
+    ${extractNav('isCustomGlobalNavEntry')}
+    ${extractNav('hasCustomGlobalNavWrite')}
+    ${extractNav('rememberCustomGlobalNavWrite')}
+    ${extractNav('resolveReactGlobalNavLabel')}
+    ${extractNav('normalizeReactGlobalNavText')}
+    ${extractNav('shouldSkipReactGlobalNavNode')}
+    ${extractNav('translateReactGlobalNavTextNode')}
+  `;
+  runInContext(preamble, ctx);
+  assert.strictEqual(ctx.resolveReactGlobalNavLabel('Issues'), null, '译文与原文相同时应返回 null 防止自我触发');
+  assert.strictEqual(ctx.resolveReactGlobalNavLabel('Repositories'), '仓库');
+
+  const identityNode = { data: 'Issues' };
+  let writes = 0;
+  const wrapped = {
+    get data() { return identityNode.data; },
+    set data(v) { writes++; identityNode.data = v; },
+  };
+  ctx.translateReactGlobalNavTextNode(wrapped);
+  assert.strictEqual(writes, 0, '译文与原文相同时不得重复写入 DOM text node');
+
+  const notranslateEl = { closest: (sel) => sel.includes('.notranslate') };
+  const editableEl = { closest: (sel) => sel.includes('[contenteditable=""]') };
+  assert.strictEqual(ctx.shouldSkipReactGlobalNavNode({ nodeType: 3, parentElement: notranslateEl }), true, '应跳过 .notranslate 节点');
+  assert.strictEqual(ctx.shouldSkipReactGlobalNavNode({ nodeType: 3, parentElement: editableEl }), true, '应跳过 [contenteditable=""] 节点');
+});
+
+test('TL;DR navigation resets busy state, removes stale cards, and isolates monorepo subdirectories', async () => {
+  const readmeRoot = makeMiniEl('article');
+  readmeRoot.textContent = 'Monorepo subpackage README with enough English words to exceed eighty characters threshold easily.';
+  readmeRoot.cloneNode = () => ({ textContent: readmeRoot.textContent, querySelectorAll: () => [] });
+  const staleCard = makeMiniEl('section');
+  staleCard.dataset.ghcnTldr = 'capsule';
+  staleCard.dataset.sourceHash = 'old-hash';
+  staleCard.dataset.pathname = '/o/r';
+  staleCard.style.display = 'none';
+
+  const headerContainer = makeMiniEl('div');
+  const copilotBtn = makeMiniEl('button');
+  headerContainer.appendChild(copilotBtn);
+  const domElements = [staleCard];
+
+  let genCalled = 0;
+  let loc = { href: 'https://github.com/o/r', pathname: '/o/r' };
+  const ctx = {
+    console, URL, Math, Date,
+    performance: { now: () => 10 },
+    isPageExcluded: () => false,
+    getStableReadmeTextHash: () => 'sub-hash',
+    normalizeText: (s) => String(s || '').replace(/\s+/g, ' ').trim(),
+    normalizeRuntimeErrorMessage: (err) => String(err?.message || err || ''),
+    window: { location: loc, setTimeout, clearTimeout },
+    chrome: { storage: { local: { get: async () => ({}), set: async () => {} } } },
+    isReadmePage: () => true,
+    findReadmeHeaderActions: () => ({ container: headerContainer, beforeEl: copilotBtn }),
+    getProviderConfig: () => ({ ok: true, provider: 'deepseek', model: 'deepseek-flash', url: 'https://api.deepseek.com/chat/completions', key: 'k' }),
+    applyOpenAiCompatibleRequestOptions: () => {},
+    document: {
+      querySelector: (sel) => {
+        if (sel === '[data-ghcn-tldr="capsule"]') return domElements.find((e) => e.dataset?.ghcnTldr === 'capsule' && e.isConnected) || null;
+        if (sel === '[data-ghcn-tldr="header-btn"]') return domElements.find((e) => e.dataset?.ghcnTldr === 'header-btn' && e.isConnected) || null;
+        return null;
+      },
+      querySelectorAll: (sel) => (sel === '[data-ghcn-tldr="capsule"]' ? domElements.filter((e) => e.dataset?.ghcnTldr === 'capsule' && e.isConnected) : []),
+      createElement: (tag) => makeMiniEl(tag),
+      getElementById: () => null,
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('core/utils.js')}\n${readSrc('providers/provider-config.js')}\n${readSrc('providers/cloud-translators.js')}\n${readSrc('features/tldr-capsule.js')}`, ctx);
+  runInContext(`
+    FeatureSet.enable_extension = true;
+    FeatureSet.enable_repo_tldr = true;
+    FeatureSet.readme_enable_repo_cache = true;
+    readmeRuntime.repoCacheLoaded = true;
+    readmeRuntime.repoCacheMap.set('o/r|tldr|old-root-hash', {
+      key: 'o/r|tldr|old-root-hash',
+      repo: 'o/r',
+      pathname: '',
+      tldrContent: '- 🎯 核心定位：根仓库旧缓存，不应污染子包',
+      complete: true,
+    });
+    tldrRuntime.activeDocUrl = 'https://github.com/o/r';
+    tldrRuntime.isBusy = true;
+    tldrRuntime.busyDocUrl = 'https://github.com/o/r';
+  `, ctx);
+  // mountTldrCapsule 内部捕获 isReadmePage 等引用；覆盖 window.location 进入子包路径
+  loc.href = 'https://github.com/o/r/tree/main/packages/a';
+  loc.pathname = '/o/r/tree/main/packages/a';
+  ctx.ensureRepoCacheLoaded = async () => {};
+  ctx.getRepoCachedTranslation = async () => null;
+  ctx.upsertRepoCachedTranslation = async () => {};
+  ctx.appendReadmeTranslationRecord = async () => {};
+  ctx.findReadmeHeaderActions = () => ({ container: headerContainer, beforeEl: copilotBtn });
+  ctx.findTldrMountPoint = () => ({ parent: makeMiniEl('div'), before: readmeRoot });
+  ctx.executeTldrGeneration = async () => { genCalled += 1; };
+
+  await ctx.mountTldrCapsule(readmeRoot, { fullName: 'o/r' });
+  assert.strictEqual(staleCard.isConnected, false, '跨页面挂载时应移除旧页面残留的 TL;DR 卡片');
+  assert.strictEqual(runInContext('tldrRuntime.isBusy', ctx), false, '软导航切换页面应重置遗留的 isBusy 锁');
+
+  const headerBtn = headerContainer.children.find((el) => el.dataset?.ghcnTldr === 'header-btn');
+  assert.ok(headerBtn, '应挂载头部 AI 速读按钮');
+  assert.strictEqual(headerBtn.hasAttribute('data-has-cache'), false, 'Monorepo 子包不得误命中根仓库历史 TL;DR 缓存');
+  await headerBtn.__ghcnTldrOnToggle(headerBtn);
+  assert.strictEqual(genCalled, 1, '子包无缓存点击后应触发全新 TL;DR 生成（未被旧根缓存误开）');
+});
+
+test('Discussion translation isolates toggled epochs, invalidates inline edits, and strips clone root id', async () => {
+  const commentEl = makeMiniEl('div', { id: 'comment-body-1' });
+  commentEl.textContent = 'Please investigate this flaky test.';
+  commentEl.innerHTML = '<p>Please investigate this flaky test.</p>';
+  commentEl.cloneNode = () => {
+    const clone = makeMiniEl('div', { id: 'comment-body-1' });
+    clone.textContent = commentEl.textContent;
+    clone.innerHTML = commentEl.innerHTML;
+    clone.querySelectorAll = () => [];
+    return clone;
+  };
+  commentEl.insertAdjacentElement = (pos, node) => {
+    if (pos === 'afterend' && commentEl.parentElement) commentEl.parentElement.appendChild(node);
+  };
+  const wrapper = makeMiniEl('div');
+  const slot = makeMiniEl('div');
+  wrapper.appendChild(slot);
+  wrapper.appendChild(commentEl);
+  commentEl.closest = (sel) => (
+    sel.includes('.ghcn-discussion-translation-panel') || sel.includes('.js-preview-body')
+      ? null
+      : wrapper
+  );
+
+  let resolveTx;
+  const ctx = {
+    console, URL, performance: { now: () => 5 },
+    isPageExcluded: () => false,
+    window: { location: { href: 'https://github.com/o/r/issues/1', pathname: '/o/r/issues/1' }, setTimeout, clearTimeout },
+    chrome: { storage: { local: { get: async () => ({}), set: async () => {} } } },
+    NodeFilter: { SHOW_TEXT: 4 },
+    document: {
+      querySelectorAll: (sel) => {
+        if (sel.includes('[data-ghcn-discussion-translate="toolbar"]')) return slot.children.filter((c) => c.dataset?.ghcnDiscussionTranslate === 'toolbar');
+        if (sel === '.ghcn-discussion-translation-panel') return wrapper.children.filter((c) => c.classList?.contains('ghcn-discussion-translation-panel'));
+        if (sel === '[data-ghcn-discussion-hidden]') return commentEl.hasAttribute('data-ghcn-discussion-hidden') ? [commentEl] : [];
+        if (sel.includes('[data-testid="markdown-body"]')) return [commentEl];
+        return [];
+      },
+      createTreeWalker: (el) => {
+        const nodes = [{ nodeType: 3, data: el.textContent || '', parentElement: el, isConnected: true }];
+        return { nextNode: () => nodes.shift() || null };
+      },
+      createElement: (tag) => makeMiniEl(tag),
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('core/utils.js')}\n${readSrc('core/storage-cache.js')}\n${readSrc('core/text-filter.js')}\n${readSrc('features/markdown-translation.js')}\n${readSrc('features/discussion-translation.js')}`, ctx);
+  runInContext('FeatureSet.enable_extension = true; FeatureSet.enable_issue_pr_translation = true; FeatureSet.readme_enable_progressive = false;', ctx);
+  ctx.getProviderConfig = () => ({ ok: true, provider: 'deepseek', targetLang: 'zh-CN', signature: 'sig' });
+  ctx.getCurrentRepoInfo = () => ({ fullName: 'o/r' });
+  ctx.getRepoCachedTranslation = async () => null;
+  ctx.upsertRepoCachedTranslation = async () => {};
+  ctx.appendReadmeTranslationRecord = async () => {};
+  ctx.findDiscussionToolbarSlot = () => slot;
+  ctx.translateTextsWithProvider = () => new Promise((resolve) => { resolveTx = resolve; });
+
+  const cloneTest = ctx.createTranslatedClone(commentEl);
+  assert.strictEqual(cloneTest.hasAttribute('id'), false, 'createTranslatedClone 应移除根节点 id 避免重复 DOM id');
+
+  const item = { markdownEl: commentEl, sourceType: 'issue', viewerEl: wrapper };
+  ctx.mountDiscussionToolbar(item);
+  const pendingClick = ctx.handleIssuePrTranslateButton(item);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.strictEqual(ctx.getIssuePrDiscussionState(item).isBusy, true);
+  // 请求未完成时关闭再重开功能
+  ctx.restoreIssuePrTranslations();
+  assert.strictEqual(ctx.getIssuePrDiscussionState(item).isBusy, false, 'restoreIssuePrTranslations 应复位 isBusy');
+  resolveTx({ translatedMap: new Map([['Please investigate this flaky test.', '请排查此测试。']]), totalTokens: 10 });
+  await pendingClick;
+  assert.strictEqual(ctx.getIssuePrDiscussionState(item).translatedEl, null, '旧 epoch 完成后不得写入已被关闭销毁的状态');
+
+  // 译文已挂载时行内编辑评论内容，再次扫描必须失效旧译文面板并恢复“翻译”按钮
+  const st = ctx.getIssuePrDiscussionState(item);
+  const panel = makeMiniEl('div');
+  panel.classList.add('ghcn-discussion-translation-panel');
+  wrapper.appendChild(panel);
+  st.translatedEl = panel;
+  st.translatedHash = ctx.createHash(commentEl.innerHTML);
+  const reusedToolbar = makeMiniEl('div');
+  reusedToolbar.dataset.ghcnDiscussionTranslate = 'toolbar';
+  slot.appendChild(reusedToolbar);
+  st.toolbarEl = reusedToolbar;
+
+  commentEl.innerHTML = '<p>Updated comment content after inline edit.</p>';
+  ctx.mountDiscussionToolbar(item);
+  assert.strictEqual(st.translatedEl, null, '行内编辑正文后再次扫描应使旧译文失效');
+  assert.strictEqual(panel.isConnected, false, '旧译文面板应从 DOM 移除');
+});
+
+test('Collaboration helper tightens mount guards, keeps modal open on detached textarea, and debounces copy button', async () => {
+  const tooltip = makeMiniEl('tool-tip', { 'data-for': 'field-1' });
+  const area1 = makeMiniEl('textarea');
+  area1.id = 'field-1';
+  const area2 = makeMiniEl('textarea');
+  area2.id = 'field-2';
+  const form = makeMiniEl('form');
+  const tabList = makeMiniEl('div', { role: 'tablist' });
+  const sibling = makeMiniEl('div');
+  form.appendChild(tabList);
+  form.appendChild(sibling);
+  form.appendChild(area1);
+  form.appendChild(area2);
+  const queryMap = { 'tool-tip': tooltip };
+
+  const formQueryAll = (sel) => (sel === 'textarea' ? [area1, area2] : []);
+  form.querySelector = (sel) => (sel.includes('tablist') ? tabList : null);
+  form.querySelectorAll = formQueryAll;
+  area1.closest = (sel) => (sel.includes('form') ? form : null);
+
+  let copyTimeoutFn;
+  let clipboardCalls = 0;
+  let clearedTimers = [];
+  const docBody = makeMiniEl('body');
+  const ctx = {
+    console, URL, CSS: { escape: (s) => s },
+    navigator: { clipboard: { writeText: async () => { clipboardCalls += 1; } } },
+    isPageExcluded: () => false,
+    window: {
+      location: { href: 'https://github.com/o/r/issues/new', pathname: '/o/r/issues/new', hostname: 'github.com' },
+      addEventListener() {},
+      removeEventListener() {},
+      setTimeout: (fn) => { copyTimeoutFn = fn; return clipboardCalls; },
+      clearTimeout: (id) => { clearedTimers.push(id); },
+    },
+    document: {
+      body: docBody,
+      querySelector: (sel) => (sel === '[data-for="field-1"]' ? queryMap['tool-tip'] : null),
+      querySelectorAll: () => [],
+      addEventListener() {},
+      createElement: (tag) => Object.assign(makeMiniEl(tag), { focus() {}, select() {} }),
+      getElementById: () => null,
+    },
+  };
+  createContext(ctx);
+  runInContext(`${readSrc('core/constants.js')}\n${readSrc('features/collaboration-helper.js')}`, ctx);
+
+  // Step 1 不应匹配 <tool-tip data-for="...">，且 Step 4 在多文本框表单中应拒绝共享兜底容器
+  assert.strictEqual(ctx.findCollaborationToolbarMountPoint(area1), null, '不应错挂到 tool-tip 或多输入框共享的 tab sibling');
+
+  // 失联 textarea 点击应用后必须保留弹窗并给出错误提示，且连击复制按钮应复位为“复制英文”
+  const liveArea = Object.assign(makeMiniEl('textarea'), { focus() {}, select() {} });
+  liveArea.isConnected = false;
+  ctx.openCollaborationModal(liveArea);
+  const overlay = docBody.children.at(-1);
+  const collectByTag = (root, tag) => {
+    const out = [];
+    const walk = (n) => {
+      if (n.tagName === tag) out.push(n);
+      (n.children || []).forEach(walk);
+    };
+    walk(root);
+    return out;
+  };
+  const areas = collectByTag(overlay, 'TEXTAREA');
+  const previewArea = areas[1];
+  const buttons = collectByTag(overlay, 'BUTTON');
+  const copyBtn = buttons.find((b) => b.textContent === '复制英文');
+  const applyBtn = buttons.find((b) => b.textContent === '填入输入框');
+  const statusEl = overlay.children[0].children[3].children[0];
+
+  previewArea.value = 'Polished English body';
+  copyBtn.dispatch('click');
+  await new Promise((r) => setTimeout(r, 0));
+  copyBtn.dispatch('click');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.strictEqual(clearedTimers.includes(1), true, '连击复制按钮时应取消前一个定时器');
+  copyTimeoutFn();
+  assert.strictEqual(copyBtn.textContent, '复制英文', '定时器触发后复制按钮文案必须恢复为“复制英文”');
+
+  applyBtn.dispatch('click');
+  assert.strictEqual(overlay.isConnected, true, '目标输入框已卸载时不得关闭弹窗丢弃润色内容');
+  assert.match(statusEl.textContent, /已失效或不可编辑/);
+});
+
+test('TL;DR mount cleanly absorbs invalidated extension context without unhandled rejections or noisy errors', async () => {
+  const readmeRoot = makeMiniEl('article', 'markdown-body');
+  readmeRoot.cloneNode = () => makeMiniEl('article', 'markdown-body');
+  readmeRoot.textContent = 'Long enough README summary content for TL;DR extraction to avoid short text skip threshold check cleanly.';
+  const warnCalls = [];
+  const errorCalls = [];
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+
+  const ctx = {
+    console: {
+      debug() {},
+      info() {},
+      log() {},
+      warn: (...args) => warnCalls.push(args.join(' ')),
+      error: (...args) => errorCalls.push(args.join(' ')),
+    },
+    URL, Math, Date, TextEncoder,
+    performance: { now: () => 10 },
+    isPageExcluded: () => false,
+    isReadmePage: () => true,
+    getReadmeRootElement: () => readmeRoot,
+    getReadmeElementState: () => null,
+    normalizeText: (s) => String(s || '').replace(/\s+/g, ' ').trim(),
+    getStableReadmeTextHash: (s) => `h:${String(s || '').length}`,
+    window: { location: { href: 'https://github.com/o/r', pathname: '/o/r' }, setTimeout, clearTimeout },
+    chrome: {
+      storage: {
+        local: {
+          get: async () => { throw new Error('Extension context invalidated.'); },
+          set: async () => {},
+        },
+      },
+    },
+    document: {
+      head: makeMiniEl('head'),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      createElement: (tag) => makeMiniEl(tag),
+      getElementById: () => null,
+    },
+  };
+  createContext(ctx);
+  try {
+    runInContext(`${readSrc('core/constants.js')}\n${readSrc('core/utils.js')}\n${readSrc('core/storage-cache.js')}\n${readSrc('features/tldr-capsule.js')}`, ctx);
+    runInContext('FeatureSet.enable_extension = true; FeatureSet.enable_repo_tldr = true; FeatureSet.readme_enable_repo_cache = true;', ctx);
+    ctx.setupTldrCapsuleControls();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepStrictEqual(unhandled, [], '扩展重载触发上下文失效时不得产生 Uncaught (in promise)');
+    assert.deepStrictEqual(warnCalls, [], '扩展重载触发上下文失效时不得输出噪音警告');
+    assert.deepStrictEqual(errorCalls, [], '扩展重载触发上下文失效时不得输出错误日志');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
 });

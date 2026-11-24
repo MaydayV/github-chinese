@@ -30,6 +30,25 @@ function translate(rules, source) {
   return source;
 }
 
+test('dictionary conflict cleanup preserves page-specific effective regex translations', () => {
+  for (const [browser, file] of locales) {
+    const zh = loadLocale(file)['zh-CN'];
+    for (const [page, source, expected] of [
+      ['public', 'Chatting with 2 attachments', '附加 2 个附件'],
+      ['repository/issues', 'Edited 2 times', '已编辑 2 次'],
+      ['repository/labels', 'Edited 2 times', '已编辑 2 次'],
+      ['repository/pull_issue_public', 'Edited 2 times', '编辑 2 次'],
+      ['repository/pull', '2 successful checks', '2 次成功检查'],
+      ['repository-public', '2 successful checks', '2 个成功的检查'],
+      ['repository/settings/access', '2 members', '2 位成员'],
+      ['repository-public', '2 members', '2 个成员'],
+      ['repository/pulse', '2 authors', '2 作者'],
+    ]) assert.equal(translate(zh[page].regexp, source), expected, `${browser}: ${page} ${source}`);
+    assert.equal(zh.public.static['Copied!'], '复制成功！', browser);
+    assert.equal(zh.repository.static.Name, '文件名', browser);
+  }
+});
+
 test('upstream relative-time regression keeps minutes and months distinct', () => {
   for (const [browser, file] of locales) {
     const publicLocale = loadLocale(file)['zh-CN'].public;
@@ -435,5 +454,349 @@ test('two-factor authentication deadline accepts joined and spaced dates', () =>
       assert.match(translate([rule], source), /^启用双因素身份验证（2FA）/, `${browser}: ${source}`);
       assert.doesNotMatch(translate([rule], source), /to enable two-factor authentication/);
     }
+  }
+});
+
+test('PR #840 repository pages include missing terms without replacing local wording', () => {
+  const samples = {
+    'repository/issues': {
+      'Shared': '共享',
+      'No private views yet': '暂无私有视图',
+      'No shared views yet': '暂无共享视图',
+      'Collapse Private': '折叠私有视图',
+      'Expand Private': '展开私有视图',
+      'Collapse Shared': '折叠共享视图',
+      'Expand Shared': '展开共享视图',
+      'Updated': '最后更新',
+    },
+    'repository/projects': {
+      'Clear search query': '清除搜索内容',
+      'No closed projects': '暂无已关闭的项目',
+      'No projects matched your search': '没有与搜索条件匹配的项目',
+      'Try a different search term or clear the search to see all': '请更换搜索词，或清除搜索条件以查看所有',
+    },
+    'repository/pull': { 'Merge is blocked': '合并被阻止' },
+    'repository/security': {
+      'Malware alerts are disabled.': '恶意软件警报已禁用。',
+      'To receive Malware alerts, you must first enable Malware alerts in': '要接收恶意软件警报，请先启用此功能，入口位于',
+      'No open alerts': '暂无未关闭的警报',
+      'There are no open Dependabot alerts for this repository.': '此仓库没有未关闭的 Dependabot 警报。',
+      'No closed alerts': '暂无已关闭的警报',
+      'There are no closed Dependabot alerts for this repository.': '此仓库没有已关闭的 Dependabot 警报。',
+    },
+    'repository/community': {
+      'Additional community file': '其他社区文件',
+      "Describe your project's accessibility commitment, supported environments, known limitations, and how people can report barriers.": '说明项目在无障碍方面的承诺、支持的环境、已知限制，以及如何反馈遇到的无障碍问题。',
+      'Writing an accessibility statement': '编写无障碍声明',
+      'View an ACCESSIBILITY.md example': '查看 ACCESSIBILITY.md 示例',
+    },
+  };
+  for (const [browser, file] of locales) {
+    const i18n = loadLocale(file);
+    const zh = i18n['zh-CN'];
+    for (const [page, terms] of Object.entries(samples)) {
+      for (const [source, expected] of Object.entries(terms)) {
+        assert.equal(zh[page].static[source], expected, `${browser}: ${page} ${source}`);
+      }
+    }
+    for (const page of ['repository/issues', 'repository/projects', 'repository/milestones', 'repository/labels']) {
+      assert.equal(zh[page].static['Collapse sidebar'], '折叠侧边栏', `${browser}: ${page}`);
+      assert.equal(zh[page].static['Expand sidebar'], '展开侧边栏', `${browser}: ${page}`);
+      assert.equal(zh[page].static['Assigned to me'], '分配给我', `${browser}: 保留本地第一人称`);
+      assert.equal(zh[page].static['Created by me'], '由我创建', browser);
+      assert.ok(i18n.conf.characterDataPage.includes(page), `${browser}: ${page} 动态文字监听`);
+    }
+    assert.equal(translate(zh['repository/projects'].regexp, 'No projects matched “test”'), '未找到与“test”匹配的项目', browser);
+    assert.equal(translate(zh.projects.regexp, 'No projects matched “test”'), 'No projects matched “test”', `${browser}: 不扩大项目正则作用域`);
+    assert.equal(zh['repository/projects/new'].attributes, undefined, `${browser}: 不改变项目创建页属性`);
+    assert.equal(zh.public.static['There are no projects linked to this repository.'], '尚无关联到此仓库的项目。', browser);
+  }
+});
+
+function extractRuntimeFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, name);
+  let depth = 0;
+  for (let i = source.indexOf('{', start); i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+  }
+  throw new Error(`Cannot extract ${name}`);
+}
+
+function makeElement(selectors = [], attributes = {}, children = []) {
+  const element = {
+    nodeType: 1, tagName: 'DIV', className: '', dataset: {}, attributes: { ...attributes }, children,
+    parentElement: null, ignored: false, writes: 0,
+    getAttribute(name) { return this.attributes[name] ?? null; },
+    setAttribute(name, value) { this.attributes[name] = value; this.writes++; },
+    matches(selector) { return selectors.includes(selector) || (selector === this.ignoreSelector && this.ignored); },
+    closest(selector) {
+      return this.matches(selector) ? this : this.parentElement?.closest(selector) || null;
+    },
+    get title() { return this.attributes.title; },
+    set title(value) { this.setAttribute('title', value); },
+  };
+  for (const child of children) child.parentElement = element;
+  return element;
+}
+
+function loadAttributeRuntime(browser, page, pathname) {
+  const i18n = loadLocale(locales.find(([name]) => name === browser)[1]);
+  const source = readFileSync(contentScripts.find(([name]) => name === browser)[1], 'utf8');
+  const observers = [];
+  const context = {
+    I18N: i18n,
+    GhcnMaintenance: { lookup: () => undefined }, maintenanceData: { entries: [] }, recordUiMiss() {},
+    CONFIG: { LANG: 'zh-CN', OBSERVER_CONFIG: { childList: true, subtree: true, characterData: true, attributeFilter: ['value', 'placeholder', 'aria-label', 'data-confirm'] } },
+    FeatureSet: { enable_extension: true }, readmeRuntime: { isApplyingTranslation: false },
+    window: { location: { pathname, href: `https://github.com${pathname}` } },
+    Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
+    NodeFilter: { SHOW_ELEMENT: 1, SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
+    isReactGlobalNavPortalNode: () => false,
+    updatePageConfig() {},
+    document: {
+      body: makeElement(),
+      createTreeWalker(root, flags, filter) {
+        const nodes = [];
+        const visit = node => {
+          if (filter(node) === 2) return;
+          nodes.push(node);
+          (node.children || []).forEach(visit);
+        };
+        (root.children || []).forEach(visit);
+        return { nextNode: () => nodes.shift() || null };
+      },
+    },
+    MutationObserver: class {
+      constructor(callback) { this.callback = callback; observers.push(this); }
+      disconnect() {}
+      observe(body, config) { this.config = config; }
+    },
+  };
+  createContext(context);
+  const functions = ['buildPageConfig', 'getPageObserverConfig', 'watchUpdate', 'traverseNode',
+    'transPageAttributes', 'applyCustomAttributes', 'transElement', 'transText', 'fetchTranslatedText'];
+  runInContext(functions.map(name => extractRuntimeFunction(source, name)).join('\n'), context);
+  context.pageConfig = context.buildPageConfig(page);
+  return { context, observers, rules: context.pageConfig.attributeTranslations };
+}
+
+test('PR #841 attributes handle mutation roots and descendants without repeated writes', () => {
+  for (const [browser] of locales) {
+    const { context, rules } = loadAttributeRuntime(browser, 'repository/projects', '/owner/repo/projects');
+    for (const [selector, attribute, translations] of rules) {
+      for (const [source, expected] of Object.entries(translations)) {
+        const node = makeElement([selector], { [attribute]: source });
+        context.traverseNode(node);
+        assert.equal(node.getAttribute(attribute), expected, `${browser}: root ${source}`);
+        const writes = node.writes;
+        context.traverseNode(node);
+        assert.equal(node.writes, writes, `${browser}: 不重复写入中文属性`);
+        const child = makeElement([selector], { [attribute]: source });
+        context.traverseNode(makeElement([], {}, [child]));
+        assert.equal(child.getAttribute(attribute), expected, `${browser}: descendant ${source}`);
+      }
+    }
+    const wrongElement = makeElement([], { 'aria-label': 'Loading projects' });
+    context.traverseNode(wrongElement);
+    assert.equal(wrongElement.getAttribute('aria-label'), 'Loading projects', `${browser}: 选择器不匹配不改写`);
+  }
+});
+
+test('issue view attribute rules use the live path and do not leak into ordinary issues', () => {
+  for (const [browser] of locales) {
+    const { context, rules } = loadAttributeRuntime(browser, 'repository/issues', '/owner/repo/issues/views');
+    const [selector, attribute, translations] = rules.at(-1);
+    for (const [source, expected] of Object.entries(translations)) {
+      for (const pathname of ['/owner/repo/issues/views', '/owner/repo/issues/views/']) {
+        context.window.location.pathname = pathname;
+        const node = makeElement([selector], { [attribute]: source });
+        context.traverseNode(node);
+        assert.equal(node.getAttribute(attribute), expected, `${browser}: ${source}`);
+      }
+      for (const pathname of ['/owner/repo/issues', '/owner/repo/issues/123', '/owner/repo/issues/views/other', '/orgs/example/issues/views']) {
+        context.window.location.pathname = pathname;
+        const node = makeElement([selector], { [attribute]: source });
+        context.traverseNode(node);
+        assert.equal(node.getAttribute(attribute), source, `${browser}: 离开视图后不沿用排序规则`);
+      }
+    }
+  }
+});
+
+test('scoped attributes inherit search, editable, code, and React hydration exclusions', () => {
+  for (const [browser] of locales) {
+    const { context, rules } = loadAttributeRuntime(browser, 'repository/projects', '/owner/repo/projects');
+    const [selector, attribute] = rules[0];
+    const ignore = context.pageConfig.ignoreSelectors;
+    for (const protectedSelector of ['header.GlobalNav', 'qbsearch-input', '[contenteditable="true"]', '[translate="no"]', 'CODE', 'react-app:not(.loaded)', '#__primerPortalRoot__']) {
+      assert.ok(ignore.includes(protectedSelector), `${browser}: ${protectedSelector} 保持保护`);
+      const parent = makeElement();
+      parent.ignored = true;
+      parent.ignoreSelector = ignore;
+      const node = makeElement([selector], { [attribute]: 'Issues sidebar navigation' });
+      node.parentElement = parent;
+      context.traverseNode(node);
+      assert.equal(node.writes, 0, `${browser}: 忽略祖先内不改写`);
+      const ignoredChild = makeElement([selector], { [attribute]: 'Issues sidebar navigation' });
+      ignoredChild.ignored = true;
+      ignoredChild.ignoreSelector = ignore;
+      context.traverseNode(makeElement([], {}, [ignoredChild]));
+      assert.equal(ignoredChild.writes, 0, `${browser}: 忽略后代不改写`);
+    }
+    const hydrating = makeElement([selector], { [attribute]: 'Issues sidebar navigation' });
+    hydrating.ignoreSelector = ignore;
+    hydrating.ignored = true;
+    context.traverseNode(hydrating);
+    hydrating.ignored = false;
+    context.traverseNode(hydrating);
+    assert.equal(hydrating.getAttribute(attribute), '议题侧边栏导航', `${browser}: hydration 完成后可翻译`);
+  }
+});
+
+test('page observers restore dynamic sidebar attributes and text while keeping title monitoring scoped', () => {
+  for (const [browser] of locales) {
+    for (const page of ['repository/projects', 'repository/milestones', 'repository/labels']) {
+      const { context, observers, rules } = loadAttributeRuntime(browser, page, '/owner/repo/' + page.split('/')[1]);
+      assert.equal(context.getPageObserverConfig().attributeFilter.includes('title'), true, browser);
+      context.watchUpdate();
+      const observer = observers[0];
+      const node = makeElement([rules[1][0]], { title: 'Assigned to me' });
+      observer.callback([{ type: 'attributes', attributeName: 'title', target: node, addedNodes: [] }]);
+      assert.equal(node.getAttribute('title'), '分配给我', `${browser}: 动态 title 根节点`);
+      const text = { nodeType: 3, data: 'Expand sidebar', get length() { return this.data.length; }, parentElement: makeElement() };
+      observer.callback([{ type: 'characterData', target: text, addedNodes: [] }]);
+      assert.equal(text.data, '展开侧边栏', `${browser}: 动态字符数据`);
+      context.pageConfig = context.buildPageConfig('repository');
+      context.refreshPageObserver();
+      assert.equal(observer.config.attributeFilter.includes('title'), false, `${browser}: 离开页面后不再增加 title 监听`);
+      assert.deepEqual(Array.from(context.CONFIG.OBSERVER_CONFIG.attributeFilter), ['value', 'placeholder', 'aria-label', 'data-confirm'], `${browser}: 全局观察配置不变`);
+    }
+  }
+});
+
+test('detectPageType matches newly fixed routes and anchors prefixes cleanly across all browsers', () => {
+  for (const [browser, localeFile] of locales) {
+    const i18n = loadLocale(localeFile);
+    const source = readFileSync(contentScripts.find(([name]) => name === browser)[1], 'utf8');
+    const fnCode = [
+      extractRuntimeFunction(source, 'isFallbackRepositoryPath'),
+      extractRuntimeFunction(source, 'detectPageType'),
+    ].join('\n');
+
+    const checkRoute = (pathname, repoNwo = '') => {
+      const ctx = {
+        URL,
+        URLSearchParams,
+        I18N: i18n,
+        CONFIG: {
+          LANG: 'zh-CN',
+          PAGE_MAP: {
+            'github.com': 'github',
+            'gist.github.com': 'gist',
+            'www.githubstatus.com': 'status',
+            'skills.github.com': 'skills',
+            'education.github.com': 'education',
+          },
+          SPECIAL_SITES: ['gist', 'status', 'skills', 'education'],
+        },
+        window: { location: { href: `https://github.com${pathname}`, hostname: 'github.com', pathname } },
+        document: {
+          body: { classList: { contains: () => false } },
+          head: {
+            querySelector: (sel) => (repoNwo && sel.includes('octolytics-dimension-repository_nwo') ? { content: repoNwo } : null),
+          },
+        },
+      };
+      createContext(ctx);
+      runInContext(fnCode, ctx);
+      return ctx.detectPageType();
+    };
+
+    assert.equal(checkRoute('/settings/codespaces/allow_permissions'), 'settings/codespaces/allow_permissions', browser);
+    assert.equal(checkRoute('/owner/repo/search', 'owner/repo'), 'repository/search', browser);
+    assert.equal(checkRoute('/owner/repo/reported_content', 'owner/repo'), 'repository/reported_content', browser);
+    assert.equal(checkRoute('/orgs/acme/discussions'), 'orgs/discussions', browser);
+    assert.equal(checkRoute('/installations/new'), 'installations/new', browser);
+    assert.equal(checkRoute('/owner/repo/tree', 'owner/repo'), 'repository/tree', browser);
+    assert.equal(checkRoute('/owner/repo/tree-foo', 'owner/repo'), 'repository', `${browser}: tree-foo 不得误匹配 repository/tree`);
+  }
+});
+
+test('locals.js audit regex fixes preserve English prose and translate exact metrics cleanly', () => {
+  for (const [browser, localeFile] of locales) {
+    const zh = loadLocale(localeFile)['zh-CN'];
+    const timeRules = zh.public['time-regexp'];
+
+    assert.equal(translate(timeRules, 'May contain sensitive data'), 'May contain sensitive data', `${browser}: 不得误改正文 May`);
+    assert.equal(translate(timeRules, 'May 15, 2026'), '2026年5月15日', `${browser}: 完整英文日期应正常翻译`);
+    assert.equal(translate(timeRules, '200ms'), '200ms', `${browser}: 不得误改毫秒单位`);
+    assert.equal(translate(timeRules, '5mb'), '5mb', `${browser}: 不得误改文件大小单位`);
+    assert.equal(translate(timeRules, '1990s'), '1990s', `${browser}: 不得误改年代`);
+    assert.equal(translate(timeRules, '5m ago'), '5 分钟之前', `${browser}: 相对时间短格式应正常翻译`);
+
+    assert.equal(
+      translate(zh['settings/billing'].regexp, 'Top three repositories last year'),
+      '去年排名前三的仓库',
+      `${browser}: Top three repositories last year`,
+    );
+    assert.equal(
+      translate(zh['repository'].regexp, 'MIT and 2 other licenses found'),
+      'MIT和另外2个许可证',
+      `${browser}: 许可证数量兜底不应输出 undefined`,
+    );
+    assert.equal(
+      translate(zh['repository/settings'].regexp, 'Default branch changed to main'),
+      '默认分支更改为 main',
+      `${browser}: 默认分支名称应完整捕获`,
+    );
+    assert.equal(translate(zh['repository/settings'].regexp, 'Delete item'), 'Delete item', `${browser}: ^Delete$ 不得误匹配短语`);
+    assert.equal(translate(zh['repository/deployments'].regexp, 'previous'), 'previous', `${browser}: ^via$ 不得误匹配 previous`);
+    assert.equal(translate(zh['repository/projects'].regexp, 'hobby'), 'hobby', `${browser}: hobby 保持不变`);
+
+    assert.equal(
+      zh.public.title.regexp.some(([pattern]) => pattern === '_regexp_end'),
+      false,
+      `${browser}: public.title.regexp 不应残留死规则 _regexp_end`,
+    );
+    assert.equal(translate(zh['repository/pull'].regexp, '2 pending reviewers'), '2 名审查者未决', browser);
+    assert.equal(translate(zh['repository/pull'].regexp, 'Commit message'), 'Commit message', `${browser}: Commit message 不得被 Commit 部分替换`);
+    assert.equal(translate(zh['repository/pull'].regexp, 'Commits'), '提交', browser);
+    assert.equal(
+      translate(zh['repository/pull'].regexp, '1 skipped, 2 successful, 1 in progress, and 1 expected checks'),
+      '1 个跳过, 2 个成功, 1 个正在进行, 1 个预先检查',
+      browser,
+    );
+    assert.equal(
+      translate([...zh['repository/pull'].regexp, ...zh.public.regexp], 'alice requested changes, you commented'),
+      'alice 要求更改，您发表评论',
+      browser,
+    );
+    assert.equal(translate(zh['repository/pull'].regexp, 'alice requested changes'), 'alice 要求更改', browser);
+
+    assert.equal(translate(zh['repository/releases'].regexp, 'Alice and Bob'), 'Alice 和 Bob', browser);
+    assert.equal(translate(zh['repository/releases'].regexp, 'Docs and tests updated'), 'Docs and tests updated', browser);
+    assert.equal(translate([...zh['repository/releases'].regexp, ...zh.public.regexp], 'alice, bob, and 2 more'), 'alice, bob，以及其他 2 个组织', browser);
+
+    assert.equal(translate(zh['repository/forks'].regexp, 'Created 2 days ago'), '创建于 2 days ago', browser);
+    assert.equal(translate(zh['repository/forks'].regexp, 'Updated'), '更新于', browser);
+    assert.equal(translate(zh['repository/forks'].regexp, 'Last Updated'), 'Last Updated', browser);
+    assert.equal(translate(zh['repository/forks'].regexp, 'Newly Created'), 'Newly Created', browser);
+
+    assert.equal(translate(zh.gist.regexp, '5 changes: 3 additions & 2 deletions'), ' 5 处更改：3 处增加 & 2 处删除', browser);
+
+    assert.equal(
+      translate(zh.marketplace.regexp, 'By clicking Set up with Acme, you agree to GitHub’s'),
+      '单击 “使用 Acme 设置”，即表示您同意 GitHub 的以下条款',
+      browser,
+    );
+    assert.equal(translate(zh.marketplace.regexp, 'Set up with Acme'), '使用 Acme 设置', browser);
+
+    assert.equal(
+      translate(zh.codespaces.regexp, 'Your codespace "dev" has been updated to use machine type: "4 cores, 16 GB RAM, 32 GB storage". Changes will take effect the next time your codespace restarts.'),
+      '您的代码空间“dev”将更新机器类型为：“4 核，16 GB 内存，32 GB 存储”。更改将在下次启动代码空间时生效。',
+      browser,
+    );
   }
 });

@@ -13,6 +13,8 @@
     /****************** 全局配置区（开发者可修改部分） ******************/
     const STORAGE_DEFAULTS = {
         enable_extension: true,
+        prefer_chinese_readme: true,
+        collect_ui_misses: false,
         enable_readme_translation: false,
         enable_issue_pr_translation: false,
         enable_collaboration_helper: false,
@@ -21,7 +23,7 @@
         readme_enable_repo_cache: false,
         readme_enable_progressive: false,
         readme_enable_debug: false,
-        readme_provider: 'deepseek',
+        readme_provider: 'index_translate',
         readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
         readme_deepl_api_key: '',
         readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',
@@ -29,15 +31,22 @@
         readme_azure_api_url: 'https://api.cognitive.microsofttranslator.com/translate',
         readme_azure_api_key: '',
         readme_azure_region: '',
-        readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
+        readme_openai_api_url: 'https://api.deepseek.com',
         readme_openai_api_key: '',
-        readme_openai_model: 'gpt-4.1-mini',
+        readme_openai_model: 'deepseek-flash',
         readme_qwen_mt_api_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
         readme_qwen_mt_api_key: '',
         readme_qwen_mt_model: 'qwen-mt-turbo',
+        readme_index_translate_api_url: 'http://127.0.0.1:8080/v1',
+        readme_index_translate_api_key: '',
+        readme_index_translate_model: 'Index-Translate-35B-A3B',
     };
 
-    const FeatureSet = { ...STORAGE_DEFAULTS };
+    const FeatureSet = new Proxy({ ...STORAGE_DEFAULTS }, {
+        get(target, key) {
+            return key === 'enable_extension' ? target[key] && !isPageExcluded() : target[key];
+        },
+    });
 
     const CONFIG = {
         LANG: 'zh-CN',
@@ -160,18 +169,22 @@
         timerId: 0,
         inFlight: false,
         rerunRequested: false,
+        runEpoch: 0,
         stateByElement: new WeakMap(),
         isApplyingTranslation: false,
         domMutationGuardDepth: 0,
         translationCache: new Map(),
+        preservedCache: new Set(),
         repoCacheMap: new Map(),
         repoCacheLoaded: false,
+        repoCacheLoadPromise: null,
         lastWarnKey: '',
     };
 
     const issuePrRuntime = {
         timerId: 0,
         inFlight: false,
+        runEpoch: 0,
         stateByElement: new WeakMap(),
         lastWarnKey: '',
     };
@@ -179,18 +192,25 @@
     const collabRuntime = {
         timerId: 0,
         modalEl: null,
+        modalCleanup: null,
     };
 
     const tldrRuntime = {
         timerId: 0,
         isBusy: false,
+        genSeq: 0,
+        mountSeq: 0,
+        activeDocUrl: '',
+        busyDocUrl: '',
+        busyCard: null,
     };
 
     const FIXED_TARGET_LANG = 'zh-CN';
-    const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
+    const AI_CHAT_PROVIDERS = ['index_translate', 'openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
 
     let pageConfig = {};
     let scheduleReactGlobalNavRefresh = () => {};
     let refreshPageObserver = () => {};
+    let refreshHydrationObserver = () => {};
     let historyRefreshTimer = null;
 

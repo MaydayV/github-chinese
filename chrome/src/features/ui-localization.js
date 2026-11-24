@@ -5,19 +5,25 @@
 
     function isReactGlobalNavPortalNode(node) {
         const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-        if (element?.matches?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')
-            || element?.querySelector?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')) {
+        if (!element) return false;
+
+        const quickSearchSelector = '#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]';
+        const portalRoot = element.closest?.('#__primerPortalRoot__');
+        if (element.closest?.(quickSearchSelector)) {
             return true;
         }
-
-        const portalRoot = element?.closest?.('#__primerPortalRoot__');
-        if (!portalRoot) return false;
+        if (!portalRoot) {
+            if (element.id === '__primerPortalRoot__' || element.contains?.(document.querySelector?.('#search-suggestions-dialog'))) {
+                return Boolean(element.querySelector?.(quickSearchSelector));
+            }
+            return false;
+        }
 
         const portal = element.closest?.('[data-component="Portal"]')
             || element.querySelector?.('[data-component="Portal"]')
             || portalRoot;
-        if (portal.matches?.('#search-suggestions-dialog')
-            || portal.querySelector?.('#search-suggestions-dialog')) return true;
+        if (portal.matches?.(quickSearchSelector)
+            || portal.querySelector?.(quickSearchSelector)) return true;
 
         const referenceAttributes = ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns'];
         const referenceElements = [
@@ -55,7 +61,7 @@
         const hasControlledSurface = portal.matches?.('[role="menu"], [role="dialog"], [role="tooltip"]')
             || portal.querySelector?.('[role="menu"], [role="dialog"], [role="tooltip"]');
         return !!hasControlledSurface
-            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input, #__primerPortalRoot__, [role="dialog"]');
+            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input');
     }
 
     function setupReactGlobalNavTranslation() {
@@ -75,7 +81,11 @@
         const searchModuleSelector = 'header.GlobalNav [class*="Search-module__"]';
         const unsafeTextSelector = [
             'textarea',
+            '[contenteditable=""]',
             '[contenteditable="true"]',
+            '[contenteditable="plaintext-only"]',
+            '.notranslate',
+            '[translate="no"]',
             'code',
             'pre',
             'kbd',
@@ -88,10 +98,18 @@
         const translatableAttributeNames = ['title', 'aria-label', 'data-visible-text', 'placeholder'];
         const reactGlobalNavIdleMs = 700;
         const reactGlobalNavRetryMs = 400;
+        const maxHeaderRetryCount = 4;
         let timer = null;
         let headerObserver = null;
         let lastReactGlobalNavMutationAt = Date.now();
         let lastReactGlobalNavPortalMutationAt = Date.now();
+        let isApplyingNavTranslation = false;
+        let headerRetryCount = 0;
+        let portalRafId = 0;
+        let portalTimers = [];
+        let globalNavStaticIndex = null;
+        let cachedNavPageType = '';
+        const navLabelCache = new Map();
         const observedSurfaces = new WeakSet();
 
         function isReactGlobalNavSearchActive() {
@@ -113,30 +131,47 @@
                 && !isReactGlobalNavSearchActive();
         }
 
-        function findStaticGlobalNavLabel(source) {
+        function getGlobalNavStaticIndex() {
+            if (globalNavStaticIndex) return globalNavStaticIndex;
+            globalNavStaticIndex = new Map();
             const locale = I18N[CONFIG.LANG];
-            if (!locale) return null;
+            if (!locale) return globalNavStaticIndex;
 
             for (const section of Object.values(locale)) {
-                const label = section?.static?.[source];
-                if (typeof label === 'string' && label && label !== source) {
-                    return label;
+                const dict = section?.static;
+                if (!dict || typeof dict !== 'object') continue;
+                for (const [key, value] of Object.entries(dict)) {
+                    if (typeof value === 'string' && value && value !== key && !globalNavStaticIndex.has(key)) {
+                        globalNavStaticIndex.set(key, value);
+                    }
                 }
             }
+            return globalNavStaticIndex;
+        }
 
-            return null;
+        function findStaticGlobalNavLabel(source) {
+            return getGlobalNavStaticIndex().get(source) || null;
         }
 
         function findRegexpGlobalNavLabel(source) {
             const locale = I18N[CONFIG.LANG];
             if (!locale) return null;
 
-            for (const section of Object.values(locale)) {
-                for (const [pattern, replacement] of section?.regexp || []) {
-                    const match = source.match(pattern);
+            const currentRules = typeof pageConfig !== 'undefined' && Array.isArray(pageConfig?.regexpRules)
+                ? pageConfig.regexpRules
+                : [];
+            const publicRules = Array.isArray(locale.public?.regexp) ? locale.public.regexp : [];
+            const candidateRuleLists = currentRules.length ? [currentRules] : [publicRules];
+
+            for (const rules of candidateRuleLists) {
+                for (const [pattern, replacement] of rules) {
+                    const re = pattern?.global
+                        ? new RegExp(pattern.source, pattern.flags.replace('g', ''))
+                        : pattern;
+                    const match = source.match(re);
                     if (!match || match.index !== 0 || match[0] !== source) continue;
 
-                    const label = source.replace(pattern, replacement);
+                    const label = source.replace(re, replacement);
                     if (label !== source) return label;
                 }
             }
@@ -144,12 +179,54 @@
             return null;
         }
 
+        function isCustomGlobalNavEntry(source) {
+            return typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined'
+                && maintenanceData.entries.length
+                && Boolean(GhcnMaintenance.lookup(maintenanceData.entries, source, window.location));
+        }
+
+        function hasCustomGlobalNavWrite(node, field, value) {
+            return typeof hasCustomWrite === 'function' && typeof maintenanceData !== 'undefined'
+                && maintenanceData.entries.length && hasCustomWrite(node, field, value);
+        }
+
+        function rememberCustomGlobalNavWrite(node, field, value) {
+            if (typeof rememberCustomWrite === 'function') {
+                rememberCustomWrite(node, field, value);
+            }
+        }
+
         function resolveReactGlobalNavLabel(source) {
-            return labels[source] || findStaticGlobalNavLabel(source) || findRegexpGlobalNavLabel(source);
+            if (typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined' && maintenanceData.entries.length) {
+                const custom = GhcnMaintenance.lookup(maintenanceData.entries, source, window.location);
+                if (custom) return custom !== source ? custom : null;
+            }
+            if (!/[A-Za-z]/.test(source)) return null;
+
+            const currentType = typeof pageConfig !== 'undefined' ? (pageConfig?.currentPageType || '') : '';
+            if (cachedNavPageType !== currentType) {
+                cachedNavPageType = currentType;
+                navLabelCache.clear();
+            }
+            if (navLabelCache.has(source)) {
+                return navLabelCache.get(source);
+            }
+
+            const ownNavLabel = Object.hasOwn(labels, source) && typeof labels[source] === 'string' && labels[source] !== source
+                ? labels[source]
+                : null;
+            const resolved = ownNavLabel || findStaticGlobalNavLabel(source) || findRegexpGlobalNavLabel(source);
+            const normalizedResult = resolved && resolved !== source ? resolved : null;
+
+            if (navLabelCache.size >= 2000) {
+                navLabelCache.delete(navLabelCache.keys().next().value);
+            }
+            navLabelCache.set(source, normalizedResult);
+            return normalizedResult;
         }
 
         function normalizeReactGlobalNavText(text) {
-            return text?.replace(/\s+/g, ' ').trim();
+            return text?.replace(/[\xa0\s]+/g, ' ').trim();
         }
 
         function translateReactGlobalNavText(text) {
@@ -158,9 +235,19 @@
         }
 
         function translateReactGlobalNavElement(element, source) {
-            const label = translateReactGlobalNavText(source ?? element.textContent);
+            const rawText = source ?? element.textContent;
+            const normalized = normalizeReactGlobalNavText(rawText);
+            if (!normalized) return;
+            if (hasCustomGlobalNavWrite(element, 'textContent', element.textContent)) return;
+            const label = resolveReactGlobalNavLabel(normalized);
             if (label && element.textContent !== label) {
                 element.textContent = label;
+                if (isCustomGlobalNavEntry(normalized)) {
+                    rememberCustomGlobalNavWrite(element, 'textContent', label);
+                    if (element.firstChild?.nodeType === Node.TEXT_NODE) {
+                        rememberCustomGlobalNavWrite(element.firstChild, 'data', label);
+                    }
+                }
             }
         }
 
@@ -175,17 +262,30 @@
         function translateReactGlobalNavAttributes(element) {
             translatableAttributeNames.forEach(attributeName => {
                 const value = element.getAttribute?.(attributeName);
-                const label = translateReactGlobalNavText(value);
+                if (!value) return;
+                if (hasCustomGlobalNavWrite(element, attributeName, value)) return;
+                const normalized = normalizeReactGlobalNavText(value);
+                const label = normalized ? resolveReactGlobalNavLabel(normalized) : null;
                 if (label && value !== label) {
+                    if (isCustomGlobalNavEntry(normalized)) rememberCustomGlobalNavWrite(element, attributeName, label);
                     element.setAttribute(attributeName, label);
                 }
             });
         }
 
         function translateReactGlobalNavTextNode(node) {
-            const label = translateReactGlobalNavText(node.data);
+            if (hasCustomGlobalNavWrite(node, 'data', node.data)) return;
+            if (node.parentElement
+                && typeof node.parentElement.textContent === 'string'
+                && hasCustomGlobalNavWrite(node.parentElement, 'textContent', node.parentElement.textContent)) return;
+            const normalized = normalizeReactGlobalNavText(node.data);
+            const label = normalized ? resolveReactGlobalNavLabel(normalized) : null;
             if (label) {
-                node.data = node.data.replace(node.data.trim(), label);
+                const next = node.data.replace(node.data.trim(), () => label);
+                if (next !== node.data) {
+                    if (isCustomGlobalNavEntry(normalized)) rememberCustomGlobalNavWrite(node, 'data', next);
+                    node.data = next;
+                }
             }
         }
 
@@ -279,7 +379,8 @@
 
             textNodeGroups.forEach((nodes, segmentIndex) => {
                 nodes.forEach((node, nodeIndex) => {
-                    node.data = nodeIndex === 0 ? segments[segmentIndex] : '';
+                    const nextText = nodeIndex === 0 ? segments[segmentIndex] : '';
+                    if (node.data !== nextText) node.data = nextText;
                 });
             });
         }
@@ -289,13 +390,19 @@
             if (!header) return true;
             if (!canTranslateReactGlobalNavHeader()) return false;
 
-            document.querySelectorAll(dataContentLabelSelector).forEach(element => {
-                if (!shouldSkipReactGlobalNavNode(element)) {
-                    translateReactGlobalNavElement(element, element.getAttribute('data-content'));
-                }
-            });
-            translateReactGlobalNavSurface(header);
-            translateReactGlobalNavSearchPlaceholder();
+            isApplyingNavTranslation = true;
+            try {
+                document.querySelectorAll(dataContentLabelSelector).forEach(element => {
+                    if (!shouldSkipReactGlobalNavNode(element)) {
+                        translateReactGlobalNavElement(element, element.getAttribute('data-content'));
+                    }
+                });
+                translateReactGlobalNavSurface(header);
+                translateReactGlobalNavSearchPlaceholder();
+            } finally {
+                headerObserver?.takeRecords?.();
+                isApplyingNavTranslation = false;
+            }
 
             return true;
         }
@@ -311,13 +418,19 @@
             if (!surfaces.length) return true;
 
             let searchPortalPending = false;
-            surfaces.forEach(surface => {
-                if (isReactGlobalNavSearchPortal(surface) && !isReactGlobalNavSurfaceIdle('portal')) {
-                    searchPortalPending = true;
-                    return;
-                }
-                translateReactGlobalNavSurface(surface);
-            });
+            isApplyingNavTranslation = true;
+            try {
+                surfaces.forEach(surface => {
+                    if (isReactGlobalNavSearchPortal(surface) && !isReactGlobalNavSurfaceIdle('portal')) {
+                        searchPortalPending = true;
+                        return;
+                    }
+                    translateReactGlobalNavSurface(surface);
+                });
+            } finally {
+                headerObserver?.takeRecords?.();
+                isApplyingNavTranslation = false;
+            }
 
             return !searchPortalPending;
         }
@@ -329,8 +442,20 @@
             const headerTranslated = translateReactGlobalNavHeader();
             const portalsTranslated = translateReactGlobalNavPortals();
 
+            if (headerTranslated && portalsTranslated) {
+                headerRetryCount = 0;
+                return;
+            }
+
+            if (isReactGlobalNavSearchActive()) {
+                return;
+            }
+
             if ((options.requireSettledHeader && !headerTranslated) || !portalsTranslated) {
-                scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, options);
+                if (headerRetryCount < maxHeaderRetryCount) {
+                    headerRetryCount += 1;
+                    scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, options);
+                }
             }
         }
 
@@ -342,20 +467,28 @@
         function translateReactGlobalNavPortalsSoon() {
             if (!FeatureSet.enable_extension) return;
 
+            if (portalRafId && typeof window.cancelAnimationFrame === 'function') {
+                window.cancelAnimationFrame(portalRafId);
+                portalRafId = 0;
+            }
+            portalTimers.forEach(id => window.clearTimeout(id));
+            portalTimers = [];
+
             const translatePortals = () => {
                 observeReactGlobalNav();
                 translateReactGlobalNavPortals();
             };
 
-            window.requestAnimationFrame(translatePortals);
+            portalRafId = window.requestAnimationFrame(translatePortals);
             [80, 200].forEach(delay => {
-                window.setTimeout(translatePortals, delay);
+                portalTimers.push(window.setTimeout(translatePortals, delay));
             });
         }
 
         function scheduleReactGlobalNavSeries() {
+            headerRetryCount = 0;
             [800, 1600, 3000].forEach(delay => {
-                window.setTimeout(translateReactGlobalNavLabels, delay);
+                window.setTimeout(() => translateReactGlobalNavLabels({ requireSettledHeader: true }), delay);
             });
         }
 
@@ -373,8 +506,10 @@
         function observeReactGlobalNav() {
             if (!headerObserver) {
                 headerObserver = new MutationObserver(mutations => {
+                    if (isApplyingNavTranslation) return;
                     mutations.forEach(mutation => recordReactGlobalNavMutation(mutation.target));
-                    translateReactGlobalNavPortals();
+                    headerRetryCount = 0;
+                    translateReactGlobalNavPortalsSoon();
                     scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
                 });
             }
@@ -412,7 +547,12 @@
         window.addEventListener('turbo:load', scheduleReactGlobalNavSeries);
         window.addEventListener('urlchange', scheduleReactGlobalNavSeries);
         ['click', 'focusin', 'focusout', 'pointerover'].forEach(eventName => {
-            document.addEventListener(eventName, () => {
+            document.addEventListener(eventName, event => {
+                if (eventName === 'pointerover'
+                    && !event.target?.closest?.('header.GlobalNav, #__primerPortalRoot__')) {
+                    return;
+                }
+                headerRetryCount = 0;
                 translateReactGlobalNavPortalsSoon();
                 scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
             }, true);
@@ -533,12 +673,30 @@
     }
 
     /**
-     * transTitle 函数：翻译页面标题
+     * 仅翻译当前页面明确列出的属性原文，并可进一步限定路径。
      */
+    function transPageAttributes(node, rules) {
+        for (const [selector, name, translations, pathname] of rules) {
+            const text = node.getAttribute(name);
+            if (!text) continue;
+            if (maintenanceData.entries.length && hasCustomWrite(node, name, text)) continue;
+            const normalized = GhcnMaintenance.normalize ? GhcnMaintenance.normalize(text) : text.trim().replace(/[\xa0\s]+/g, ' ');
+            const custom = GhcnMaintenance.lookup(maintenanceData.entries, normalized, window.location);
+            const translated = custom || translations[text];
+            // 使用当前路径，避免 SPA 从议题视图返回列表后继续沿用视图排序规则。
+            if (typeof translated === 'string' && translated !== text
+                && (!pathname || pathname.test(window.location.pathname)) && node.matches(selector)) {
+                if (custom) rememberCustomWrite(node, name, translated);
+                node.setAttribute(name, translated);
+            }
+        }
+    }
+
+    /** 翻译页面标题。 */
     function transTitle() {
         if (!FeatureSet.enable_extension) return;
         const text = document.title; // 获取标题文本内容
-        let translatedText = pageConfig.titleStaticDict[text] || '';
+        let translatedText = Object.hasOwn(pageConfig.titleStaticDict, text) ? pageConfig.titleStaticDict[text] : '';
         if (!translatedText) {
             for (const [pattern, replacement] of pageConfig.titleRegexpRules) {
                 translatedText = text.replace(pattern, replacement);
@@ -579,10 +737,16 @@
         if (!FeatureSet.enable_extension) return false;
         const text = el[field]; // 获取需要翻译的文本
         if (!text) return false; // 当 text 为空时，退出函数
+        if (maintenanceData.entries.length && hasCustomWrite(el, field, text)) return false;
 
         const translatedText = transText(text); // 翻译后的文本
         if (translatedText) {
+            if (GhcnMaintenance.lookup(maintenanceData.entries, text.trim().replace(/[\xa0\s]+/g, ' '), window.location)) rememberCustomWrite(el, field, translatedText);
             el[field] = translatedText; // 替换翻译后的内容
+        } else {
+            const element = el.nodeType === Node.TEXT_NODE ? el.parentElement : el;
+            if (element?.closest?.('button, [role="button"], [role="menuitem"], [role="tab"], label')
+                && !element.closest('article, .markdown-body, .comment-body, input, textarea, [contenteditable], [data-hovercard-type], .AppHeader-context, [role="listbox"], [role="option"]')) recordUiMiss(text);
         }
     }
 
@@ -592,6 +756,17 @@
      * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
      */
     function transText(text) {
+        const trimmedText = text.trim(); // 去除首尾空格
+        if (!trimmedText) return false;
+        const cleanedText = trimmedText.replace(/\xa0|[\s]+/g, ' '); // 去除多余空白字符（包括 &nbsp; 空格 换行符）
+
+        if (typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined') {
+            const customTranslation = GhcnMaintenance.lookup(maintenanceData.entries, cleanedText, window.location);
+            if (customTranslation && customTranslation !== cleanedText) {
+                return text.replace(trimmedText, () => customTranslation);
+            }
+        }
+
         // 判断是否需要跳过翻译
         //  1. 检查内容是否为空或者仅包含空白字符或数字。
         //  2. 检查内容是否仅包含中文字符。
@@ -599,16 +774,12 @@
         const shouldSkip = text => /^[\s0-9]*$/.test(text) || /^[\u4e00-\u9fa5]+$/.test(text) || !/[a-zA-Z,.]/.test(text);
         if (shouldSkip(text)) return false;
 
-        // 清理文本内容
-        const trimmedText = text.trim(); // 去除首尾空格
-        const cleanedText = trimmedText.replace(/\xa0|[\s]+/g, ' '); // 去除多余空白字符（包括 &nbsp; 空格 换行符）
-
         // 尝试获取翻译结果
         const translatedText = fetchTranslatedText(cleanedText);
 
         // 如果找到翻译并且不与清理后的文本相同，则返回替换后的结果
         if (translatedText && translatedText !== cleanedText) {
-            return text.replace(trimmedText, translatedText); // 替换原字符，保留首尾空白部分
+            return text.replace(trimmedText, () => translatedText); // 替换原字符，保留首尾空白部分
         }
 
         return false;
@@ -620,14 +791,23 @@
      * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
      */
     function fetchTranslatedText(text) {
+        const custom = GhcnMaintenance.lookup(maintenanceData.entries, text, window.location);
+        if (custom) return custom;
         const cachedText = pageConfig.textCache.get(text);
         if (cachedText !== undefined) return cachedText;
 
+        const cacheSet = (key, value) => {
+            if (!pageConfig.textCache.has(key) && pageConfig.textCache.size >= 5000) {
+                pageConfig.textCache.delete(pageConfig.textCache.keys().next().value);
+            }
+            pageConfig.textCache.set(key, value);
+        };
+
         // 静态翻译
-        let translatedText = pageConfig.staticDict[text]; // 默认翻译 公共部分
+        let translatedText = Object.hasOwn(pageConfig.staticDict, text) ? pageConfig.staticDict[text] : undefined; // 默认翻译 公共部分
 
         if (typeof translatedText === 'string') {
-            pageConfig.textCache.set(text, translatedText);
+            cacheSet(text, translatedText);
             return translatedText;
         }
 
@@ -635,12 +815,12 @@
         for (const [pattern, replacement] of pageConfig.regexpRules) {
             translatedText = text.replace(pattern, replacement);
             if (translatedText !== text) {
-                pageConfig.textCache.set(text, translatedText);
+                cacheSet(text, translatedText);
                 return translatedText;
             }
         }
 
-        pageConfig.textCache.set(text, false);
+        cacheSet(text, false);
         return false; // 没有翻译条目
     }
 

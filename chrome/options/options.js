@@ -9,7 +9,7 @@ const DEFAULTS = {
   readme_enable_repo_cache: false,
   readme_enable_progressive: false,
   readme_enable_debug: false,
-  readme_provider: 'deepseek',
+  readme_provider: 'index_translate',
   readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
   readme_deepl_api_key: '',
   readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',
@@ -17,12 +17,15 @@ const DEFAULTS = {
   readme_azure_api_url: 'https://api.cognitive.microsofttranslator.com/translate',
   readme_azure_api_key: '',
   readme_azure_region: '',
-  readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
+  readme_openai_api_url: 'https://api.deepseek.com',
   readme_openai_api_key: '',
-  readme_openai_model: 'gpt-4.1-mini',
+  readme_openai_model: 'deepseek-flash',
   readme_qwen_mt_api_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
   readme_qwen_mt_api_key: '',
   readme_qwen_mt_model: 'qwen-mt-turbo',
+  readme_index_translate_api_url: 'http://127.0.0.1:8080/v1',
+  readme_index_translate_api_key: '',
+  readme_index_translate_model: 'Index-Translate-35B-A3B',
 };
 
 const LOCAL_STORAGE_KEYS = {
@@ -53,7 +56,7 @@ const RECORDS_STATE = {
   pageSize: 8,
 };
 
-const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
+const AI_CHAT_PROVIDERS = ['index_translate', 'openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
 
 const AI_PROVIDER_DEFAULTS = {
   openai: { apiUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' },
@@ -102,7 +105,8 @@ function collectValues() {
       return result;
     }
 
-    result[key] = (el.value || '').trim();
+    const raw = (el.value || '').trim();
+    result[key] = key.endsWith('_api_url') ? normalizeUrl(raw) : raw;
     return result;
   }, {});
 }
@@ -149,7 +153,9 @@ function applyValues(values) {
 }
 
 function refreshProviderPanel(provider) {
-  const normalizedProvider = AI_CHAT_PROVIDERS.includes(provider) ? 'ai_chat' : provider;
+  const normalizedProvider = (provider !== 'index_translate' && AI_CHAT_PROVIDERS.includes(provider))
+    ? 'ai_chat'
+    : provider;
   document.querySelectorAll('.provider').forEach((panel) => {
     panel.classList.toggle('is-active', panel.dataset.provider === normalizedProvider);
   });
@@ -167,14 +173,36 @@ function getQwenMtDefaults() {
   };
 }
 
+function getIndexTranslateDefaults() {
+  return {
+    apiUrl: DEFAULTS.readme_index_translate_api_url,
+    model: DEFAULTS.readme_index_translate_model,
+  };
+}
+
 function applyProviderDefaultsToValues(values) {
   const provider = (values.readme_provider || '').trim().toLowerCase();
   const nextValues = { ...values };
 
   if (provider === 'qwen_mt') {
     const defaults = getQwenMtDefaults();
-    nextValues.readme_qwen_mt_api_url = defaults.apiUrl;
-    nextValues.readme_qwen_mt_model = defaults.model;
+    if (!normalizeUrl(nextValues.readme_qwen_mt_api_url)) {
+      nextValues.readme_qwen_mt_api_url = defaults.apiUrl;
+    }
+    if (!(nextValues.readme_qwen_mt_model || '').trim()) {
+      nextValues.readme_qwen_mt_model = defaults.model;
+    }
+    return nextValues;
+  }
+
+  if (provider === 'index_translate') {
+    const defaults = getIndexTranslateDefaults();
+    if (!normalizeUrl(nextValues.readme_index_translate_api_url)) {
+      nextValues.readme_index_translate_api_url = defaults.apiUrl;
+    }
+    if (!(nextValues.readme_index_translate_model || '').trim()) {
+      nextValues.readme_index_translate_model = defaults.model;
+    }
     return nextValues;
   }
 
@@ -188,6 +216,7 @@ function applyProviderDefaultsToValues(values) {
 
 function getAiProviderLabel(provider) {
   const labels = {
+    index_translate: '哔哩哔哩翻译',
     openai: 'OpenAI 官方接口',
     openai_compatible: 'OpenAI 兼容接口',
     deepseek: 'DeepSeek',
@@ -262,21 +291,29 @@ function normalizeOpenAiEndpoint(url) {
 
   const hostname = parsedUrl.hostname.toLowerCase();
   const path = parsedUrl.pathname.replace(/\/+$/, '');
+  const search = parsedUrl.search || '';
   if (/\/chat\/completions$/i.test(path)) {
-    return `${parsedUrl.origin}${path}`;
+    return `${parsedUrl.origin}${path}${search}`;
   }
 
   if (!path) {
-    return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions`;
+    return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions${search}`;
   }
 
-  return `${parsedUrl.origin}${path}/chat/completions`;
+  return `${parsedUrl.origin}${path}/chat/completions${search}`;
 }
 
 function applyOpenAiCompatibleRequestOptions(payload, config) {
   if (!payload) return payload;
 
-  if (isDeepSeekEndpoint(config?.url) || isKimiEndpoint(config?.url)) {
+  // 兼容官方端点、本地桥接及使用原模型名的中转接口。
+  const isIndexTranslate = config?.provider === 'index_translate'
+    || getProviderHost(config?.url) === 'index-translate.bilibili.com'
+    || /(?:^|\/)Index-Translate(?:-|$)/i.test(String(config?.model || '').trim());
+  if (isIndexTranslate) {
+    payload.stream = false;
+    payload.chat_template_kwargs = { ...payload.chat_template_kwargs, enable_thinking: false };
+  } else if (isDeepSeekEndpoint(config?.url) || isKimiEndpoint(config?.url)) {
     payload.stream = false;
     payload.thinking = { type: 'disabled' };
   } else if (isQwenEndpoint(config?.url)) {
@@ -344,6 +381,15 @@ function getProviderConfig(values) {
       }
       return { ok: true, provider, targetLang, url, key, model };
     }
+    case 'index_translate': {
+      const url = normalizeOpenAiEndpoint(normalizeUrl(values.readme_index_translate_api_url));
+      const key = (values.readme_index_translate_api_key || '').trim();
+      const model = (values.readme_index_translate_model || '').trim();
+      if (!url || !model) {
+        return { ok: false, message: '哔哩哔哩翻译需要 API 地址和模型名（API Key 可留空）。' };
+      }
+      return { ok: true, provider, targetLang, url, key, model };
+    }
     case 'openai':
     case 'openai_compatible':
     case 'deepseek':
@@ -383,7 +429,7 @@ function getApiOriginPattern(url) {
 
   return {
     ok: true,
-    originPattern: `${parsedUrl.protocol}//${parsedUrl.host}/*`,
+    originPattern: `${protocol}//${hostname}/*`,
     hostLabel: parsedUrl.host,
   };
 }
@@ -532,7 +578,12 @@ async function loadValues() {
   let normalized = ruled.values;
 
   if (isAnyAiTranslationEnabled(normalized)) {
-    const permission = await ensureProviderHostPermission(normalized, { request: false });
+    let permission = { ok: false };
+    try {
+      permission = await ensureProviderHostPermission(normalized, { request: false });
+    } catch (error) {
+      console.warn('检查接口权限失败，已回退关闭翻译开关:', error);
+    }
     if (!permission.ok) {
       normalized = enforceFeatureSwitchRules(
         {
@@ -583,7 +634,8 @@ async function proxyFetchJson(request) {
     throw new Error('后台未返回响应。');
   }
 
-  const { ok, status, statusText, body, error } = response;
+  const { ok, status, statusText, body, error, userMessage } = response;
+  if (userMessage) throw new Error(userMessage);
   if (!ok) {
     const details = body ? truncateText(body, 180) : (error || 'unknown error');
     throw new Error(`HTTP ${status} ${statusText} - ${details}`);
@@ -675,13 +727,17 @@ async function testOpenAiCompatible(config) {
   };
   applyOpenAiCompatibleRequestOptions(payload, config);
 
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  if (config.key) {
+    headers.Authorization = `Bearer ${config.key}`;
+  }
+
   const data = await proxyFetchJson({
     url: config.url,
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.key}`,
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -744,6 +800,7 @@ async function testProviderConnection(values) {
     case 'qwen_mt':
       await testQwenMt(config);
       return 'Qwen-MT 连通性正常。';
+    case 'index_translate':
     case 'openai':
     case 'openai_compatible':
     case 'deepseek':
@@ -860,7 +917,7 @@ function formatRecordDetail(detail) {
 
 function normalizeRecordSourceType(sourceType) {
   const value = String(sourceType || '').trim().toLowerCase();
-  if (value === 'issue' || value === 'pull' || value === 'release' || value === 'readme' || value === 'about' || value === 'collab' || value === 'tldr') return value;
+  if (value === 'issue' || value === 'pull' || value === 'discussion' || value === 'release' || value === 'readme' || value === 'about' || value === 'collab' || value === 'tldr') return value;
   return 'readme';
 }
 
@@ -871,6 +928,7 @@ function getRecordSourceMeta(sourceType) {
     about: { label: '仓库简介', className: 'is-about' },
     issue: { label: '议题', className: 'is-issue' },
     pull: { label: '拉取请求', className: 'is-pull' },
+    discussion: { label: '讨论', className: 'is-discussion' },
     release: { label: '发行版', className: 'is-release' },
     collab: { label: '协作润色', className: 'is-collab' },
     tldr: { label: '速读胶囊', className: 'is-tldr' },
@@ -926,6 +984,28 @@ function createRecordSpan(text, className = '') {
   return span;
 }
 
+function formatRecordProviderLabel(provider) {
+  const raw = String(provider || '').trim();
+  if (!raw) return '未知';
+
+  const labels = {
+    index_translate: '哔哩哔哩翻译',
+    deepseek: 'DeepSeek',
+    deepl: 'DeepL',
+    google: 'Google Cloud Translation',
+    azure: 'Azure Translator',
+    qwen_mt: 'Qwen-MT',
+    openai: 'OpenAI',
+    qwen: 'Qwen',
+    minimax: 'MiniMax',
+    kimi: 'Kimi',
+    zhipu: '智谱 GLM',
+    volcengine: '火山方舟',
+    openai_compatible: 'OpenAI 兼容接口',
+  };
+  return labels[raw.toLowerCase()] || raw;
+}
+
 function createRecordListItem(item) {
   const meta = getStatusMeta(item.status);
   const sourceMeta = getRecordSourceMeta(item.sourceType);
@@ -963,7 +1043,7 @@ function createRecordListItem(item) {
   metaEl.append(
     createRecordSpan(`Tokens：${formatNumber(item.tokens)}`),
     createRecordSpan(`时间：${formatTime(item.createdAt)}`),
-    createRecordSpan(`服务：${item.provider || '未知'}`)
+    createRecordSpan(`服务：${formatRecordProviderLabel(item.provider)}`)
   );
   if (detailText) metaEl.append(createRecordSpan(detailText));
 
@@ -1063,7 +1143,7 @@ function exportDebugLogs() {
   link.href = url;
   link.download = `github-chinese-readme-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   return true;
 }
 
@@ -1097,10 +1177,11 @@ function bindEvents() {
 
   const mainSwitch = byId('enable_readme_translation');
   mainSwitch?.addEventListener('change', async () => {
-    const values = collectValues();
+    const checked = Boolean(mainSwitch.checked);
+    const candidateValues = { ...LAST_SAVED_VALUES, enable_readme_translation: checked };
 
-    if (values.enable_readme_translation) {
-      const ruled = enforceFeatureSwitchRules(values, {
+    if (checked) {
+      const ruled = enforceFeatureSwitchRules(candidateValues, {
         requireApiConfig: true,
         resetAdvancedWhenEnable: true,
       });
@@ -1137,7 +1218,12 @@ function bindEvents() {
       }
 
       try {
-        applyValues(ruled.values);
+        mainSwitch.checked = true;
+        ADVANCED_SWITCH_KEYS.forEach((key) => {
+          const input = byId(key);
+          if (input) input.checked = false;
+        });
+        updateAdvancedSwitchUi(true);
         await savePartialValues({
           enable_readme_translation: true,
           readme_enable_token_record: false,
@@ -1155,9 +1241,9 @@ function bindEvents() {
       return;
     }
 
-    const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: false });
     try {
-      applyValues(ruled.values);
+      mainSwitch.checked = false;
+      updateAdvancedSwitchUi(false);
       await savePartialValues({
         enable_readme_translation: false,
         readme_enable_token_record: false,
@@ -1176,10 +1262,11 @@ function bindEvents() {
 
   const issuePrSwitch = byId('enable_issue_pr_translation');
   issuePrSwitch?.addEventListener('change', async () => {
-    const values = collectValues();
+    const checked = Boolean(issuePrSwitch.checked);
 
-    if (values.enable_issue_pr_translation) {
-      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+    if (checked) {
+      const candidateValues = { ...LAST_SAVED_VALUES, enable_issue_pr_translation: true };
+      const ruled = enforceFeatureSwitchRules(candidateValues, { requireApiConfig: true });
       if (!ruled.ok) {
         issuePrSwitch.checked = false;
         setStatus(ruled.message, 'error');
@@ -1207,22 +1294,34 @@ function bindEvents() {
         return;
       }
 
-      applyValues(ruled.values);
-      await savePartialValues({ enable_issue_pr_translation: true });
-      setStatus('正文翻译已开启并保存。进入 Issue、PR 或 Release 页面后，可手动翻译当前内容。', 'success');
+      try {
+        await savePartialValues({ enable_issue_pr_translation: true });
+        setStatus('正文翻译已开启并保存。进入 Issue、PR 或 Release 页面后，可手动翻译当前内容。', 'success');
+      } catch (error) {
+        console.error(error);
+        issuePrSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_issue_pr_translation);
+        setStatus('保存正文翻译设置失败，请重试。', 'error');
+      }
       return;
     }
 
-    await savePartialValues({ enable_issue_pr_translation: false });
-    setStatus('正文翻译已关闭并保存。', 'success');
+    try {
+      await savePartialValues({ enable_issue_pr_translation: false });
+      setStatus('正文翻译已关闭并保存。', 'success');
+    } catch (error) {
+      console.error(error);
+      issuePrSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_issue_pr_translation);
+      setStatus('保存正文翻译设置失败，请重试。', 'error');
+    }
   });
 
   const collabSwitch = byId('enable_collaboration_helper');
   collabSwitch?.addEventListener('change', async () => {
-    const values = collectValues();
+    const checked = Boolean(collabSwitch.checked);
 
-    if (values.enable_collaboration_helper) {
-      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+    if (checked) {
+      const candidateValues = { ...LAST_SAVED_VALUES, enable_collaboration_helper: true };
+      const ruled = enforceFeatureSwitchRules(candidateValues, { requireApiConfig: true });
       if (!ruled.ok) {
         collabSwitch.checked = false;
         setStatus(ruled.message, 'error');
@@ -1250,22 +1349,34 @@ function bindEvents() {
         return;
       }
 
-      applyValues(ruled.values);
-      await savePartialValues({ enable_collaboration_helper: true });
-      setStatus('协作润色助手已开启并保存。进入 Issue / PR / 讨论输入框，可使用“润色转为英文”。', 'success');
+      try {
+        await savePartialValues({ enable_collaboration_helper: true });
+        setStatus('协作润色助手已开启并保存。进入 Issue / PR / 讨论输入框，可使用“润色转为英文”。', 'success');
+      } catch (error) {
+        console.error(error);
+        collabSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_collaboration_helper);
+        setStatus('保存协作润色设置失败，请重试。', 'error');
+      }
       return;
     }
 
-    await savePartialValues({ enable_collaboration_helper: false });
-    setStatus('协作润色助手已关闭并保存。', 'success');
+    try {
+      await savePartialValues({ enable_collaboration_helper: false });
+      setStatus('协作润色助手已关闭并保存。', 'success');
+    } catch (error) {
+      console.error(error);
+      collabSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_collaboration_helper);
+      setStatus('保存协作润色设置失败，请重试。', 'error');
+    }
   });
 
   const tldrSwitch = byId('enable_repo_tldr');
   tldrSwitch?.addEventListener('change', async () => {
-    const values = collectValues();
+    const checked = Boolean(tldrSwitch.checked);
 
-    if (values.enable_repo_tldr) {
-      const ruled = enforceFeatureSwitchRules(values, { requireApiConfig: true });
+    if (checked) {
+      const candidateValues = { ...LAST_SAVED_VALUES, enable_repo_tldr: true };
+      const ruled = enforceFeatureSwitchRules(candidateValues, { requireApiConfig: true });
       if (!ruled.ok) {
         tldrSwitch.checked = false;
         setStatus(ruled.message, 'error');
@@ -1293,14 +1404,25 @@ function bindEvents() {
         return;
       }
 
-      applyValues(ruled.values);
-      await savePartialValues({ enable_repo_tldr: true });
-      setStatus('仓库首页 AI 速读胶囊已开启并保存。访问项目主页时可一键速读。', 'success');
+      try {
+        await savePartialValues({ enable_repo_tldr: true });
+        setStatus('仓库首页 AI 速读胶囊已开启并保存。访问项目主页时可一键速读。', 'success');
+      } catch (error) {
+        console.error(error);
+        tldrSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_repo_tldr);
+        setStatus('保存 AI 速读设置失败，请重试。', 'error');
+      }
       return;
     }
 
-    await savePartialValues({ enable_repo_tldr: false });
-    setStatus('仓库首页 AI 速读胶囊已关闭并保存。', 'success');
+    try {
+      await savePartialValues({ enable_repo_tldr: false });
+      setStatus('仓库首页 AI 速读胶囊已关闭并保存。', 'success');
+    } catch (error) {
+      console.error(error);
+      tldrSwitch.checked = Boolean(LAST_SAVED_VALUES.enable_repo_tldr);
+      setStatus('保存 AI 速读设置失败，请重试。', 'error');
+    }
   });
 
   document.querySelectorAll('.feature-tip-trigger').forEach((btn) => {
@@ -1352,6 +1474,23 @@ function bindEvents() {
           setStatus(permission.message, 'error');
           return;
         }
+      } else {
+        const urlKeyByProvider = {
+          deepl: 'readme_deepl_api_url',
+          google: 'readme_google_api_url',
+          azure: 'readme_azure_api_url',
+          qwen_mt: 'readme_qwen_mt_api_url',
+          index_translate: 'readme_index_translate_api_url',
+        };
+        const activeUrlKey = urlKeyByProvider[ruled.values.readme_provider] || 'readme_openai_api_url';
+        const activeUrl = normalizeUrl(ruled.values[activeUrlKey]);
+        if (activeUrl) {
+          const urlCheck = getApiOriginPattern(activeUrl);
+          if (!urlCheck.ok) {
+            setStatus(urlCheck.message, 'error');
+            return;
+          }
+        }
       }
 
       applyValues(ruled.values);
@@ -1368,21 +1507,32 @@ function bindEvents() {
     }
   });
 
-  byId('testConnection')?.addEventListener('click', async () => {
+  const testButton = byId('testConnection');
+  let testConnectionSeq = 0;
+  testButton?.addEventListener('click', async () => {
+    const requestSeq = ++testConnectionSeq;
     try {
       setStatus('');
       setTestStatus('正在测试连通性，请稍候...');
       const values = collectValues();
+      testButton.disabled = true;
       const permission = await ensureProviderHostPermission(values, { request: true });
+      if (requestSeq !== testConnectionSeq) return;
       if (!permission.ok) {
         setTestStatus(permission.message, 'error');
         return;
       }
       const message = await testProviderConnection(values);
+      if (requestSeq !== testConnectionSeq) return;
       setTestStatus(`测试成功：${message}`, 'success');
     } catch (error) {
+      if (requestSeq !== testConnectionSeq) return;
       console.error(error);
       setTestStatus(`测试失败：${error instanceof Error ? error.message : String(error)}`, 'error');
+    } finally {
+      if (requestSeq === testConnectionSeq) {
+        testButton.disabled = false;
+      }
     }
   });
 
@@ -1463,11 +1613,14 @@ function bindEvents() {
       const changedKeys = Object.keys(changes);
       if (!changedKeys.some((key) => key in DEFAULTS)) return;
 
-      const nextValues = collectValues();
+      const nextValues = { ...LAST_SAVED_VALUES };
       changedKeys.forEach((key) => {
         if (!(key in DEFAULTS)) return;
-        nextValues[key] = changes[key].newValue;
-        LAST_SAVED_VALUES[key] = changes[key].newValue;
+        const nextValue = Object.hasOwn(changes[key], 'newValue') && changes[key].newValue !== undefined
+          ? changes[key].newValue
+          : DEFAULTS[key];
+        nextValues[key] = nextValue;
+        LAST_SAVED_VALUES[key] = nextValue;
       });
 
       const ruled = enforceFeatureSwitchRules(nextValues, { requireApiConfig: false });

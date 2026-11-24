@@ -137,8 +137,16 @@ h1 {
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
 }
 
-.options-btn:hover {
+.options-btn:hover:not(:disabled) {
   filter: brightness(0.98);
+}
+
+.options-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+  color: #64748b;
+  background: #e2e8f0;
 }
 
 .update-notice[hidden] {

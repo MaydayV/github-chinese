@@ -21,12 +21,25 @@
         return owner && repo ? `${owner}/${repo}` : '';
     }
 
+    const NON_REPO_ROOT_SEGMENTS = new Set([
+        'home', 'dashboard', 'feed', 'copilot', 'spark', 'signup', 'account_verifications',
+        'login', 'logout', 'session', 'sessions', 'password_reset', 'orgs', 'organizations',
+        'explore', 'topics', 'notifications', 'watching', 'stars', 'issues', 'pulls', 'repos',
+        'search', 'trending', 'showcases', 'new', 'import', 'settings', 'installations',
+        'marketplace', 'apps', 'account', 'projects', 'redeem', 'discussions', 'collections',
+        'sponsors', 'sponsoring', 'github-copilot', 'codespaces', 'developer', 'features',
+        'security', 'sitemap', 'education', 'mcp', 'users', 'billing', 'plans', 'about', 'pricing',
+    ]);
+
     function getCurrentRepoInfo() {
+        if (typeof window !== 'undefined' && window.location?.hostname && window.location.hostname !== 'github.com') {
+            return null;
+        }
         const fullName = buildRepoIdentifierFromPath(window.location.pathname);
         if (!fullName) return null;
 
         const [owner, repo] = fullName.split('/');
-        if (!owner || !repo) return null;
+        if (!owner || !repo || NON_REPO_ROOT_SEGMENTS.has(owner)) return null;
         return { owner, repo, fullName };
     }
 
@@ -36,8 +49,13 @@
     }
 
     function getStableReadmeTextHash(html) {
-        const container = document.createElement('div');
-        container.innerHTML = String(html || '');
+        const container = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(html)
+            : (() => {
+                const div = document.createElement('div');
+                div.innerHTML = String(html || '');
+                return div;
+            })();
         return createHash(normalizeText(container.textContent || ''));
     }
 
@@ -55,9 +73,11 @@
         const usage = payload?.usage;
         if (!usage || typeof usage !== 'object') return 0;
 
-        const totalTokens = Number(usage.total_tokens);
-        if (Number.isFinite(totalTokens) && totalTokens >= 0) {
-            return totalTokens;
+        if (usage.total_tokens != null && usage.total_tokens !== '') {
+            const totalTokens = Number(usage.total_tokens);
+            if (Number.isFinite(totalTokens) && totalTokens > 0) {
+                return totalTokens;
+            }
         }
 
         const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
@@ -71,10 +91,12 @@
     }
 
     function isExtensionContextInvalidatedError(error) {
+        if (error?.code === 'GHCN_CONTEXT_INVALIDATED') return true;
         const message = String(error?.message || error || '');
         return /extension context invalidated/i.test(message)
             || /context invalidated/i.test(message)
-            || /extension context was invalidated/i.test(message);
+            || /extension context was invalidated/i.test(message)
+            || /插件上下文已失效/.test(message);
     }
 
     function normalizeRuntimeErrorMessage(error) {
@@ -97,23 +119,45 @@
         return String(error || '翻译失败');
     }
 
+    function normalizePreservedTexts(list) {
+        if (!Array.isArray(list)) return [];
+
+        const seen = new Set();
+        const result = [];
+        for (const item of list) {
+            if (typeof item !== 'string') continue;
+            const text = item.trim();
+            if (!text || text.length > 160 || seen.has(text)) continue;
+            seen.add(text);
+            result.push(text);
+            if (result.length >= 120) break;
+        }
+        return result;
+    }
+
+    function sanitizeCachedPayloadText(value) {
+        return typeof value === 'string' && value.length > 0 && !containsObjectObjectArtifact(value)
+            ? value
+            : '';
+    }
+
     function normalizeRepoCacheEntries(entries) {
         const list = Array.isArray(entries) ? entries : [];
 
         return list
-            .filter((item) => item
-                && typeof item.key === 'string'
-                && ((typeof item.translatedHtml === 'string' && !containsObjectObjectArtifact(item.translatedHtml))
-                    || (typeof item.tldrContent === 'string' && !containsObjectObjectArtifact(item.tldrContent))))
+            .filter((item) => item && typeof item.key === 'string' && item.key.length > 0)
             .map((item) => ({
                 key: item.key,
-                repo: item.repo || '',
-                sourceHash: item.sourceHash || '',
-                translatedHtml: item.translatedHtml || '',
-                tldrContent: item.tldrContent || '',
+                repo: typeof item.repo === 'string' ? item.repo : '',
+                pathname: typeof item.pathname === 'string' ? item.pathname : '',
+                sourceHash: typeof item.sourceHash === 'string' ? item.sourceHash : '',
+                translatedHtml: sanitizeCachedPayloadText(item.translatedHtml),
+                tldrContent: sanitizeCachedPayloadText(item.tldrContent),
                 complete: item.complete === true,
+                preservedTexts: normalizePreservedTexts(item.preservedTexts),
                 updatedAt: Number(item.updatedAt || 0),
             }))
+            .filter((item) => Boolean(item.translatedHtml || item.tldrContent))
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, README_CONFIG.REPO_CACHE_MAX_ENTRIES);
     }
@@ -141,17 +185,74 @@
         }
     }
 
+    let localStorageWriteQueue = Promise.resolve();
+    const REPO_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+    const DEBUG_LOGS_MAX_BYTES = 512 * 1024;
+
+    function enqueueLocalStorageWrite(task) {
+        const run = localStorageWriteQueue.catch(() => {}).then(task);
+        localStorageWriteQueue = run.catch(() => {});
+        return run;
+    }
+
+    function estimateJsonUtf8Bytes(value) {
+        const json = JSON.stringify(value);
+        if (typeof TextEncoder === 'function') {
+            return new TextEncoder().encode(json).byteLength;
+        }
+        return json.length * 2;
+    }
+
+    function trimEntriesToByteBudget(entries, maxBytes) {
+        const result = Array.isArray(entries) ? [...entries] : [];
+        while (result.length > 1 && estimateJsonUtf8Bytes(result) > maxBytes) {
+            result.pop();
+        }
+        return result;
+    }
+
+    function isQuotaExceededError(error) {
+        const msg = String(error?.message || error || '');
+        return error?.name === 'QuotaExceededError' || /quota/i.test(msg);
+    }
+
+    async function setLocalValueWithQuotaRetry(key, entries, trimFn) {
+        let candidate = entries;
+        try {
+            await setLocalValue(key, candidate);
+            return candidate;
+        } catch (error) {
+            if (!isQuotaExceededError(error) || !Array.isArray(candidate) || candidate.length <= 1) {
+                throw error;
+            }
+            candidate = trimFn(candidate);
+            await setLocalValue(key, candidate);
+            return candidate;
+        }
+    }
+
     async function ensureRepoCacheLoaded() {
         if (readmeRuntime.repoCacheLoaded) return;
+        if (readmeRuntime.repoCacheLoadPromise) {
+            return readmeRuntime.repoCacheLoadPromise;
+        }
 
-        const storedEntries = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
-        const normalizedEntries = normalizeRepoCacheEntries(storedEntries);
+        readmeRuntime.repoCacheLoadPromise = (async () => {
+            const storedEntries = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
+            const normalizedEntries = normalizeRepoCacheEntries(storedEntries);
 
-        readmeRuntime.repoCacheMap.clear();
-        normalizedEntries.forEach((entry) => {
-            readmeRuntime.repoCacheMap.set(entry.key, entry);
-        });
-        readmeRuntime.repoCacheLoaded = true;
+            readmeRuntime.repoCacheMap.clear();
+            normalizedEntries.forEach((entry) => {
+                readmeRuntime.repoCacheMap.set(entry.key, entry);
+            });
+            readmeRuntime.repoCacheLoaded = true;
+        })();
+
+        try {
+            await readmeRuntime.repoCacheLoadPromise;
+        } finally {
+            readmeRuntime.repoCacheLoadPromise = null;
+        }
     }
 
     async function getRepoCachedTranslation(cacheKey, options = {}) {
@@ -167,33 +268,61 @@
 
     async function upsertRepoCachedTranslation(cacheKey, value) {
         if (!FeatureSet.readme_enable_repo_cache || !cacheKey) return;
-        const hasHtml = typeof value?.translatedHtml === 'string' && value.translatedHtml.length <= README_CONFIG.MAX_CACHE_HTML_CHARS && !containsObjectObjectArtifact(value.translatedHtml);
-        const hasTldr = typeof value?.tldrContent === 'string' && value.tldrContent.length <= README_CONFIG.MAX_CACHE_HTML_CHARS && !containsObjectObjectArtifact(value.tldrContent);
+        const hasHtml = typeof value?.translatedHtml === 'string'
+            && value.translatedHtml.length > 0
+            && value.translatedHtml.length <= README_CONFIG.MAX_CACHE_HTML_CHARS
+            && !containsObjectObjectArtifact(value.translatedHtml);
+        const hasTldr = typeof value?.tldrContent === 'string'
+            && value.tldrContent.length > 0
+            && value.tldrContent.length <= README_CONFIG.MAX_CACHE_HTML_CHARS
+            && !containsObjectObjectArtifact(value.tldrContent);
 
         if (!hasHtml && !hasTldr) return;
 
-        await ensureRepoCacheLoaded();
+        return enqueueLocalStorageWrite(async () => {
+            await ensureRepoCacheLoaded();
 
-        const existing = readmeRuntime.repoCacheMap.get(cacheKey) || {};
+            const storedRaw = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
+            const storedNormalized = normalizeRepoCacheEntries(storedRaw);
+            const mergedMap = new Map();
+            storedNormalized.forEach((entry) => mergedMap.set(entry.key, entry));
+            for (const [key, entry] of readmeRuntime.repoCacheMap.entries()) {
+                const storedEntry = mergedMap.get(key);
+                if (!storedEntry || Number(entry.updatedAt || 0) > Number(storedEntry.updatedAt || 0)) {
+                    mergedMap.set(key, entry);
+                }
+            }
 
-        readmeRuntime.repoCacheMap.set(cacheKey, {
-            ...existing,
-            key: cacheKey,
-            repo: value.repo || existing.repo || '',
-            sourceHash: value.sourceHash || existing.sourceHash || '',
-            translatedHtml: value.translatedHtml ?? existing.translatedHtml ?? '',
-            tldrContent: value.tldrContent ?? existing.tldrContent ?? '',
-            complete: value.complete ?? existing.complete ?? false,
-            updatedAt: Date.now(),
+            const existing = mergedMap.get(cacheKey) || {};
+            mergedMap.set(cacheKey, {
+                ...existing,
+                key: cacheKey,
+                repo: value.repo || existing.repo || '',
+                pathname: typeof value.pathname === 'string' ? value.pathname : (existing.pathname || ''),
+                sourceHash: value.sourceHash || existing.sourceHash || '',
+                translatedHtml: hasHtml ? value.translatedHtml : (existing.translatedHtml || ''),
+                tldrContent: hasTldr ? value.tldrContent : (existing.tldrContent || ''),
+                complete: value.complete ?? existing.complete ?? false,
+                preservedTexts: normalizePreservedTexts(value.preservedTexts !== undefined ? value.preservedTexts : existing.preservedTexts),
+                updatedAt: Date.now(),
+            });
+
+            const entries = trimEntriesToByteBudget(
+                normalizeRepoCacheEntries([...mergedMap.values()]),
+                REPO_CACHE_MAX_BYTES,
+            );
+
+            const committed = await setLocalValueWithQuotaRetry(
+                README_LOCAL_STORAGE_KEYS.REPO_CACHE,
+                entries,
+                (list) => list.slice(0, Math.max(1, Math.floor(list.length / 2))),
+            );
+            readmeRuntime.repoCacheMap.clear();
+            committed.forEach((entry) => {
+                readmeRuntime.repoCacheMap.set(entry.key, entry);
+            });
+            readmeRuntime.repoCacheLoaded = true;
         });
-
-        const entries = normalizeRepoCacheEntries([...readmeRuntime.repoCacheMap.values()]);
-        readmeRuntime.repoCacheMap.clear();
-        entries.forEach((entry) => {
-            readmeRuntime.repoCacheMap.set(entry.key, entry);
-        });
-
-        await setLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, entries);
     }
 
     async function appendReadmeTranslationRecord(record) {
@@ -213,11 +342,17 @@
             detail: record?.detail ? truncateText(String(record.detail), 160) : '',
         };
 
-        const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, []);
-        const records = Array.isArray(existing) ? existing : [];
-        records.push(nextRecord);
+        return enqueueLocalStorageWrite(async () => {
+            const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, []);
+            const records = Array.isArray(existing) ? [...existing] : [];
+            records.push(nextRecord);
 
-        const trimmed = trimTranslationRecords(records, README_CONFIG.RECORD_MAX_ENTRIES);
-        await setLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, trimmed);
+            const trimmed = trimTranslationRecords(records, README_CONFIG.RECORD_MAX_ENTRIES);
+            await setLocalValueWithQuotaRetry(
+                README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS,
+                trimmed,
+                (list) => list.slice(0, Math.max(1, Math.floor(list.length / 2))),
+            );
+        });
     }
 

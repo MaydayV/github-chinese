@@ -57,12 +57,17 @@
 
 - 覆盖 `github.com`、`gist.github.com`、`skills.github.com`、`education.github.com`、`www.githubstatus.com`
 - 使用内置词库与规则在本地执行界面翻译，无需依赖在线翻译服务
-- 支持仓库 README 和侧栏 About 描述的英文内容翻译（可选）：可配置 DeepL、Google Cloud Translation、Azure Translator、Qwen-MT 或 OpenAI 兼容接口
+- 支持仓库 README 和侧栏 About 描述的英文内容翻译（可选）：默认选用哔哩哔哩翻译（Bilibili Index-Translate，免费免 Key，提供 [Win/macOS 一键托盘代理](https://github.com/MaydayV/github-chinese/releases/tag/bridge-v1.0.0) 或官方脚本 `call_api.py --serve`），并内置 DeepSeek、DeepL、Google Cloud Translation、Azure Translator、Qwen-MT 与 OpenAI 兼容接口
 - 支持 Issue / Pull Request / Release 正文翻译（可选）：复用同一套翻译接口配置，可手动翻译单条正文或评论，并在原文、译文、双语视图间切换
 - 弹窗提供总开关；切换后若当前标签页为 GitHub 页面，将自动刷新并立即生效
 - 支持翻译记录、缓存复用与分段渐进翻译（可在设置中按需开启）；记录会标注来源为 README、Issue、Pull Request 或 Release
 - DeepL 与 Google Cloud Translation 使用官方 JSON 请求格式；Azure 单服务 Global 资源可不填写 Region，多服务或区域资源仍需填写
 - 提供 Chrome、Edge、Firefox 三套浏览器扩展目录，便于按浏览器加载
+- 优先显示仓库中已有的中文 README（默认开启）：通过当前仓库的语言链接或文件列表识别，可切回原文；未找到或读取失败时沿用原有 API 翻译设置，不会将 README 发往新的第三方服务
+- “词库与维护”支持按页面范围添加、搜索、编辑、删除及导入导出精确匹配词条；沿用代码、输入框和顶部搜索保护
+- 支持排除当前页面或配置路径范围，停用匹配页面的界面和 AI 翻译；保存后刷新页面生效
+- 可选本地界面漏译记录（默认关闭），支持导出与清空；只采集可识别界面控件，过滤邮箱、URL、敏感设置路径及正文编辑区，不上传记录；导出后会提示前往本仓库提交 Issue 附上清单以完善内置词库
+- 配置备份与恢复包含设置、自定义词条和排除路径，默认排除 API Key；缓存与历史记录不进入配置备份
 
 ## 🔒 隐私与数据
 
@@ -137,7 +142,29 @@ node script/test-update-entry.js
 
 官网更新日志板块由 README 生成，请勿直接编辑 `index.html` 中 `<!-- CHANGELOG:START -->` 与 `<!-- CHANGELOG:END -->` 之间的内容。
 
+## 词库维护工具（开发者）
+
+在设置页开启“记录界面漏译”，浏览相关页面后导出清单；以下命令只处理本机词库和明确提供的样本，不自动访问用户页面：
+
+```bash
+node script/locale-maintenance.js check
+node script/locale-maintenance.js check --strict
+node script/locale-maintenance.js harvest /path/to/github-chinese-ui-misses.json
+node script/locale-maintenance.js coverage /path/to/github-chinese-ui-misses.json
+```
+
+`check` 校验三端一致性、词条和规则格式，并报告同块静态词条、同页面正则的冲突；`--strict` 将冲突提示视为失败。`harvest` 去重并过滤导出样本，`coverage` 检查这些历史漏译样本在当前内置词库中的覆盖情况，不代表整个 GitHub 的覆盖率，也不计入个人自定义词条。恢复备份不会自动授予翻译接口的域名访问权限；首次使用请到“翻译接口”确认设置。
+
 ## 🔄 更新日志
+
+### v3.1.5 (2026-11-24)
+
+1. 新增“优先显示仓库已有中文 README”（默认开启）：自动识别仓库中文 README 并在安全净化后展示，完整保留中文目录锚点，支持一键切换英文原文或改用 API 翻译
+1. 新增“词库与维护”面板及弹窗快捷排除：支持按页面范围管理/导入导出自定义精确词条、排除指定页面或路径、可选本地界面漏译记录与导出，以及配置备份与恢复（默认不含 API Key，变更接口域名自动清空旧密钥）
+1. 内置并默认选用哔哩哔哩翻译（Bilibili Index-Translate 免费免 Key 服务，默认本地桥接 `http://127.0.0.1:8080/v1`，提供免安装 Python 的 Win `.exe` / macOS `.app` 一键托盘代理，支持可选 API Key、协作润色、AI 速读与自定义端口保留），适配异常响应、瞬态 502/503/504 重试与本地代理断连提示，修复设置页保存前“测试连通性”被拦截及接口地址含空白字符的问题；精简冗余顶层主机权限并强化后台代理来源与域名校验
+1. 全面加固 README、AI 速读胶囊（TL;DR）、Issue/PR/Release 讨论区翻译与开源协作润色助手：修复品牌/技术栈/架构标签误判重翻、渐进式翻译并发控制与 Token 统计、Monorepo 子目录缓存隔离、跨仓库软导航状态残留及行内编辑失效问题
+1. 补强 React 顶部全局导航防重入与自定义词条写入保护，修复多处内置词库正则遮蔽与未锚定误译（PR、Release、Forks、Gist、Marketplace、Codespaces 等）及页面路由边界识别
+1. Chrome、Edge、Firefox 三端同步更新
 
 ### v3.1.4 (2026-11-17)
 

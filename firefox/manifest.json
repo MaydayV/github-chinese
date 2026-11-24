@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub 中文汉化翻译插件",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "GitHub 中文汉化翻译插件用于将 GitHub 页面中的菜单、按钮、标题、提示语等界面文本进行本地化为简体中文，提升中文用户的浏览与协作效率。",
   "homepage_url": "https://maydayv.github.io/github-chinese/",
   "icons": {
@@ -13,20 +13,13 @@
   "permissions": [
     "storage"
   ],
-  "host_permissions": [
-    "https://github.com/*",
-    "https://skills.github.com/*",
-    "https://gist.github.com/*",
-    "https://education.github.com/*",
-    "https://www.githubstatus.com/*"
-  ],
   "optional_host_permissions": [
     "https://*/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["maintenance-tools.js", "background.js"]
   },
   "browser_specific_settings": {
     "gecko": {

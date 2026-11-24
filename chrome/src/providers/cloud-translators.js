@@ -39,7 +39,7 @@
         });
 
         return {
-            translations: (data?.data?.translations || []).map(item => decodeHtmlEntities(normalizeTranslationText(item?.translatedText ?? item))),
+            translations: (data?.data?.translations || []).map(item => normalizeTranslationText(item?.translatedText ?? item)),
             tokens: 0,
         };
     }
@@ -125,23 +125,35 @@
         };
         applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (providerConfig.key) {
+            headers.Authorization = `Bearer ${providerConfig.key}`;
+        }
+
         const data = await proxyFetchJson({
             url: providerConfig.url,
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${providerConfig.key}`,
-            },
+            headers,
             body: JSON.stringify(payload),
         });
 
         const firstChoice = data?.choices?.[0] || {};
         const raw = extractChatMessageContent(firstChoice);
+        const tokens = getReadmeUsageTokens(data);
 
-        return {
-            translations: parseOpenAiArray(raw, texts.length),
-            tokens: getReadmeUsageTokens(data),
-        };
+        try {
+            return {
+                translations: parseOpenAiArray(raw, texts.length),
+                tokens,
+            };
+        } catch (error) {
+            if (error && typeof error === 'object') {
+                error.tokens = tokens;
+            }
+            throw error;
+        }
     }
 
     function extractChatMessageContent(messageOrChoice) {
@@ -159,17 +171,21 @@
             throw createRecoverableTranslationError('OpenAI 兼容接口返回内容无效。');
         }
 
-        const start = text.indexOf('[');
-        const end = text.lastIndexOf(']');
-        if (start !== -1 && end !== -1 && end > start) {
-            text = text.slice(start, end + 1);
-        }
-
         let parsed;
         try {
             parsed = JSON.parse(text);
         } catch {
-            throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+            const start = text.indexOf('[');
+            const end = text.lastIndexOf(']');
+            if (start !== -1 && end !== -1 && end > start) {
+                try {
+                    parsed = JSON.parse(text.slice(start, end + 1));
+                } catch {
+                    throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+                }
+            } else {
+                throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+            }
         }
 
         if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
@@ -200,7 +216,7 @@
     }
 
     function stripOpenAiReasoningBlocks(text) {
-        return String(text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        return String(text || '').replace(/^(?:\s*<think>[\s\S]*?<\/think>)+/i, '').trim();
     }
 
     function sendProxyMessageOnce(request) {
@@ -233,13 +249,14 @@
         // “Could not establish connection / message channel closed”，短暂退避后重试。
         // 注意：仅对“消息未送达后台”的瞬时失败重试；上下文失效需刷新页面，不重试。
         const maxAttempts = 3;
+        const isConnectError = (error) => /Could not establish connection|Receiving end does not exist/i.test(error?.message || '');
         let response;
         for (let attempt = 1; ; attempt += 1) {
             try {
                 response = await sendProxyMessageOnce(request);
                 break;
             } catch (error) {
-                if (isExtensionContextInvalidatedError(error) || attempt >= maxAttempts) {
+                if (isExtensionContextInvalidatedError(error) || !isConnectError(error) || attempt >= maxAttempts) {
                     throw error;
                 }
                 await new Promise((resolve) => window.setTimeout(resolve, 150 * attempt));
@@ -250,7 +267,8 @@
             throw new Error('翻译请求失败：后台未返回响应。');
         }
 
-        const { ok, status, statusText, body, error } = response;
+        const { ok, status, statusText, body, error, userMessage } = response;
+        if (userMessage) throw new Error(userMessage);
         if (!ok) {
             const details = body ? truncateText(body, 200) : (error || 'unknown error');
             throw new Error(`翻译请求失败 (${status} ${statusText}): ${details}`);
@@ -281,7 +299,14 @@
     function applyOpenAiCompatibleRequestOptions(payload, providerConfig) {
         if (!payload) return payload;
 
-        if (isDeepSeekEndpoint(providerConfig?.url) || isKimiEndpoint(providerConfig?.url)) {
+        // 兼容官方端点、本地桥接及使用原模型名的中转接口。
+        const isIndexTranslate = providerConfig?.provider === 'index_translate'
+            || getProviderHost(providerConfig?.url) === 'index-translate.bilibili.com'
+            || /(?:^|\/)Index-Translate(?:-|$)/i.test(String(providerConfig?.model || '').trim());
+        if (isIndexTranslate) {
+            payload.stream = false;
+            payload.chat_template_kwargs = { ...payload.chat_template_kwargs, enable_thinking: false };
+        } else if (isDeepSeekEndpoint(providerConfig?.url) || isKimiEndpoint(providerConfig?.url)) {
             payload.stream = false;
             payload.thinking = { type: 'disabled' };
         } else if (isQwenEndpoint(providerConfig?.url)) {

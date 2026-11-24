@@ -72,7 +72,13 @@ assert.ok(/update_notice/.test(basePopupJs), 'popup.js 应读取 update_notice �
 assert.ok(/storage\.local\.remove\('update_notice'\)/.test(basePopupJs), 'popup.js 应在点击后清除提示');
 
 // 不应为此功能引入新权限
-const permissions = JSON.parse(read('chrome', 'manifest.json')).permissions;
-assert.deepStrictEqual(permissions, ['storage'], 'chrome manifest 权限不应变化');
+for (const browser of BROWSERS) {
+  const manifest = JSON.parse(read(browser, 'manifest.json'));
+  assert.deepStrictEqual(manifest.permissions, ['storage'], `${browser} manifest 权限不应变化`);
+  assert.strictEqual(Object.hasOwn(manifest, 'host_permissions'), false, `${browser} 不应包含顶层 host_permissions`);
+  for (const rel of ['options/options.html', 'options/options.js', 'options/options.css', 'options/maintenance.js', 'maintenance-tools.js']) {
+    assert.strictEqual(read(browser, ...rel.split('/')), read('chrome', ...rel.split('/')), `${browser} ${rel} 应与 chrome 一致`);
+  }
+}
 
 console.log('PASS');

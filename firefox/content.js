@@ -15,6 +15,8 @@
     /****************** 全局配置区（开发者可修改部分） ******************/
     const STORAGE_DEFAULTS = {
         enable_extension: true,
+        prefer_chinese_readme: true,
+        collect_ui_misses: false,
         enable_readme_translation: false,
         enable_issue_pr_translation: false,
         enable_collaboration_helper: false,
@@ -23,7 +25,7 @@
         readme_enable_repo_cache: false,
         readme_enable_progressive: false,
         readme_enable_debug: false,
-        readme_provider: 'deepseek',
+        readme_provider: 'index_translate',
         readme_deepl_api_url: 'https://api-free.deepl.com/v2/translate',
         readme_deepl_api_key: '',
         readme_google_api_url: 'https://translation.googleapis.com/language/translate/v2',
@@ -31,15 +33,22 @@
         readme_azure_api_url: 'https://api.cognitive.microsofttranslator.com/translate',
         readme_azure_api_key: '',
         readme_azure_region: '',
-        readme_openai_api_url: 'https://api.openai.com/v1/chat/completions',
+        readme_openai_api_url: 'https://api.deepseek.com',
         readme_openai_api_key: '',
-        readme_openai_model: 'gpt-4.1-mini',
+        readme_openai_model: 'deepseek-flash',
         readme_qwen_mt_api_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
         readme_qwen_mt_api_key: '',
         readme_qwen_mt_model: 'qwen-mt-turbo',
+        readme_index_translate_api_url: 'http://127.0.0.1:8080/v1',
+        readme_index_translate_api_key: '',
+        readme_index_translate_model: 'Index-Translate-35B-A3B',
     };
 
-    const FeatureSet = { ...STORAGE_DEFAULTS };
+    const FeatureSet = new Proxy({ ...STORAGE_DEFAULTS }, {
+        get(target, key) {
+            return key === 'enable_extension' ? target[key] && !isPageExcluded() : target[key];
+        },
+    });
 
     const CONFIG = {
         LANG: 'zh-CN',
@@ -162,18 +171,22 @@
         timerId: 0,
         inFlight: false,
         rerunRequested: false,
+        runEpoch: 0,
         stateByElement: new WeakMap(),
         isApplyingTranslation: false,
         domMutationGuardDepth: 0,
         translationCache: new Map(),
+        preservedCache: new Set(),
         repoCacheMap: new Map(),
         repoCacheLoaded: false,
+        repoCacheLoadPromise: null,
         lastWarnKey: '',
     };
 
     const issuePrRuntime = {
         timerId: 0,
         inFlight: false,
+        runEpoch: 0,
         stateByElement: new WeakMap(),
         lastWarnKey: '',
     };
@@ -181,20 +194,639 @@
     const collabRuntime = {
         timerId: 0,
         modalEl: null,
+        modalCleanup: null,
     };
 
     const tldrRuntime = {
         timerId: 0,
         isBusy: false,
+        genSeq: 0,
+        mountSeq: 0,
+        activeDocUrl: '',
+        busyDocUrl: '',
+        busyCard: null,
     };
 
     const FIXED_TARGET_LANG = 'zh-CN';
-    const AI_CHAT_PROVIDERS = ['openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
+    const AI_CHAT_PROVIDERS = ['index_translate', 'openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine'];
 
     let pageConfig = {};
     let scheduleReactGlobalNavRefresh = () => {};
     let refreshPageObserver = () => {};
+    let refreshHydrationObserver = () => {};
     let historyRefreshTimer = null;
+
+    // ==========================================================================
+    // [Module] core/maintenance-tools.js
+    // ==========================================================================
+
+/* Shared validation for content scripts, settings and developer tools. */
+var GhcnMaintenance = (() => {
+    const DATA_KEY = 'ghcn_maintenance';
+    const MISS_KEY = 'ghcn_ui_misses';
+    const indexes = new WeakMap();
+    const hosts = ['github.com', 'gist.github.com', 'skills.github.com', 'education.github.com', 'www.githubstatus.com'];
+    function normalize(text) {
+        return String(text || '').replace(/[\xa0\s]+/g, ' ').trim();
+    }
+    function scope(value) {
+        const text = String(value || '').trim();
+        if (text === '*') return text;
+        if (text.length > 300 || /[?#\\\s]/.test(text)) throw new Error('页面范围不能包含查询参数、空格或反斜杠。');
+        const match = text.match(/^([^/]+)(\/[^*]*)?(\*)?$/);
+        if (!match || !hosts.includes(match[1])) throw new Error('范围格式：github.com/owner/repo/*，只允许末尾通配符。');
+        return match[1] + (match[2] || '/') + (match[3] || '');
+    }
+    function matches(pattern, location) {
+        if (pattern === '*') return true;
+        const normalizedPattern = String(pattern || '').toLowerCase();
+        const target = (String(location?.hostname || '') + String(location?.pathname || '')).toLowerCase();
+        if (normalizedPattern.endsWith('*')) {
+            const prefix = normalizedPattern.slice(0, -1);
+            if (target.startsWith(prefix)) return true;
+            const base = prefix.replace(/\/+$/, '');
+            return Boolean(base && target === base);
+        }
+        return target.replace(/\/+$/, '') === normalizedPattern.replace(/\/+$/, '');
+    }
+    function validateData(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('无效的词库配置。');
+        const entries = input.entries ?? [];
+        const excluded = input.excluded ?? [];
+        if (!Array.isArray(entries) || entries.length > 1000 || !Array.isArray(excluded) || excluded.length > 100) throw new Error('最多 1000 条词条、100 条排除路径。');
+        const seen = new Set();
+        const validated = {
+            entries: entries.map(item => {
+                if (!item || typeof item.source !== 'string' || typeof item.target !== 'string') throw new Error('词条需要原文和译文。');
+                const rawSource = item.source.trim(), rawTarget = item.target.trim(), page = scope(item.scope || '*');
+                if (!rawSource || !rawTarget || /[\u0000-\u001f]/.test(rawSource + rawTarget)) throw new Error('词条为空、过长或包含控制字符。');
+                const source = normalize(rawSource), target = rawTarget;
+                if (!source || source.length > 500 || target.length > 2000) throw new Error('词条为空、过长或包含控制字符。');
+                const key = page + '\n' + source;
+                if (seen.has(key)) throw new Error('同一页面范围内存在重复原文：' + source);
+                seen.add(key);
+                return { scope: page, source, target };
+            }),
+            excluded: [...new Set(excluded.map(scope))],
+        };
+        if (JSON.stringify(validated).length > 500000) throw new Error('词库配置总量不能超过 50 万字符。');
+        return validated;
+    }
+    function lookup(entries, text, location) {
+        if (typeof text !== 'string' || !text) return undefined;
+        let index = indexes.get(entries);
+        if (!index) {
+            index = new Map();
+            for (const entry of entries) {
+                const list = index.get(entry.source) || [];
+                list.push(entry); index.set(entry.source, list);
+            }
+            indexes.set(entries, index);
+        }
+        const scoreScope = (s) => (s.endsWith('*') ? s.length - 1 : 10000 + s.length);
+        let best;
+        for (const entry of index.get(text) || []) {
+            if (entry.source === text && matches(entry.scope, location)
+                && (!best || scoreScope(entry.scope) > scoreScope(best.scope))) best = entry;
+        }
+        return best?.target;
+    }
+    function collectable(text, pathname = '') {
+        if (typeof text !== 'string' || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text)) return false;
+        const normalized = normalize(text);
+        return normalized.length >= 6 && normalized.length <= 200
+            && !/(?:settings|billing|security|tokens|secrets|credentials|login|sessions?|password_reset|account_verifications|two-factor|oauth|audit-log|enterprises|sso|people|invitations)(?:\/|$)/i.test(pathname)
+            && /[a-z]{2,}\s+[a-z]{2,}/i.test(normalized)
+            && !/(?:https?:|www\.|@|\b(?:sk|ghp|github_pat)[_-]|\bgh[opusr]_[A-Za-z0-9_]+|\bxox[baprs]-[A-Za-z0-9-]+|\bAKIA[0-9A-Z]{16}\b|\bBearer\s+\S+|\beyJ[A-Za-z0-9_-]{10,}|\b[0-9a-f]{16,}\b|[\/\\]|[\u4e00-\u9fff])/i.test(normalized);
+    }
+    function settings(input, defaults, allowSecrets = false) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('无效的设置配置。');
+        const allowedProviders = new Set([
+            'index_translate', 'deepl', 'google', 'azure', 'qwen_mt',
+            'openai', 'openai_compatible', 'deepseek', 'qwen', 'minimax', 'kimi', 'zhipu', 'volcengine',
+        ]);
+        const result = {};
+        for (const [key, defaultValue] of Object.entries(defaults)) {
+            if (!Object.hasOwn(input, key) || (!allowSecrets && /(?:key|token|secret)/i.test(key) && !key.startsWith('readme_enable_'))) continue;
+            const value = input[key];
+            if (typeof value !== typeof defaultValue || (typeof value === 'string' && value.length > 4000)) throw new Error('配置字段无效：' + key);
+            if (key === 'readme_provider' && value && !allowedProviders.has(String(value).trim().toLowerCase())) {
+                throw new Error('不支持的翻译服务：' + value);
+            }
+            if (key.endsWith('_api_url') && value) {
+                const cleaned = value.trim().replace(/\s+/g, '');
+                let url;
+                try {
+                    url = new URL(cleaned);
+                } catch { throw new Error('配置 URL 无效：' + key); }
+                const protocol = url.protocol.toLowerCase();
+                const hostname = url.hostname.toLowerCase();
+                const isLocalHttp = protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
+                if (protocol !== 'https:' && !isLocalHttp) {
+                    throw new Error('配置 URL 仅支持 HTTPS 或本机 HTTP（localhost/127.0.0.1）：' + key);
+                }
+                if (!allowSecrets) {
+                    url.username = ''; url.password = ''; url.hash = '';
+                    for (const name of [...url.searchParams.keys()]) if (/key|token|secret|password|auth|signature/i.test(name)) url.searchParams.delete(name);
+                    result[key] = url.href;
+                } else result[key] = cleaned;
+            } else result[key] = value;
+        }
+        return result;
+    }
+    function backup(input, defaults, allowSecrets = false) {
+        if (!input || typeof input !== 'object' || Array.isArray(input) || input.format !== 'ghcn-backup' || input.version !== 1) throw new Error('不支持的备份文件。');
+        if (input.settings !== undefined && (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings))) {
+            throw new Error('备份中的设置格式无效。');
+        }
+        return { data: validateData(input.data), settings: settings(input.settings || {}, defaults, allowSecrets) };
+    }
+    return { DATA_KEY, MISS_KEY, normalize, scope, matches, validateData, lookup, collectable, settings, backup };
+})();
+
+    // ==========================================================================
+    // [Module] features/maintenance.js
+    // ==========================================================================
+
+    let maintenanceData = { entries: [], excluded: [] };
+    const uiMisses = new Map();
+    let uiMissTimer = 0;
+    let uiMissCapturedAt = 0;
+    let customWrites = new WeakMap();
+    function hasCustomWrite(node, field, text) {
+        if (typeof text !== 'string') return false;
+        const map = customWrites.get(node);
+        if (!map) return false;
+        return map.get(field === 'ariaLabel' ? 'aria-label' : field) === text;
+    }
+    function rememberCustomWrite(node, field, text) {
+        const fields = customWrites.get(node) || new Map();
+        fields.set(field === 'ariaLabel' ? 'aria-label' : field, text);
+        customWrites.set(node, fields);
+    }
+
+    function isPageExcluded() {
+        return maintenanceData.excluded.some(pattern => GhcnMaintenance.matches(pattern, window.location));
+    }
+
+    function applyCustomAttributes(node) {
+        if (!maintenanceData.entries.length) return;
+        for (const name of ['aria-label', 'placeholder', 'title']) {
+            const text = node.getAttribute(name);
+            if (!text) continue;
+            if (hasCustomWrite(node, name, text)) continue;
+            const normalized = GhcnMaintenance.normalize(text);
+            const translated = GhcnMaintenance.lookup(maintenanceData.entries, normalized, window.location);
+            if (translated && translated !== text) {
+                rememberCustomWrite(node, name, translated);
+                node.setAttribute(name, translated);
+            }
+        }
+    }
+
+    async function loadMaintenanceSettings() {
+        try {
+            const raw = await chrome.storage.local.get(GhcnMaintenance.DATA_KEY);
+            maintenanceData = GhcnMaintenance.validateData(raw[GhcnMaintenance.DATA_KEY] || {});
+        }
+        catch (error) {
+            const isInvalidated = typeof isExtensionContextInvalidatedError === 'function'
+                ? isExtensionContextInvalidatedError(error)
+                : /extension context invalidated|context invalidated|插件上下文已失效/i.test(String(error?.message || error || ''));
+            if (!isInvalidated) console.warn('[词库维护] 已忽略无效配置', error.message);
+        }
+    }
+
+    function recordUiMiss(rawText) {
+        const publicMeta = typeof document !== 'undefined'
+            ? document.querySelector?.('meta[name="octolytics-dimension-repository_public"]')
+            : null;
+        if (publicMeta && publicMeta.getAttribute('content') !== 'true') return;
+        const text = GhcnMaintenance.normalize(rawText);
+        if (!FeatureSet.collect_ui_misses || !FeatureSet.enable_extension
+            || !GhcnMaintenance.collectable(text, window.location.pathname) || uiMisses.size >= 200) return;
+        const page = pageConfig.currentPageType;
+        if (!page) return;
+        const key = page + '\n' + text;
+        const row = uiMisses.get(key) || { page, text, count: 0 };
+        row.count++;
+        uiMisses.set(key, row);
+        uiMissCapturedAt = Date.now();
+        if (uiMissTimer) return;
+        uiMissTimer = window.setTimeout(() => {
+            uiMissTimer = 0;
+            const rows = [...uiMisses.values()];
+            const capturedAt = uiMissCapturedAt || Date.now();
+            uiMissCapturedAt = 0;
+            uiMisses.clear();
+            try {
+                chrome.runtime.sendMessage({ type: 'ghcn-ui-misses', rows, capturedAt }, () => {
+                    if (chrome.runtime.lastError) console.info('[词库维护] 日志未保存，请刷新页面。');
+                });
+            } catch {
+                console.info('[词库维护] 日志未保存，请刷新页面。');
+            }
+        }, 2000);
+    }
+
+    const chineseReadme = { state: null, pending: null, cache: new Map(), failures: new Map(), bypass: new WeakMap() };
+
+    function getDocumentUrlWithoutHash() {
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        if (typeof URL === 'function') {
+            try {
+                const parsed = new URL(href);
+                parsed.hash = '';
+                return parsed.href;
+            } catch { /* 忽略非法 URL */ }
+        }
+        return href.split('#')[0];
+    }
+
+    function runWithReadmeMutationGuard(fn) {
+        if (typeof withReadmeDomMutationGuard === 'function') {
+            return withReadmeDomMutationGuard(fn);
+        }
+        return fn();
+    }
+
+    function restoreChineseReadme() {
+        const state = chineseReadme.state;
+        if (!state) return;
+        runWithReadmeMutationGuard(() => {
+            state.root.hidden = state.hidden;
+            state.copy.remove();
+            state.controls.remove();
+            chineseReadme.state = null;
+        });
+    }
+
+    function isAlreadyChineseReadme(root) {
+        if (!root) return false;
+        const state = typeof getReadmeElementState === 'function' ? getReadmeElementState(root) : null;
+        const clone = (state?.originalHtml && typeof parseInertHtmlBody === 'function')
+            ? parseInertHtmlBody(state.originalHtml)
+            : (typeof root.cloneNode === 'function' ? root.cloneNode(true) : root);
+        clone.querySelectorAll?.('pre, code, kbd, samp, script, style, svg, math').forEach(node => node.remove());
+        const text = String(clone.textContent || '').trim();
+        const cjkCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+        if (cjkCount < 20) return false;
+        const latinWords = (text.match(/[A-Za-z]{2,}/g) || []).length;
+        return cjkCount >= latinWords * 1.5;
+    }
+
+    function detectRepoBranchName(repoPrefix) {
+        const refNode = document.querySelector?.(
+            '#branch-picker-repos-header-ref-selector [data-component="text"], #branch-picker-repos-header-ref-selector .css-truncate-target, [data-hotkey="w"] [data-component="text"]',
+        );
+        const direct = refNode?.textContent?.trim();
+        if (direct && !direct.includes('\n')) return direct;
+        const escapedPrefix = repoPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const linkRe = new RegExp(`^${escapedPrefix}/(?:edit|blob)/(.+)/readme(?:[._-][^/]+)?$`, 'i');
+        for (const link of document.querySelectorAll?.('a[href*="/blob/"], a[href*="/edit/"]') || []) {
+            try {
+                const url = new URL(link.getAttribute('href') || '', window.location.href);
+                const path = decodeURIComponent(url.pathname);
+                const match = path.match(linkRe);
+                if (match?.[1]) return match[1];
+            } catch { /* 忽略非法链接。 */ }
+        }
+        return '';
+    }
+
+    function findChineseReadmeCandidates(root) {
+        const repo = getCurrentRepoInfo();
+        if (!repo || window.location.hostname !== 'github.com') return [];
+        if (isAlreadyChineseReadme(root)) return [];
+
+        let currentPath;
+        try {
+            currentPath = decodeURIComponent(window.location.pathname);
+        } catch {
+            currentPath = window.location.pathname;
+        }
+        currentPath = currentPath.length > 1 ? currentPath.replace(/\/+$/, '') : currentPath;
+        const lowerPath = currentPath.toLowerCase();
+        const repoPrefix = '/' + repo.fullName;
+
+        let mode = '';
+        let blobPrefix = '';
+        let detectedBranchLower = '';
+        if (lowerPath === repoPrefix) {
+            mode = 'repo';
+            blobPrefix = repoPrefix + '/blob/';
+            detectedBranchLower = detectRepoBranchName(repoPrefix).toLowerCase();
+        } else if (lowerPath.startsWith(repoPrefix + '/tree/')) {
+            const treeTail = currentPath.slice((repoPrefix + '/tree/').length);
+            if (!treeTail) return [];
+            mode = 'tree';
+            blobPrefix = repoPrefix + '/blob/' + treeTail.toLowerCase() + '/';
+        } else if (lowerPath.startsWith(repoPrefix + '/blob/')) {
+            const blobTail = currentPath.slice((repoPrefix + '/blob/').length);
+            const lastSlash = blobTail.lastIndexOf('/');
+            if (lastSlash < 1) return [];
+            const blobDir = blobTail.slice(0, lastSlash);
+            const filename = blobTail.slice(lastSlash + 1);
+            if (!/^readme(?:[._-](?:en(?:[._-]?(?:us|gb))?|english))?(?:\.(?:md|markdown|rst|txt))?$/i.test(filename)) {
+                return [];
+            }
+            if (/(?:^|\/)(?:zh(?:[._-]?(?:cn|hans|tw|hant))?|cn|中文)$/i.test(blobDir)) {
+                return [];
+            }
+            mode = 'blob';
+            blobPrefix = currentPath.slice(0, currentPath.lastIndexOf('/') + 1).toLowerCase();
+        } else {
+            return [];
+        }
+
+        const subprojectDirRe = /^(?:packages|examples|apps|crates|plugins|modules|services|demos|samples|templates|tests?|benchmarks?)\//i;
+        const chineseReadmeRe = /(?:\/readme[._-](?:zh(?:[._-]?(?:cn|hans|tw|hant))?|cn|中文)\.(?:md|markdown|rst)|\/(?:zh-cn|zh_cn|zh|cn)\/readme\.(?:md|markdown|rst))$/i;
+        const rootLinks = [...root.querySelectorAll('a[href]')].map(link => ({ link, fromRoot: true }));
+        const rootSet = new Set(rootLinks.map(item => item.link));
+        const extraLinks = [...document.querySelectorAll('a[href*="readme" i]')]
+            .filter(link => !rootSet.has(link))
+            .map(link => ({ link, fromRoot: false }));
+        const seen = new Map();
+
+        for (const { link, fromRoot } of [...rootLinks, ...extraLinks]) {
+            try {
+                const href = link.getAttribute('href');
+                if (!href) continue;
+                const url = new URL(href, window.location.href);
+                const path = decodeURIComponent(url.pathname);
+                if (url.origin !== window.location.origin || !path.toLowerCase().startsWith(blobPrefix)) continue;
+                if (!chineseReadmeRe.test(path)) continue;
+                let rel;
+                if (mode === 'repo') {
+                    const afterBlob = path.slice(blobPrefix.length);
+                    if (detectedBranchLower && afterBlob.toLowerCase().startsWith(detectedBranchLower + '/')) {
+                        rel = afterBlob.slice(detectedBranchLower.length + 1);
+                    } else {
+                        const slashIndex = afterBlob.indexOf('/');
+                        if (slashIndex <= 0) continue;
+                        rel = afterBlob.slice(slashIndex + 1);
+                    }
+                } else {
+                    rel = path.slice(blobPrefix.length);
+                }
+                if (!rel || subprojectDirRe.test(rel)) continue;
+                if (!fromRoot && rel.includes('/') && !/^(?:zh-cn|zh_cn|zh|cn)\/readme\./i.test(rel)) continue;
+                url.search = ''; url.hash = '';
+                if (url.pathname === window.location.pathname) continue;
+                const existing = seen.get(url.href);
+                if (!existing || (fromRoot && !existing.fromRoot)) {
+                    seen.set(url.href, { href: url.href, rel, fromRoot });
+                }
+            } catch { /* 非 URL 链接忽略。 */ }
+        }
+        return [...seen.values()].sort((a, b) => {
+            const tradDiff = Number(/(?:tw|hant)/i.test(a.rel)) - Number(/(?:tw|hant)/i.test(b.rel));
+            if (tradDiff !== 0) return tradDiff;
+            const depthDiff = a.rel.split('/').length - b.rel.split('/').length;
+            if (depthDiff !== 0) return depthDiff;
+            return Number(b.fromRoot) - Number(a.fromRoot);
+        }).map(item => item.href);
+    }
+
+    function findChineseReadme(root) {
+        return findChineseReadmeCandidates(root)[0] || null;
+    }
+
+    function sanitizeChineseReadme(article, base) {
+        const copy = document.importNode(article, true);
+        copy.querySelectorAll('script,style,iframe,object,embed,form,input,textarea,button,link,meta,base,svg,math,template,turbo-frame,turbo-stream').forEach(node => node.remove());
+        const usedIds = new Set();
+        const idMap = new Map();
+        const assignSafeId = (rawId) => {
+            const trimmed = String(rawId || '').trim();
+            if (!trimmed || trimmed.length > 200 || /[\s\u0000-\u001f\u007f"'<>\\#?/]/.test(trimmed)) return '';
+            const clean = trimmed.replace(/^user-content-/i, '') || trimmed;
+            let candidate = `ghcn-cr-${clean}`;
+            let suffix = 2;
+            while (usedIds.has(candidate)) {
+                candidate = `ghcn-cr-${clean}-${suffix++}`;
+            }
+            usedIds.add(candidate);
+            idMap.set(trimmed, candidate);
+            if (!idMap.has(clean)) idMap.set(clean, candidate);
+            const lowerClean = clean.toLowerCase();
+            if (!idMap.has(lowerClean)) idMap.set(lowerClean, candidate);
+            return candidate;
+        };
+        const nodes = [copy, ...copy.querySelectorAll('*')];
+        for (const node of nodes) {
+            for (const attribute of [...node.attributes]) {
+                const name = attribute.name;
+                const lower = name.toLowerCase();
+                if (/^on/i.test(name) || name.includes(':') || ['srcdoc', 'style', 'name'].includes(lower)
+                    || /^data-(?:turbo(?:$|[-_])|action$|remote$|method$)/i.test(lower)) {
+                    node.removeAttribute(name);
+                }
+            }
+            if (node.hasAttribute('id')) {
+                const mappedId = assignSafeId(node.getAttribute('id'));
+                if (mappedId) node.setAttribute('id', mappedId);
+                else node.removeAttribute('id');
+            }
+        }
+        const resolveMappedFragment = (hashText) => {
+            const fragment = hashText.startsWith('#') ? hashText.slice(1) : hashText;
+            if (!fragment) return '';
+            let decoded = fragment;
+            try { decoded = decodeURIComponent(fragment); } catch {}
+            const stripped = decoded.replace(/^user-content-/i, '');
+            return idMap.get(fragment)
+                || idMap.get(decoded)
+                || idMap.get(stripped)
+                || idMap.get(decoded.toLowerCase())
+                || idMap.get(stripped.toLowerCase())
+                || '';
+        };
+        const baseUrl = new URL(base);
+        for (const node of nodes) {
+            if (node.hasAttribute('href')) {
+                const rawHref = String(node.getAttribute('href') || '').trim();
+                if (rawHref.startsWith('#')) {
+                    const mapped = resolveMappedFragment(rawHref);
+                    if (mapped) node.setAttribute('href', `#${mapped}`);
+                    else node.removeAttribute('href');
+                } else {
+                    try {
+                        const url = new URL(rawHref, base);
+                        if (url.origin === baseUrl.origin && url.pathname === baseUrl.pathname && url.hash) {
+                            const mapped = resolveMappedFragment(url.hash);
+                            if (mapped) {
+                                node.setAttribute('href', `#${mapped}`);
+                            } else if (['https:', 'http:', 'mailto:'].includes(url.protocol)) {
+                                node.setAttribute('href', url.href);
+                            } else {
+                                node.removeAttribute('href');
+                            }
+                        } else if (!['https:', 'http:', 'mailto:'].includes(url.protocol)) {
+                            node.removeAttribute('href');
+                        } else {
+                            node.setAttribute('href', url.href);
+                        }
+                    } catch { node.removeAttribute('href'); }
+                }
+            }
+            for (const attr of ['src', 'poster']) {
+                if (!node.hasAttribute(attr)) continue;
+                try {
+                    const raw = node.getAttribute(attr);
+                    const url = new URL(raw, base);
+                    if (!['https:', 'http:'].includes(url.protocol)) node.removeAttribute(attr);
+                    else node.setAttribute(attr, url.href);
+                } catch { node.removeAttribute(attr); }
+            }
+            if (node.hasAttribute('srcset')) {
+                const rawSrcset = String(node.getAttribute('srcset') || '');
+                const parts = rawSrcset.split(',').map(part => part.trim()).filter(Boolean);
+                const cleanParts = [];
+                let validAll = parts.length > 0;
+                for (const part of parts) {
+                    const tokens = part.split(/\s+/);
+                    if (tokens.length > 2 || !tokens[0]) { validAll = false; break; }
+                    try {
+                        const url = new URL(tokens[0], base);
+                        if (!['https:', 'http:'].includes(url.protocol)) { validAll = false; break; }
+                        if (tokens[1] && !/^(?:\d+w|\d+(?:\.\d+)?x)$/i.test(tokens[1])) { validAll = false; break; }
+                        cleanParts.push(tokens[1] ? `${url.href} ${tokens[1]}` : url.href);
+                    } catch {
+                        validAll = false;
+                        break;
+                    }
+                }
+                if (validAll && cleanParts.length) node.setAttribute('srcset', cleanParts.join(', '));
+                else node.removeAttribute('srcset');
+            }
+        }
+        copy.dataset.ghcnChineseReadme = 'true';
+        copy.setAttribute('translate', 'no');
+        return copy;
+    }
+
+    async function preferChineseReadme() {
+        const root = getReadmeRootElement();
+        const currentDocUrl = getDocumentUrlWithoutHash();
+        if (chineseReadme.state && (chineseReadme.state.root !== root || chineseReadme.state.pageUrl !== currentDocUrl || !FeatureSet.prefer_chinese_readme || !FeatureSet.enable_extension)) {
+            restoreChineseReadme();
+        }
+        if (!root || !FeatureSet.enable_extension || !FeatureSet.prefer_chinese_readme || !isReadmePage() || chineseReadme.bypass.get(root) === currentDocUrl) return false;
+        // 等 React 完成 hydration 再挂载；返回 true 暂缓 API，避免回退链路提前改 DOM。
+        if (root.closest('react-app:not(.loaded), react-partial:not(.loaded)')) return true;
+        if (chineseReadme.state?.root === root && chineseReadme.state?.pageUrl === currentDocUrl) return true;
+        const candidates = findChineseReadmeCandidates(root)
+            .filter(candidate => Date.now() - (chineseReadme.failures.get(candidate) || 0) >= 300000);
+        if (!candidates.length) return false;
+        if (chineseReadme.pending) {
+            if (chineseReadme.pending.pageUrl === currentDocUrl && chineseReadme.pending.root === root && candidates.includes(chineseReadme.pending.url)) {
+                await chineseReadme.pending.promise;
+                if (!root.isConnected || currentDocUrl !== getDocumentUrlWithoutHash() || !FeatureSet.enable_extension || !FeatureSet.prefer_chinese_readme) {
+                    return false;
+                }
+                if (chineseReadme.state?.root === root && chineseReadme.state?.pageUrl === currentDocUrl) {
+                    return true;
+                }
+                if (root.closest('react-app:not(.loaded), react-partial:not(.loaded)')) {
+                    return true;
+                }
+            } else {
+                chineseReadme.pending.controller.abort();
+            }
+        }
+        const remainingCandidates = candidates.filter(candidate => Date.now() - (chineseReadme.failures.get(candidate) || 0) >= 300000);
+        for (const url of remainingCandidates) {
+            const pageUrl = getDocumentUrlWithoutHash();
+            if (!root.isConnected || pageUrl !== currentDocUrl || !FeatureSet.enable_extension || !FeatureSet.prefer_chinese_readme) return false;
+            const controller = new AbortController();
+            const task = { url, pageUrl, root, controller, promise: null };
+            task.promise = (async () => {
+                let timedOut = false;
+                try {
+                    let cachedEntry = chineseReadme.cache.get(url);
+                    if (typeof cachedEntry === 'string') {
+                        cachedEntry = { html: cachedEntry, baseUrl: url };
+                    }
+                    let fetchedEntry = null;
+                    if (!cachedEntry) {
+                        const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 12000);
+                        try {
+                            const response = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
+                            if (!response.ok || new URL(response.url || url).origin !== window.location.origin) return { ok: false, failed: true, aborted: false };
+                            const html = await response.text();
+                            if (html.length > 2000000) return { ok: false, failed: true, aborted: false };
+                            fetchedEntry = { html, baseUrl: response.url || url };
+                        } finally { window.clearTimeout(timeout); }
+                    }
+                    const entry = cachedEntry || fetchedEntry;
+                    if (!root.isConnected || pageUrl !== getDocumentUrlWithoutHash() || !FeatureSet.enable_extension || !FeatureSet.prefer_chinese_readme) {
+                        return { ok: false, failed: false, aborted: true };
+                    }
+                    const parsed = new DOMParser().parseFromString(entry.html, 'text/html');
+                    const article = parsed.querySelector('article.markdown-body, [data-testid="readme"] .markdown-body');
+                    if (!article || !/[\u4e00-\u9fff]/.test(article.textContent)) return { ok: false, failed: true, aborted: false };
+                    if (fetchedEntry) {
+                        if (chineseReadme.cache.size >= 10) chineseReadme.cache.delete(chineseReadme.cache.keys().next().value);
+                        chineseReadme.cache.set(url, fetchedEntry);
+                    }
+                    const copy = sanitizeChineseReadme(article, entry.baseUrl || url);
+                    if (!root.isConnected || pageUrl !== getDocumentUrlWithoutHash() || !FeatureSet.enable_extension || !FeatureSet.prefer_chinese_readme) {
+                        return { ok: false, failed: false, aborted: true };
+                    }
+                    if (root.closest('react-app:not(.loaded), react-partial:not(.loaded)')) return { ok: true, failed: false, aborted: false };
+                    if (typeof getReadmeElementState === 'function' && typeof restoreReadmeTranslation === 'function') {
+                        const apiState = getReadmeElementState(root);
+                        if (apiState?.translatedHash || (apiState?.originalHtml && root.innerHTML !== apiState.originalHtml)) {
+                            restoreReadmeTranslation();
+                        }
+                    }
+                    const controls = document.createElement('div');
+                    controls.className = 'ghcn-native-readme mb-2 d-flex flex-items-center';
+                    controls.setAttribute('translate', 'no');
+                    const label = document.createElement('span'); label.textContent = '仓库已有中文 README · ';
+                    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'btn btn-sm'; toggle.textContent = '查看原文';
+                    const hidden = root.hidden;
+                    controls.append(label, toggle);
+                    toggle.addEventListener('click', () => {
+                        runWithReadmeMutationGuard(() => {
+                            copy.hidden = !copy.hidden; root.hidden = !copy.hidden;
+                            toggle.textContent = copy.hidden ? '查看中文版' : '查看原文';
+                        });
+                    });
+                    if (FeatureSet.enable_readme_translation) {
+                        const api = document.createElement('button'); api.type = 'button'; api.className = 'btn btn-sm ml-2'; api.textContent = '改用 API 翻译';
+                        api.addEventListener('click', () => { chineseReadme.bypass.set(root, pageUrl); restoreChineseReadme(); scheduleReadmeTranslation('native:api'); });
+                        controls.append(api);
+                    }
+                    runWithReadmeMutationGuard(() => {
+                        root.before(controls, copy); root.hidden = true;
+                        chineseReadme.state = { root, hidden, copy, controls, pageUrl };
+                    });
+                    return { ok: true, failed: false, aborted: false };
+                } catch (error) {
+                    if (controller.signal.aborted && !timedOut) return { ok: false, failed: false, aborted: true };
+                    console.info('[中文 README] 获取失败，回退原有流程：', error.message);
+                    return { ok: false, failed: true, aborted: false };
+                }
+            })();
+            chineseReadme.pending = task;
+            try {
+                const result = await task.promise;
+                if (result.failed) {
+                    if (chineseReadme.failures.size >= 20) chineseReadme.failures.clear();
+                    chineseReadme.failures.set(url, Date.now());
+                    continue;
+                }
+                if (result.aborted) return false;
+                if (result.ok) return true;
+            } finally {
+                if (chineseReadme.pending === task) chineseReadme.pending = null;
+            }
+        }
+        return false;
+    }
 
     // ==========================================================================
     // [Module] core/utils.js
@@ -224,12 +856,28 @@
         return `${text.slice(0, maxLength)}...`;
     }
 
-    function createHash(input) {
-        let hash = 0;
-        for (let i = 0; i < input.length; i += 1) {
-            hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+    function parseInertHtmlBody(html) {
+        if (typeof DOMParser === 'function') {
+            const parsedBody = new DOMParser().parseFromString(String(html || ''), 'text/html')?.body;
+            if (parsedBody && typeof parsedBody.textContent === 'string') {
+                return parsedBody;
+            }
         }
-        return (hash >>> 0).toString(16);
+        const container = document.createElement('div');
+        container.innerHTML = String(html || '');
+        return container;
+    }
+
+    function createHash(input) {
+        const text = String(input || '');
+        let h1 = 0x811c9dc5 ^ text.length;
+        let h2 = 0x9e3779b1 + text.length;
+        for (let i = 0; i < text.length; i += 1) {
+            const ch = text.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 0x01000193);
+            h2 = (((h2 << 5) - h2) + ch) | 0;
+        }
+        return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
     }
 
     function isObjectObjectArtifact(value) {
@@ -307,12 +955,25 @@
         return owner && repo ? `${owner}/${repo}` : '';
     }
 
+    const NON_REPO_ROOT_SEGMENTS = new Set([
+        'home', 'dashboard', 'feed', 'copilot', 'spark', 'signup', 'account_verifications',
+        'login', 'logout', 'session', 'sessions', 'password_reset', 'orgs', 'organizations',
+        'explore', 'topics', 'notifications', 'watching', 'stars', 'issues', 'pulls', 'repos',
+        'search', 'trending', 'showcases', 'new', 'import', 'settings', 'installations',
+        'marketplace', 'apps', 'account', 'projects', 'redeem', 'discussions', 'collections',
+        'sponsors', 'sponsoring', 'github-copilot', 'codespaces', 'developer', 'features',
+        'security', 'sitemap', 'education', 'mcp', 'users', 'billing', 'plans', 'about', 'pricing',
+    ]);
+
     function getCurrentRepoInfo() {
+        if (typeof window !== 'undefined' && window.location?.hostname && window.location.hostname !== 'github.com') {
+            return null;
+        }
         const fullName = buildRepoIdentifierFromPath(window.location.pathname);
         if (!fullName) return null;
 
         const [owner, repo] = fullName.split('/');
-        if (!owner || !repo) return null;
+        if (!owner || !repo || NON_REPO_ROOT_SEGMENTS.has(owner)) return null;
         return { owner, repo, fullName };
     }
 
@@ -322,8 +983,13 @@
     }
 
     function getStableReadmeTextHash(html) {
-        const container = document.createElement('div');
-        container.innerHTML = String(html || '');
+        const container = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(html)
+            : (() => {
+                const div = document.createElement('div');
+                div.innerHTML = String(html || '');
+                return div;
+            })();
         return createHash(normalizeText(container.textContent || ''));
     }
 
@@ -341,9 +1007,11 @@
         const usage = payload?.usage;
         if (!usage || typeof usage !== 'object') return 0;
 
-        const totalTokens = Number(usage.total_tokens);
-        if (Number.isFinite(totalTokens) && totalTokens >= 0) {
-            return totalTokens;
+        if (usage.total_tokens != null && usage.total_tokens !== '') {
+            const totalTokens = Number(usage.total_tokens);
+            if (Number.isFinite(totalTokens) && totalTokens > 0) {
+                return totalTokens;
+            }
         }
 
         const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
@@ -357,10 +1025,12 @@
     }
 
     function isExtensionContextInvalidatedError(error) {
+        if (error?.code === 'GHCN_CONTEXT_INVALIDATED') return true;
         const message = String(error?.message || error || '');
         return /extension context invalidated/i.test(message)
             || /context invalidated/i.test(message)
-            || /extension context was invalidated/i.test(message);
+            || /extension context was invalidated/i.test(message)
+            || /插件上下文已失效/.test(message);
     }
 
     function normalizeRuntimeErrorMessage(error) {
@@ -383,23 +1053,45 @@
         return String(error || '翻译失败');
     }
 
+    function normalizePreservedTexts(list) {
+        if (!Array.isArray(list)) return [];
+
+        const seen = new Set();
+        const result = [];
+        for (const item of list) {
+            if (typeof item !== 'string') continue;
+            const text = item.trim();
+            if (!text || text.length > 160 || seen.has(text)) continue;
+            seen.add(text);
+            result.push(text);
+            if (result.length >= 120) break;
+        }
+        return result;
+    }
+
+    function sanitizeCachedPayloadText(value) {
+        return typeof value === 'string' && value.length > 0 && !containsObjectObjectArtifact(value)
+            ? value
+            : '';
+    }
+
     function normalizeRepoCacheEntries(entries) {
         const list = Array.isArray(entries) ? entries : [];
 
         return list
-            .filter((item) => item
-                && typeof item.key === 'string'
-                && ((typeof item.translatedHtml === 'string' && !containsObjectObjectArtifact(item.translatedHtml))
-                    || (typeof item.tldrContent === 'string' && !containsObjectObjectArtifact(item.tldrContent))))
+            .filter((item) => item && typeof item.key === 'string' && item.key.length > 0)
             .map((item) => ({
                 key: item.key,
-                repo: item.repo || '',
-                sourceHash: item.sourceHash || '',
-                translatedHtml: item.translatedHtml || '',
-                tldrContent: item.tldrContent || '',
+                repo: typeof item.repo === 'string' ? item.repo : '',
+                pathname: typeof item.pathname === 'string' ? item.pathname : '',
+                sourceHash: typeof item.sourceHash === 'string' ? item.sourceHash : '',
+                translatedHtml: sanitizeCachedPayloadText(item.translatedHtml),
+                tldrContent: sanitizeCachedPayloadText(item.tldrContent),
                 complete: item.complete === true,
+                preservedTexts: normalizePreservedTexts(item.preservedTexts),
                 updatedAt: Number(item.updatedAt || 0),
             }))
+            .filter((item) => Boolean(item.translatedHtml || item.tldrContent))
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, README_CONFIG.REPO_CACHE_MAX_ENTRIES);
     }
@@ -427,17 +1119,74 @@
         }
     }
 
+    let localStorageWriteQueue = Promise.resolve();
+    const REPO_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+    const DEBUG_LOGS_MAX_BYTES = 512 * 1024;
+
+    function enqueueLocalStorageWrite(task) {
+        const run = localStorageWriteQueue.catch(() => {}).then(task);
+        localStorageWriteQueue = run.catch(() => {});
+        return run;
+    }
+
+    function estimateJsonUtf8Bytes(value) {
+        const json = JSON.stringify(value);
+        if (typeof TextEncoder === 'function') {
+            return new TextEncoder().encode(json).byteLength;
+        }
+        return json.length * 2;
+    }
+
+    function trimEntriesToByteBudget(entries, maxBytes) {
+        const result = Array.isArray(entries) ? [...entries] : [];
+        while (result.length > 1 && estimateJsonUtf8Bytes(result) > maxBytes) {
+            result.pop();
+        }
+        return result;
+    }
+
+    function isQuotaExceededError(error) {
+        const msg = String(error?.message || error || '');
+        return error?.name === 'QuotaExceededError' || /quota/i.test(msg);
+    }
+
+    async function setLocalValueWithQuotaRetry(key, entries, trimFn) {
+        let candidate = entries;
+        try {
+            await setLocalValue(key, candidate);
+            return candidate;
+        } catch (error) {
+            if (!isQuotaExceededError(error) || !Array.isArray(candidate) || candidate.length <= 1) {
+                throw error;
+            }
+            candidate = trimFn(candidate);
+            await setLocalValue(key, candidate);
+            return candidate;
+        }
+    }
+
     async function ensureRepoCacheLoaded() {
         if (readmeRuntime.repoCacheLoaded) return;
+        if (readmeRuntime.repoCacheLoadPromise) {
+            return readmeRuntime.repoCacheLoadPromise;
+        }
 
-        const storedEntries = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
-        const normalizedEntries = normalizeRepoCacheEntries(storedEntries);
+        readmeRuntime.repoCacheLoadPromise = (async () => {
+            const storedEntries = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
+            const normalizedEntries = normalizeRepoCacheEntries(storedEntries);
 
-        readmeRuntime.repoCacheMap.clear();
-        normalizedEntries.forEach((entry) => {
-            readmeRuntime.repoCacheMap.set(entry.key, entry);
-        });
-        readmeRuntime.repoCacheLoaded = true;
+            readmeRuntime.repoCacheMap.clear();
+            normalizedEntries.forEach((entry) => {
+                readmeRuntime.repoCacheMap.set(entry.key, entry);
+            });
+            readmeRuntime.repoCacheLoaded = true;
+        })();
+
+        try {
+            await readmeRuntime.repoCacheLoadPromise;
+        } finally {
+            readmeRuntime.repoCacheLoadPromise = null;
+        }
     }
 
     async function getRepoCachedTranslation(cacheKey, options = {}) {
@@ -453,33 +1202,61 @@
 
     async function upsertRepoCachedTranslation(cacheKey, value) {
         if (!FeatureSet.readme_enable_repo_cache || !cacheKey) return;
-        const hasHtml = typeof value?.translatedHtml === 'string' && value.translatedHtml.length <= README_CONFIG.MAX_CACHE_HTML_CHARS && !containsObjectObjectArtifact(value.translatedHtml);
-        const hasTldr = typeof value?.tldrContent === 'string' && value.tldrContent.length <= README_CONFIG.MAX_CACHE_HTML_CHARS && !containsObjectObjectArtifact(value.tldrContent);
+        const hasHtml = typeof value?.translatedHtml === 'string'
+            && value.translatedHtml.length > 0
+            && value.translatedHtml.length <= README_CONFIG.MAX_CACHE_HTML_CHARS
+            && !containsObjectObjectArtifact(value.translatedHtml);
+        const hasTldr = typeof value?.tldrContent === 'string'
+            && value.tldrContent.length > 0
+            && value.tldrContent.length <= README_CONFIG.MAX_CACHE_HTML_CHARS
+            && !containsObjectObjectArtifact(value.tldrContent);
 
         if (!hasHtml && !hasTldr) return;
 
-        await ensureRepoCacheLoaded();
+        return enqueueLocalStorageWrite(async () => {
+            await ensureRepoCacheLoaded();
 
-        const existing = readmeRuntime.repoCacheMap.get(cacheKey) || {};
+            const storedRaw = await getLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, []);
+            const storedNormalized = normalizeRepoCacheEntries(storedRaw);
+            const mergedMap = new Map();
+            storedNormalized.forEach((entry) => mergedMap.set(entry.key, entry));
+            for (const [key, entry] of readmeRuntime.repoCacheMap.entries()) {
+                const storedEntry = mergedMap.get(key);
+                if (!storedEntry || Number(entry.updatedAt || 0) > Number(storedEntry.updatedAt || 0)) {
+                    mergedMap.set(key, entry);
+                }
+            }
 
-        readmeRuntime.repoCacheMap.set(cacheKey, {
-            ...existing,
-            key: cacheKey,
-            repo: value.repo || existing.repo || '',
-            sourceHash: value.sourceHash || existing.sourceHash || '',
-            translatedHtml: value.translatedHtml ?? existing.translatedHtml ?? '',
-            tldrContent: value.tldrContent ?? existing.tldrContent ?? '',
-            complete: value.complete ?? existing.complete ?? false,
-            updatedAt: Date.now(),
+            const existing = mergedMap.get(cacheKey) || {};
+            mergedMap.set(cacheKey, {
+                ...existing,
+                key: cacheKey,
+                repo: value.repo || existing.repo || '',
+                pathname: typeof value.pathname === 'string' ? value.pathname : (existing.pathname || ''),
+                sourceHash: value.sourceHash || existing.sourceHash || '',
+                translatedHtml: hasHtml ? value.translatedHtml : (existing.translatedHtml || ''),
+                tldrContent: hasTldr ? value.tldrContent : (existing.tldrContent || ''),
+                complete: value.complete ?? existing.complete ?? false,
+                preservedTexts: normalizePreservedTexts(value.preservedTexts !== undefined ? value.preservedTexts : existing.preservedTexts),
+                updatedAt: Date.now(),
+            });
+
+            const entries = trimEntriesToByteBudget(
+                normalizeRepoCacheEntries([...mergedMap.values()]),
+                REPO_CACHE_MAX_BYTES,
+            );
+
+            const committed = await setLocalValueWithQuotaRetry(
+                README_LOCAL_STORAGE_KEYS.REPO_CACHE,
+                entries,
+                (list) => list.slice(0, Math.max(1, Math.floor(list.length / 2))),
+            );
+            readmeRuntime.repoCacheMap.clear();
+            committed.forEach((entry) => {
+                readmeRuntime.repoCacheMap.set(entry.key, entry);
+            });
+            readmeRuntime.repoCacheLoaded = true;
         });
-
-        const entries = normalizeRepoCacheEntries([...readmeRuntime.repoCacheMap.values()]);
-        readmeRuntime.repoCacheMap.clear();
-        entries.forEach((entry) => {
-            readmeRuntime.repoCacheMap.set(entry.key, entry);
-        });
-
-        await setLocalValue(README_LOCAL_STORAGE_KEYS.REPO_CACHE, entries);
     }
 
     async function appendReadmeTranslationRecord(record) {
@@ -499,12 +1276,18 @@
             detail: record?.detail ? truncateText(String(record.detail), 160) : '',
         };
 
-        const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, []);
-        const records = Array.isArray(existing) ? existing : [];
-        records.push(nextRecord);
+        return enqueueLocalStorageWrite(async () => {
+            const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, []);
+            const records = Array.isArray(existing) ? [...existing] : [];
+            records.push(nextRecord);
 
-        const trimmed = trimTranslationRecords(records, README_CONFIG.RECORD_MAX_ENTRIES);
-        await setLocalValue(README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS, trimmed);
+            const trimmed = trimTranslationRecords(records, README_CONFIG.RECORD_MAX_ENTRIES);
+            await setLocalValueWithQuotaRetry(
+                README_LOCAL_STORAGE_KEYS.TRANSLATION_RECORDS,
+                trimmed,
+                (list) => list.slice(0, Math.max(1, Math.floor(list.length / 2))),
+            );
+        });
     }
 
     // ==========================================================================
@@ -530,8 +1313,17 @@
         if (!input) return false;
 
         // 参数说明列表/表格中的单词键名（如 slug、tags、title、content）应保持原文，
-        // 模型通常会原样返回，不能因此把 README 判为部分完成。
-        if (/^[a-z][a-z0-9_-]{1,24}$/.test(input) && element?.closest('li, dt, table')) {
+        // 模型通常会原样返回，不能因此把 README 判为部分完成；但普通英文虚词仍需正常翻译。
+        const commonListGlueWords = new Set([
+            'and', 'or', 'in', 'on', 'at', 'to', 'of', 'for', 'with', 'by', 'from', 'as', 'via',
+            'into', 'over', 'under', 'between', 'through', 'without', 'using', 'the', 'is', 'are',
+            'was', 'were', 'be', 'been', 'have', 'has', 'had', 'can', 'will', 'may', 'not', 'but',
+            'if', 'when', 'where', 'that', 'this', 'these', 'those', 'plus', 'see', 'then', 'also',
+            'only', 'both', 'either', 'all', 'any', 'each', 'more', 'less', 'than',
+        ]);
+        if (/^[a-z][a-z0-9_-]{1,24}$/.test(input)
+            && !commonListGlueWords.has(input)
+            && element?.closest('li, dt, table')) {
             return true;
         }
 
@@ -540,8 +1332,8 @@
             || /^(?:\.\.?[\\/]|[A-Za-z]:[\\/])/.test(input)) {
             return true;
         }
-        if (input.length > 120) return false;
         if (isLikelyOpaqueReadmeLabel(input, node)) return true;
+        if (input.length > 120) return false;
 
         // 版本号、文件名和纯标识符通常不需要翻译；它们保持原文时不应把整篇 README 判为部分完成。
         if (/^[a-z]+\s+(?:version\s+)?v?\d+(?:\.\d+)+(?:[+._-][A-Za-z0-9]+)?[.!]?$/i.test(input)) {
@@ -552,18 +1344,47 @@
 
     function isLikelyOpaqueReadmeLabel(text, node = null) {
         const input = String(text || '').trim();
-        if (!input || input.length > 120 || /[\u3400-\u9FFF]/.test(input)) return false;
+        if (!input || /[\u3400-\u9FFF]/.test(input)) return false;
+
+        const element = node?.parentElement;
+        if (/[·•]/.test(input) && !/[.!?;:]/.test(input)) {
+            const segments = input.split(/\s*[·•]\s*/).filter(Boolean);
+            const minSegments = element?.closest('table') ? 3 : 4;
+            if (segments.length >= minSegments) {
+                const proseSegmentWords = new Set([
+                    'fast', 'simple', 'free', 'open', 'source', 'lightweight', 'secure', 'modern',
+                    'easy', 'clean', 'powerful', 'flexible', 'reliable', 'private', 'local', 'cloud',
+                    'docs', 'guide', 'install', 'features', 'demo', 'pricing', 'blog', 'about',
+                    'contact', 'license', 'support', 'changelog', 'roadmap', 'getting', 'started',
+                    'and', 'or', 'the', 'for', 'with', 'from', 'to', 'in', 'on', 'of', 'by', 'at',
+                ]);
+                const isProperToken = (token) => (
+                    /^[A-Z][A-Za-z0-9.+-]*$/.test(token)
+                    || /^[a-z]{1,4}[A-Z][A-Za-z0-9.+-]*$/.test(token)
+                    || /^[A-Z0-9]{2,}[A-Za-z0-9.+-]*$/.test(token)
+                    || /^(?:npm|pnpm|yarn|bun|cli|api|sdk|mcp|ide|os|fx|pi|ai|go|js|ts|py|rs)$/i.test(token)
+                );
+                const allBrandSegments = segments.every((segment) => {
+                    const segWords = segment.split(/\s+/).filter(Boolean);
+                    if (!segWords.length || segWords.length > 4) return false;
+                    return segWords.every((word) => {
+                        const cleaned = word.toLowerCase().replace(/^[([{]+|[)\]},.;:!?]+$/g, '');
+                        return cleaned && !proseSegmentWords.has(cleaned) && isProperToken(word);
+                    });
+                });
+                if (allBrandSegments) return true;
+            }
+        }
+        if (input.length > 120) return false;
 
         const words = input.split(/\s+/).filter(Boolean);
         if (!words.length || words.length > 8) return false;
 
-        const element = node?.parentElement;
         const isLink = Boolean(element?.closest('a[href]'));
-        const isListLabel = Boolean(element?.closest('li, dt, code'));
         const isHeading = Boolean(element?.closest('h1, h2, h3, h4, h5, h6'));
         const isTableLink = isLink && Boolean(element?.closest('table'));
+        const isTableDataCell = Boolean(element?.closest('td'));
         const titleCaseWords = words.filter((word) => /^[A-Z][A-Za-z0-9]*$/.test(word));
-        if (isTableLink && titleCaseWords.length === words.length) return true;
 
         // 普通句子不能因为首字母大写就被误判为产品名；这些词出现时仍需正常翻译。
         const sentenceWords = new Set([
@@ -577,32 +1398,76 @@
         ]);
         const normalizedWords = words.map((word) => word.toLowerCase().replace(/^[([{]+|[)\]},.;:!?]+$/g, ''));
         if (normalizedWords.length === 1 && sentenceWords.has(normalizedWords[0])) return false;
-        if (normalizedWords.some((word) => sentenceWords.has(word))
-            && !/\([A-Z0-9]{2,}\)/.test(input)) return false;
+
+        const tableProseWords = new Set([
+            'yes', 'no', 'none', 'all', 'other', 'others', 'default', 'defaults', 'optional',
+            'required', 'supported', 'unsupported', 'available', 'unavailable', 'experimental',
+            'stable', 'deprecated', 'recommended', 'legacy', 'manual', 'automatic', 'auto',
+            'custom', 'local', 'remote', 'global', 'free', 'paid', 'open', 'closed', 'read',
+            'write', 'full', 'partial', 'basic', 'advanced', 'high', 'medium', 'low', 'fast',
+            'slow', 'new', 'old', 'active', 'inactive', 'enabled', 'disabled', 'planned',
+            'done', 'pending', 'coming', 'soon', 'see', 'more', 'less', 'both', 'either',
+            'neither', 'unknown', 'empty', 'any', 'every', 'only', 'always', 'never', 'name',
+            'type', 'description', 'status', 'platform', 'platforms', 'method', 'command',
+            'commands', 'option', 'options', 'notes', 'note', 'value', 'values', 'version',
+            'versions', 'source', 'target', 'language', 'languages', 'summary', 'details',
+            'system', 'systems', 'action', 'actions', 'mode', 'modes', 'file', 'files',
+            'path', 'paths', 'config', 'setting', 'settings', 'package', 'packages',
+            'plugin', 'plugins', 'tool', 'tools', 'client', 'clients', 'server', 'servers',
+            'provider', 'providers', 'model', 'models', 'editor', 'editors', 'browser',
+            'browsers', 'true', 'false', 'official', 'product', 'page', 'hardware',
+            'architecture', 'interfaces', 'downloads', 'changelog', 'support', 'security',
+            'board', 'chipset', 'terminal', 'kiosk', 'display', 'module', 'control',
+            'power', 'permissions', 'capabilities', 'reports', 'bug', 'releases', 'faq',
+        ]);
 
         if (isHeading && words.length >= 2 && document.title.includes(input)) {
             return true;
         }
-        const hasOpaquePattern = /[0-9_./+#@:-]/.test(input)
-            || /[a-z][A-Z]/.test(input)
-            || /\([A-Z0-9]{2,}\)/.test(input)
-            || words.some((word) => /^[A-Z0-9]{2,}$/.test(word));
-        if (hasOpaquePattern) return true;
 
-        if ((isLink || isListLabel)
-            && titleCaseWords.length === words.length
-            && (words.some((word) => word.length > 2) || (isLink && words.length === 1 && !sentenceWords.has(normalizedWords[0])))) {
+        if (words.length === 1) {
+            if (/^(?:https?:\/\/|www\.|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(input)) return true;
+            if (/^(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+|[A-Za-z0-9_-]+\.(?:md|markdown|rst|txt|json|ya?ml|toml|xml|html?|css|scss|js|mjs|cjs|ts|tsx|jsx|py|go|rs|java|kt|kts|c|cc|cpp|h|hpp|cs|rb|php|sh|bash|zsh|ps1|bat|cmd|exe|apk|aar|jar|zip|tar|gz|tgz|dmg|pkg|deb|rpm|appimage|iso|bin|so|dll|dylib|png|jpe?g|gif|svg|webp|ico|pdf|lock|env|ini|cfg|conf|gradle))$/i.test(input)) {
+                return true;
+            }
+            if (/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.(?:com|org|net|io|ai|dev|app|co|gg|rs|xyz|cloud|tech|site|edu|gov|cn|uk|de|jp|fr|eu|info|biz|tv|cc|fm|ly)$/.test(input)) {
+                return true;
+            }
+            if (isLink && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.(?:me|sh|so|to|tools|run|build|land|im|pro|page|link|work|studio|design)$/i.test(input)) {
+                return true;
+            }
+            if (/^\(?(?:x86(?:_64)?|x64|amd64|arm64|aarch64|armhf|armv7|i386|i686|ppc64le|s390x|riscv64|mips64|wasm(?:32|64)?)\)?$/i.test(input)) return true;
+            if (!/^FAQ$/i.test(input) && /^[A-Z0-9][A-Z0-9._+-]{1,24}$/.test(input)) return true;
+            if (/^[a-z0-9]+(?:[_-][a-z0-9]+)+$/.test(input)
+                || /^[a-z]+[A-Z][A-Za-z0-9]*$/.test(input)
+                || /^[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*$/.test(input)
+                || /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2,}$/.test(input)) {
+                return true;
+            }
+            if (isLink && /^[A-Z]$/.test(input)) return true;
+        }
+
+        if (/^(?:[A-Z][a-z]+ )+\([A-Z0-9]{2,}\)$/.test(input)) {
             return true;
         }
 
-        // 外部链接中的单一标识通常是包名/库名/平台名（如 boto、X），而不是自然语言句子。
-        return isLink && words.length === 1 && !sentenceWords.has(normalizedWords[0]) && /^[A-Za-z0-9-]+$/.test(input);
+        if (normalizedWords.some((word) => sentenceWords.has(word) || tableProseWords.has(word))
+            || /[,.:;!?()&/-]/.test(input)) {
+            return false;
+        }
+
+        if (isTableLink && titleCaseWords.length === words.length && words.length <= 2) return true;
+        if (isTableDataCell && titleCaseWords.length === words.length && words.length <= 2) return true;
+
+        return false;
     }
 
 
     function isMostlyCjkText(text) {
         const input = String(text || '');
         const cjkCount = (input.match(/[\u3400-\u9FFF]/g) || []).length;
+        const lowercaseLatinWords = (input.match(/\b[a-z]{2,}\b/g) || []).length;
+        if (/、/.test(input) && lowercaseLatinWords === 0) return true;
         if (!cjkCount) return false;
 
         const latinCount = (input.match(/[A-Za-z]/g) || []).length;
@@ -610,6 +1475,16 @@
 
         const latinWords = (input.match(/[A-Za-z]{2,}/g) || []).length;
         const cjkPunctuation = (input.match(/[\u3000-\u303F\uFF01-\uFF5E]/g) || []).length;
+
+        if (cjkCount >= 2 && lowercaseLatinWords === 0
+            && !/^(?:Read|View|See|Open|Click|Switch|Use|Try|Get|Run|Add|Set)\b/i.test(input.trim())) {
+            return true;
+        }
+        if (cjkCount >= 3 && cjkPunctuation > 0 && cjkCount >= lowercaseLatinWords * 2) return true;
+        if (cjkCount >= 3 && lowercaseLatinWords <= 1
+            && !/^(?:Read|View|See|Open|Click|Switch|Use|Try|Get|Run|Add|Set)\b/i.test(input.trim())) {
+            return true;
+        }
 
         // 若中文字符达到 8 个以上，且中文字数明显多于英文词数（技术名词混排常见场景），视为中文
         if (cjkCount >= 8 && cjkCount >= latinWords * 1.5) return true;
@@ -645,18 +1520,43 @@
     // [Module] core/dom-observer.js
     // ==========================================================================
 
+    function getDocUrlNoHashFallback() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        if (typeof URL === 'function') {
+            try {
+                const parsed = new URL(href);
+                parsed.hash = '';
+                return parsed.href;
+            } catch { /* 忽略非法 URL */ }
+        }
+        return href.split('#')[0];
+    }
+
+    let lastHistoryDocUrl = typeof window !== 'undefined' ? getDocUrlNoHashFallback() : '';
+
     // 初始化
     init().catch(err => {
+        if (typeof isExtensionContextInvalidatedError === 'function' && isExtensionContextInvalidatedError(err)) return;
         console.error('初始化失败:', err);
     });
 
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (message?.type === 'ghcn-current-page') {
+            const scope = window.location.hostname + window.location.pathname;
+            sendResponse({ scope, excluded: isPageExcluded(), inheritedExclusion: maintenanceData.excluded.some(rule => rule !== scope && GhcnMaintenance.matches(rule, window.location)) });
+            return false;
+        }
         if (message?.type === 'refresh-page') {
             window.location.reload();
         }
     });
 
     async function loadFeatureSet() {
+        await loadMaintenanceSettings();
         const result = await chrome.storage.sync.get(STORAGE_DEFAULTS);
         Object.assign(FeatureSet, result);
     }
@@ -673,11 +1573,26 @@
         scheduleTldrCapsuleControls('refreshCurrentPageTranslations');
     }
 
+    function restoreAllExtensionFeatures() {
+        if (typeof readmeRuntime === 'object') {
+            readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+        }
+        if (typeof issuePrRuntime === 'object') {
+            issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+        }
+        if (typeof restoreChineseReadme === 'function') restoreChineseReadme();
+        if (typeof restoreReadmeTranslation === 'function') restoreReadmeTranslation();
+        if (typeof restoreIssuePrTranslations === 'function') restoreIssuePrTranslations();
+        if (typeof restoreCollaborationHelperControls === 'function') restoreCollaborationHelperControls();
+        if (typeof restoreTldrCapsuleControls === 'function') restoreTldrCapsuleControls();
+    }
+
     /**
      * Turbo 软导航后整页/片段可能被替换为未翻译英文，且返回时 react-partial
      * 往往已是 .loaded，hydration watcher 不会再触发。MutationObserver 也可能
      * 输给随后的 React reconcile。因此在 turbo:load 后做短延迟全量扫描。
      */
+    let turboPageTimers = [];
     function translateTurboSettledDom() {
         if (!FeatureSet.enable_extension || !pageConfig.currentPageType || !document.body) return;
         traverseNode(document.body);
@@ -686,10 +1601,12 @@
     }
 
     function scheduleTurboPageTranslation() {
+        turboPageTimers.forEach(id => window.clearTimeout(id));
+        turboPageTimers = [];
         translateTurboSettledDom();
         scheduleReactGlobalNavRefresh();
         [80, 250, 800, 1800].forEach(delay => {
-            window.setTimeout(translateTurboSettledDom, delay);
+            turboPageTimers.push(window.setTimeout(translateTurboSettledDom, delay));
         });
     }
 
@@ -706,6 +1623,10 @@
 
     function applyBatchedFeatureToggles(changedKeys) {
         if (!changedKeys.length) return;
+        if (changedKeys.includes('prefer_chinese_readme')) {
+            if (!FeatureSet.prefer_chinese_readme) restoreChineseReadme();
+            scheduleReadmeTranslation('setting:prefer_chinese_readme');
+        }
 
         // 1. 全局开关状态变化处理
         if (changedKeys.includes('enable_extension')) {
@@ -714,20 +1635,28 @@
                 document.documentElement.lang = CONFIG.LANG;
                 refreshCurrentPageTranslations();
             } else {
-                restoreReadmeTranslation();
-                restoreIssuePrTranslations();
-                restoreCollaborationHelperControls();
-                restoreTldrCapsuleControls();
+                restoreAllExtensionFeatures();
             }
         }
 
         // 2. 批量处理 README / AI 设置变更，单批次仅执行一次重置与调度
         const hasReadmeSettingsChange = changedKeys.some(isReadmeSettingKey);
         if (hasReadmeSettingsChange) {
+            readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+            if (typeof issuePrRuntime === 'object') {
+                issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+            }
             readmeRuntime.translationCache.clear();
+            readmeRuntime.preservedCache.clear();
             if (changedKeys.includes('readme_enable_repo_cache') && !FeatureSet.readme_enable_repo_cache) {
                 readmeRuntime.repoCacheMap.clear();
                 readmeRuntime.repoCacheLoaded = false;
+            }
+
+            const hasProviderSettingChange = changedKeys.some(key => key.startsWith('readme_')
+                && !['readme_enable_token_record', 'readme_enable_repo_cache', 'readme_enable_progressive', 'readme_enable_debug'].includes(key));
+            if (hasProviderSettingChange && typeof restoreReadmeTranslation === 'function') {
+                restoreReadmeTranslation();
             }
 
             const triggerKey = changedKeys.find(isReadmeSettingKey) || 'batch';
@@ -765,12 +1694,39 @@
 
     function watchFeatureChanges() {
         chrome.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName === 'local' && changes[README_LOCAL_STORAGE_KEYS.REPO_CACHE]) {
+                readmeRuntime.repoCacheMap.clear();
+                readmeRuntime.repoCacheLoaded = false;
+                if (FeatureSet.readme_enable_repo_cache && typeof normalizeRepoCacheEntries === 'function') {
+                    const normalizedEntries = normalizeRepoCacheEntries(changes[README_LOCAL_STORAGE_KEYS.REPO_CACHE].newValue);
+                    normalizedEntries.forEach((entry) => {
+                        readmeRuntime.repoCacheMap.set(entry.key, entry);
+                    });
+                    readmeRuntime.repoCacheLoaded = true;
+                }
+                return;
+            }
+            if (areaName === 'local' && changes[GhcnMaintenance.DATA_KEY]) {
+                try { maintenanceData = GhcnMaintenance.validateData(changes[GhcnMaintenance.DATA_KEY].newValue || {}); }
+                catch { return; }
+                pageConfig.textCache?.clear();
+                customWrites = new WeakMap();
+                if (!FeatureSet.enable_extension) {
+                    restoreAllExtensionFeatures();
+                } else {
+                    refreshCurrentPageTranslations();
+                }
+                return;
+            }
             if (areaName !== 'sync') return;
 
             let hasValidChange = false;
             Object.entries(changes).forEach(([key, change]) => {
                 if (!(key in FeatureSet)) return;
-                FeatureSet[key] = change.newValue;
+                const nextValue = Object.hasOwn(change, 'newValue') && change.newValue !== undefined
+                    ? change.newValue
+                    : STORAGE_DEFAULTS[key];
+                FeatureSet[key] = nextValue;
                 pendingChangedKeys.add(key);
                 hasValidChange = true;
             });
@@ -794,7 +1750,11 @@
     // 更新页面设置
     function updatePageConfig(currentPageChangeTrigger, force = false) {
         const newType = detectPageType();
-        if (newType && (force || newType !== pageConfig.currentPageType)) {
+        if (!newType) {
+            pageConfig = {};
+            return;
+        }
+        if (force || newType !== pageConfig.currentPageType) {
             pageConfig = buildPageConfig(newType);
             scheduleReadmeTranslation(`${currentPageChangeTrigger}:pageTypeChanged`);
             scheduleIssuePrTranslationControls(`${currentPageChangeTrigger}:pageTypeChanged`);
@@ -804,8 +1764,26 @@
     }
 
     function refreshAfterHistoryNavigation(trigger = '历史导航') {
-        if (!FeatureSet.enable_extension || !document.body) return;
+        const currentDocUrl = getDocUrlNoHashFallback();
+        const docUrlChanged = Boolean(lastHistoryDocUrl && currentDocUrl && currentDocUrl !== lastHistoryDocUrl);
+        if (currentDocUrl) lastHistoryDocUrl = currentDocUrl;
+        if (docUrlChanged) {
+            if (typeof closeCollaborationModal === 'function') {
+                closeCollaborationModal();
+            }
+            if (typeof resetTldrRuntimeForNavigation === 'function') {
+                resetTldrRuntimeForNavigation();
+            }
+        }
+        if (!FeatureSet.enable_extension || !document.body) {
+            restoreAllExtensionFeatures();
+            return;
+        }
 
+        readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+        if (typeof issuePrRuntime === 'object') {
+            issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+        }
         updatePageConfig(trigger, true);
         refreshPageObserver();
         scheduleTurboPageTranslation();
@@ -816,6 +1794,10 @@
     }
 
     function scheduleHistoryRefresh(event) {
+        const currentDocUrl = getDocUrlNoHashFallback();
+        if (event?.type === 'popstate' && lastHistoryDocUrl && currentDocUrl === lastHistoryDocUrl) {
+            return;
+        }
         if (historyRefreshTimer !== null) window.clearTimeout(historyRefreshTimer);
         historyRefreshTimer = window.setTimeout(() => {
             historyRefreshTimer = null;
@@ -829,6 +1811,7 @@
             // 当前页面类型
             currentPageType: pageType,
             textCache: new Map(),
+            attributeTranslations: I18N[CONFIG.LANG][pageType]?.attributes || [],
             // 页面标题静态词库
             titleStaticDict: {
                 ...I18N[CONFIG.LANG].public.title.static,
@@ -871,18 +1854,66 @@
     }
 
 
+    function getPageObserverConfig() {
+        return {
+            ...CONFIG.OBSERVER_CONFIG,
+            attributeFilter: [...new Set([
+                ...CONFIG.OBSERVER_CONFIG.attributeFilter,
+                ...(pageConfig.attributeTranslations || []).map(([, name]) => name),
+            ])],
+        };
+    }
+
     function watchUpdate() {
-        // 缓存当前页面的 URL
-        let previousURL = window.location.href;
+        const readDocUrlWithoutHash = () => {
+            if (typeof getDocumentUrlWithoutHash === 'function') {
+                return getDocumentUrlWithoutHash();
+            }
+            const href = String(window?.location?.href || '');
+            if (!href) return '';
+            if (typeof URL === 'function') {
+                try {
+                    const parsed = new URL(href);
+                    parsed.hash = '';
+                    return parsed.href;
+                } catch { /* 忽略非法 URL */ }
+            }
+            return href.split('#')[0];
+        };
+        // 缓存当前页面的 URL（忽略 #hash 锚点变化）
+        let previousURL = readDocUrlWithoutHash();
         let observer = null;
         let observedBody = null;
+        let observedAttributes = '';
 
         const handleUrlChange = () => {
-            const currentURL = window.location.href;
-            // 如果页面的 URL 发生变化
+            const currentURL = readDocUrlWithoutHash();
+            // 如果页面的文档 URL（不含 #hash）发生变化
             if (currentURL !== previousURL) {
                 previousURL = currentURL;
-                updatePageConfig('DOM变化');
+                if (typeof lastHistoryDocUrl !== 'undefined') {
+                    lastHistoryDocUrl = currentURL;
+                }
+                if (typeof closeCollaborationModal === 'function') {
+                    closeCollaborationModal();
+                }
+                if (typeof resetTldrRuntimeForNavigation === 'function') {
+                    resetTldrRuntimeForNavigation();
+                }
+                if (typeof readmeRuntime === 'object') {
+                    readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+                }
+                if (typeof issuePrRuntime === 'object') {
+                    issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+                }
+                if (!FeatureSet.enable_extension) {
+                    if (typeof restoreAllExtensionFeatures === 'function') {
+                        restoreAllExtensionFeatures();
+                    }
+                    return;
+                }
+                updatePageConfig('DOM变化', true);
+                refreshPageObserver();
             }
         }
 
@@ -951,9 +1982,9 @@
                         || (type === 'characterData' && isLiveSurfaceCharacterData(node))));
             })
             // 处理每个变化
-            .forEach(({ node }) =>
-                // 递归遍历节点树进行处理
-                traverseNode(node)
+            .forEach(({ node, type }) =>
+                // 递归遍历节点树进行处理；属性变化仅更新目标元素自身属性，避免误扫整棵子树
+                traverseNode(node, type === 'attributes')
             );
         }
 
@@ -961,10 +1992,29 @@
         const processMutationBatch = mutations => {
             if (!FeatureSet.enable_extension) return;
             handleUrlChange();
+            if (!FeatureSet.enable_extension) return;
             if (readmeRuntime.isApplyingTranslation) return;
             if (pageConfig.currentPageType) processMutations(mutations);
             if (FeatureSet.enable_readme_translation) {
                 scheduleReadmeTranslation('mutation');
+            } else if (FeatureSet.prefer_chinese_readme && typeof isReadmePage === 'function' && isReadmePage()) {
+                const currentReadmeRoot = typeof getReadmeRootElement === 'function' ? getReadmeRootElement() : null;
+                const currentUrl = readDocUrlWithoutHash();
+                const mountedForPage = typeof chineseReadme !== 'undefined'
+                    && chineseReadme.state?.root === currentReadmeRoot
+                    && (!chineseReadme.state?.pageUrl || !currentUrl || chineseReadme.state.pageUrl === currentUrl);
+                const hasMapBypass = typeof chineseReadme !== 'undefined' && typeof chineseReadme.bypass?.get === 'function';
+                const bypassEntry = (hasMapBypass && currentReadmeRoot) ? chineseReadme.bypass.get(currentReadmeRoot) : undefined;
+                const bypassed = typeof chineseReadme !== 'undefined' && Boolean(
+                    hasMapBypass
+                        ? (bypassEntry && (!currentUrl || bypassEntry === currentUrl))
+                        : (currentReadmeRoot && chineseReadme.bypass?.has?.(currentReadmeRoot)),
+                );
+                if (currentReadmeRoot
+                    ? (!mountedForPage && !bypassed)
+                    : Boolean(typeof chineseReadme !== 'undefined' && chineseReadme.state)) {
+                    scheduleReadmeTranslation('mutation');
+                }
             }
             if (FeatureSet.enable_issue_pr_translation) {
                 scheduleIssuePrTranslationControls('mutation');
@@ -980,13 +2030,17 @@
         const observeCurrentBody = () => {
             if (observer) observer.disconnect();
             observedBody = document.body;
-            if (observedBody) observer.observe(observedBody, CONFIG.OBSERVER_CONFIG);
+            const observerConfig = getPageObserverConfig();
+            observedAttributes = observerConfig.attributeFilter.join(',');
+            if (observedBody) observer.observe(observedBody, observerConfig);
         };
 
         observer = new MutationObserver(processMutationBatch);
         observeCurrentBody();
         refreshPageObserver = () => {
-            if (document.body !== observedBody) observeCurrentBody();
+            if (document.body !== observedBody
+                || getPageObserverConfig().attributeFilter.join(',') !== observedAttributes) observeCurrentBody();
+            if (typeof refreshHydrationObserver === 'function') refreshHydrationObserver();
         };
     }
 
@@ -995,40 +2049,52 @@
      * 在此之前改写文本会造成 hydration 失败，并让组件交互失效。
      */
     function watchReactHydration() {
+        const handledLoadedRoots = new WeakSet();
         const handleLoadedReactRoot = element => {
             if (
                 !FeatureSet.enable_extension
                 || !pageConfig.currentPageType
                 || !element.matches?.('react-app.loaded, react-partial.loaded')
+                || handledLoadedRoots.has(element)
             ) {
                 return;
             }
+            handledLoadedRoots.add(element);
 
             traverseNode(element);
+            scheduleReadmeTranslation('react:hydrated');
         };
 
+        let observedHydrationBody = null;
         const observer = new MutationObserver(mutations => {
             mutations.forEach(({ target, type }) => {
                 if (type === 'attributes') handleLoadedReactRoot(target);
             });
         });
 
-        observer.observe(document.body, {
-            attributes: true,
-            subtree: true,
-            attributeFilter: ['class'],
-        });
+        const observeHydrationBody = () => {
+            if (!document.body || document.body === observedHydrationBody) return;
+            observer.disconnect();
+            observedHydrationBody = document.body;
+            observer.observe(observedHydrationBody, {
+                attributes: true,
+                subtree: true,
+                attributeFilter: ['class'],
+            });
+            document.querySelectorAll('react-app.loaded, react-partial.loaded').forEach(handleLoadedReactRoot);
+        };
 
-        // 避免组件恰好在观察器启动前完成 hydration 而漏翻译
-        document.querySelectorAll('react-app.loaded, react-partial.loaded').forEach(handleLoadedReactRoot);
+        refreshHydrationObserver = observeHydrationBody;
+        observeHydrationBody();
     }
 
     /**
      * traverseNode 函数：遍历指定的节点，并对节点进行翻译。
-     * @param {Node} node - 需要遍历的节点。
+     * @param {Node} rootNode - 需要遍历的节点。
+     * @param {boolean} [attributesOnly=false] - 仅同步根节点属性（用于属性变更回调）。
      */
-    function traverseNode(rootNode) {
-        if (!FeatureSet.enable_extension) return;
+    function traverseNode(rootNode, attributesOnly = false) {
+        if (!FeatureSet.enable_extension || !rootNode) return;
 
         const handleTextNode = node => {
             if (node.length > (pageConfig.maxTextNodeLength ?? 500)) return;
@@ -1040,30 +2106,15 @@
         // 否则 handleElement 里的 placeholder / value 属性翻译会被一并跳过。
         const isUserInputText = node => node.parentElement?.tagName === 'TEXTAREA';
 
-        // 如果 rootNode 是文本节点，直接处理
+        // 如果 rootNode 是文本节点，先检查 ignoreSelectors 再处理
         if (rootNode.nodeType === Node.TEXT_NODE) {
+            if (pageConfig.ignoreSelectors && rootNode.parentElement?.closest?.(pageConfig.ignoreSelectors)) return;
             if (!isUserInputText(rootNode)) handleTextNode(rootNode);
             return; // 文本节点没有子节点，直接返回
         }
 
-        const treeWalker = document.createTreeWalker(
-            rootNode,
-            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-            node => {
-                // 跳过用户输入内容
-                if (node.nodeType === Node.TEXT_NODE) {
-                    return isUserInputText(node)
-                        ? NodeFilter.FILTER_REJECT
-                        : NodeFilter.FILTER_ACCEPT;
-                }
-                // 跳过忽略的节点
-                return node.matches?.(pageConfig.ignoreSelectors)
-                    ? NodeFilter.FILTER_REJECT
-                    : NodeFilter.FILTER_ACCEPT;
-            },
-        );
-
         const handleElement = node => {
+            applyCustomAttributes(node);
             // 处理不同标签的元素属性翻译
             switch (node.tagName) {
                 case 'RELATIVE-TIME': // 翻译时间元素
@@ -1115,6 +2166,38 @@
             return;
         }
 
+        if (pageConfig.ignoreSelectors && rootNode.closest?.(pageConfig.ignoreSelectors)) {
+            return;
+        }
+
+        // 属性变化的目标本身不会被 TreeWalker.nextNode() 访问，非 TEXTAREA 根节点也需检查其属性和自身标签。
+        const attributeTranslations = pageConfig.attributeTranslations;
+        const translateAttributes = Boolean(attributeTranslations?.length);
+        if (rootNode.nodeType === Node.ELEMENT_NODE) {
+            if (translateAttributes) {
+                transPageAttributes(rootNode, attributeTranslations);
+            }
+            handleElement(rootNode);
+            if (attributesOnly) return;
+        }
+
+        const treeWalker = document.createTreeWalker(
+            rootNode,
+            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+            node => {
+                // 跳过用户输入内容
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return isUserInputText(node)
+                        ? NodeFilter.FILTER_REJECT
+                        : NodeFilter.FILTER_ACCEPT;
+                }
+                // 跳过忽略的节点
+                return node.matches?.(pageConfig.ignoreSelectors)
+                    ? NodeFilter.FILTER_REJECT
+                    : NodeFilter.FILTER_ACCEPT;
+            },
+        );
+
         // 预绑定处理函数提升性能
         const handlers = {
             [Node.ELEMENT_NODE]: handleElement,
@@ -1123,6 +2206,9 @@
 
         let currentNode;
         while ((currentNode = treeWalker.nextNode())) {
+            if (translateAttributes && currentNode.nodeType === Node.ELEMENT_NODE) {
+                transPageAttributes(currentNode, attributeTranslations);
+            }
             handlers[currentNode.nodeType]?.(currentNode);
         }
     }
@@ -1138,19 +2224,25 @@
 
     function isReactGlobalNavPortalNode(node) {
         const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-        if (element?.matches?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')
-            || element?.querySelector?.('#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]')) {
+        if (!element) return false;
+
+        const quickSearchSelector = '#search-suggestions-dialog, [aria-label="Quick search"], [aria-label="Search suggestions"]';
+        const portalRoot = element.closest?.('#__primerPortalRoot__');
+        if (element.closest?.(quickSearchSelector)) {
             return true;
         }
-
-        const portalRoot = element?.closest?.('#__primerPortalRoot__');
-        if (!portalRoot) return false;
+        if (!portalRoot) {
+            if (element.id === '__primerPortalRoot__' || element.contains?.(document.querySelector?.('#search-suggestions-dialog'))) {
+                return Boolean(element.querySelector?.(quickSearchSelector));
+            }
+            return false;
+        }
 
         const portal = element.closest?.('[data-component="Portal"]')
             || element.querySelector?.('[data-component="Portal"]')
             || portalRoot;
-        if (portal.matches?.('#search-suggestions-dialog')
-            || portal.querySelector?.('#search-suggestions-dialog')) return true;
+        if (portal.matches?.(quickSearchSelector)
+            || portal.querySelector?.(quickSearchSelector)) return true;
 
         const referenceAttributes = ['aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns'];
         const referenceElements = [
@@ -1188,7 +2280,7 @@
         const hasControlledSurface = portal.matches?.('[role="menu"], [role="dialog"], [role="tooltip"]')
             || portal.querySelector?.('[role="menu"], [role="dialog"], [role="tooltip"]');
         return !!hasControlledSurface
-            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input, #__primerPortalRoot__, [role="dialog"]');
+            && !!document.activeElement?.closest?.('header.GlobalNav, qbsearch-input');
     }
 
     function setupReactGlobalNavTranslation() {
@@ -1208,7 +2300,11 @@
         const searchModuleSelector = 'header.GlobalNav [class*="Search-module__"]';
         const unsafeTextSelector = [
             'textarea',
+            '[contenteditable=""]',
             '[contenteditable="true"]',
+            '[contenteditable="plaintext-only"]',
+            '.notranslate',
+            '[translate="no"]',
             'code',
             'pre',
             'kbd',
@@ -1221,10 +2317,18 @@
         const translatableAttributeNames = ['title', 'aria-label', 'data-visible-text', 'placeholder'];
         const reactGlobalNavIdleMs = 700;
         const reactGlobalNavRetryMs = 400;
+        const maxHeaderRetryCount = 4;
         let timer = null;
         let headerObserver = null;
         let lastReactGlobalNavMutationAt = Date.now();
         let lastReactGlobalNavPortalMutationAt = Date.now();
+        let isApplyingNavTranslation = false;
+        let headerRetryCount = 0;
+        let portalRafId = 0;
+        let portalTimers = [];
+        let globalNavStaticIndex = null;
+        let cachedNavPageType = '';
+        const navLabelCache = new Map();
         const observedSurfaces = new WeakSet();
 
         function isReactGlobalNavSearchActive() {
@@ -1246,30 +2350,47 @@
                 && !isReactGlobalNavSearchActive();
         }
 
-        function findStaticGlobalNavLabel(source) {
+        function getGlobalNavStaticIndex() {
+            if (globalNavStaticIndex) return globalNavStaticIndex;
+            globalNavStaticIndex = new Map();
             const locale = I18N[CONFIG.LANG];
-            if (!locale) return null;
+            if (!locale) return globalNavStaticIndex;
 
             for (const section of Object.values(locale)) {
-                const label = section?.static?.[source];
-                if (typeof label === 'string' && label && label !== source) {
-                    return label;
+                const dict = section?.static;
+                if (!dict || typeof dict !== 'object') continue;
+                for (const [key, value] of Object.entries(dict)) {
+                    if (typeof value === 'string' && value && value !== key && !globalNavStaticIndex.has(key)) {
+                        globalNavStaticIndex.set(key, value);
+                    }
                 }
             }
+            return globalNavStaticIndex;
+        }
 
-            return null;
+        function findStaticGlobalNavLabel(source) {
+            return getGlobalNavStaticIndex().get(source) || null;
         }
 
         function findRegexpGlobalNavLabel(source) {
             const locale = I18N[CONFIG.LANG];
             if (!locale) return null;
 
-            for (const section of Object.values(locale)) {
-                for (const [pattern, replacement] of section?.regexp || []) {
-                    const match = source.match(pattern);
+            const currentRules = typeof pageConfig !== 'undefined' && Array.isArray(pageConfig?.regexpRules)
+                ? pageConfig.regexpRules
+                : [];
+            const publicRules = Array.isArray(locale.public?.regexp) ? locale.public.regexp : [];
+            const candidateRuleLists = currentRules.length ? [currentRules] : [publicRules];
+
+            for (const rules of candidateRuleLists) {
+                for (const [pattern, replacement] of rules) {
+                    const re = pattern?.global
+                        ? new RegExp(pattern.source, pattern.flags.replace('g', ''))
+                        : pattern;
+                    const match = source.match(re);
                     if (!match || match.index !== 0 || match[0] !== source) continue;
 
-                    const label = source.replace(pattern, replacement);
+                    const label = source.replace(re, replacement);
                     if (label !== source) return label;
                 }
             }
@@ -1277,12 +2398,54 @@
             return null;
         }
 
+        function isCustomGlobalNavEntry(source) {
+            return typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined'
+                && maintenanceData.entries.length
+                && Boolean(GhcnMaintenance.lookup(maintenanceData.entries, source, window.location));
+        }
+
+        function hasCustomGlobalNavWrite(node, field, value) {
+            return typeof hasCustomWrite === 'function' && typeof maintenanceData !== 'undefined'
+                && maintenanceData.entries.length && hasCustomWrite(node, field, value);
+        }
+
+        function rememberCustomGlobalNavWrite(node, field, value) {
+            if (typeof rememberCustomWrite === 'function') {
+                rememberCustomWrite(node, field, value);
+            }
+        }
+
         function resolveReactGlobalNavLabel(source) {
-            return labels[source] || findStaticGlobalNavLabel(source) || findRegexpGlobalNavLabel(source);
+            if (typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined' && maintenanceData.entries.length) {
+                const custom = GhcnMaintenance.lookup(maintenanceData.entries, source, window.location);
+                if (custom) return custom !== source ? custom : null;
+            }
+            if (!/[A-Za-z]/.test(source)) return null;
+
+            const currentType = typeof pageConfig !== 'undefined' ? (pageConfig?.currentPageType || '') : '';
+            if (cachedNavPageType !== currentType) {
+                cachedNavPageType = currentType;
+                navLabelCache.clear();
+            }
+            if (navLabelCache.has(source)) {
+                return navLabelCache.get(source);
+            }
+
+            const ownNavLabel = Object.hasOwn(labels, source) && typeof labels[source] === 'string' && labels[source] !== source
+                ? labels[source]
+                : null;
+            const resolved = ownNavLabel || findStaticGlobalNavLabel(source) || findRegexpGlobalNavLabel(source);
+            const normalizedResult = resolved && resolved !== source ? resolved : null;
+
+            if (navLabelCache.size >= 2000) {
+                navLabelCache.delete(navLabelCache.keys().next().value);
+            }
+            navLabelCache.set(source, normalizedResult);
+            return normalizedResult;
         }
 
         function normalizeReactGlobalNavText(text) {
-            return text?.replace(/\s+/g, ' ').trim();
+            return text?.replace(/[\xa0\s]+/g, ' ').trim();
         }
 
         function translateReactGlobalNavText(text) {
@@ -1291,9 +2454,19 @@
         }
 
         function translateReactGlobalNavElement(element, source) {
-            const label = translateReactGlobalNavText(source ?? element.textContent);
+            const rawText = source ?? element.textContent;
+            const normalized = normalizeReactGlobalNavText(rawText);
+            if (!normalized) return;
+            if (hasCustomGlobalNavWrite(element, 'textContent', element.textContent)) return;
+            const label = resolveReactGlobalNavLabel(normalized);
             if (label && element.textContent !== label) {
                 element.textContent = label;
+                if (isCustomGlobalNavEntry(normalized)) {
+                    rememberCustomGlobalNavWrite(element, 'textContent', label);
+                    if (element.firstChild?.nodeType === Node.TEXT_NODE) {
+                        rememberCustomGlobalNavWrite(element.firstChild, 'data', label);
+                    }
+                }
             }
         }
 
@@ -1308,17 +2481,30 @@
         function translateReactGlobalNavAttributes(element) {
             translatableAttributeNames.forEach(attributeName => {
                 const value = element.getAttribute?.(attributeName);
-                const label = translateReactGlobalNavText(value);
+                if (!value) return;
+                if (hasCustomGlobalNavWrite(element, attributeName, value)) return;
+                const normalized = normalizeReactGlobalNavText(value);
+                const label = normalized ? resolveReactGlobalNavLabel(normalized) : null;
                 if (label && value !== label) {
+                    if (isCustomGlobalNavEntry(normalized)) rememberCustomGlobalNavWrite(element, attributeName, label);
                     element.setAttribute(attributeName, label);
                 }
             });
         }
 
         function translateReactGlobalNavTextNode(node) {
-            const label = translateReactGlobalNavText(node.data);
+            if (hasCustomGlobalNavWrite(node, 'data', node.data)) return;
+            if (node.parentElement
+                && typeof node.parentElement.textContent === 'string'
+                && hasCustomGlobalNavWrite(node.parentElement, 'textContent', node.parentElement.textContent)) return;
+            const normalized = normalizeReactGlobalNavText(node.data);
+            const label = normalized ? resolveReactGlobalNavLabel(normalized) : null;
             if (label) {
-                node.data = node.data.replace(node.data.trim(), label);
+                const next = node.data.replace(node.data.trim(), () => label);
+                if (next !== node.data) {
+                    if (isCustomGlobalNavEntry(normalized)) rememberCustomGlobalNavWrite(node, 'data', next);
+                    node.data = next;
+                }
             }
         }
 
@@ -1412,7 +2598,8 @@
 
             textNodeGroups.forEach((nodes, segmentIndex) => {
                 nodes.forEach((node, nodeIndex) => {
-                    node.data = nodeIndex === 0 ? segments[segmentIndex] : '';
+                    const nextText = nodeIndex === 0 ? segments[segmentIndex] : '';
+                    if (node.data !== nextText) node.data = nextText;
                 });
             });
         }
@@ -1422,13 +2609,19 @@
             if (!header) return true;
             if (!canTranslateReactGlobalNavHeader()) return false;
 
-            document.querySelectorAll(dataContentLabelSelector).forEach(element => {
-                if (!shouldSkipReactGlobalNavNode(element)) {
-                    translateReactGlobalNavElement(element, element.getAttribute('data-content'));
-                }
-            });
-            translateReactGlobalNavSurface(header);
-            translateReactGlobalNavSearchPlaceholder();
+            isApplyingNavTranslation = true;
+            try {
+                document.querySelectorAll(dataContentLabelSelector).forEach(element => {
+                    if (!shouldSkipReactGlobalNavNode(element)) {
+                        translateReactGlobalNavElement(element, element.getAttribute('data-content'));
+                    }
+                });
+                translateReactGlobalNavSurface(header);
+                translateReactGlobalNavSearchPlaceholder();
+            } finally {
+                headerObserver?.takeRecords?.();
+                isApplyingNavTranslation = false;
+            }
 
             return true;
         }
@@ -1444,13 +2637,19 @@
             if (!surfaces.length) return true;
 
             let searchPortalPending = false;
-            surfaces.forEach(surface => {
-                if (isReactGlobalNavSearchPortal(surface) && !isReactGlobalNavSurfaceIdle('portal')) {
-                    searchPortalPending = true;
-                    return;
-                }
-                translateReactGlobalNavSurface(surface);
-            });
+            isApplyingNavTranslation = true;
+            try {
+                surfaces.forEach(surface => {
+                    if (isReactGlobalNavSearchPortal(surface) && !isReactGlobalNavSurfaceIdle('portal')) {
+                        searchPortalPending = true;
+                        return;
+                    }
+                    translateReactGlobalNavSurface(surface);
+                });
+            } finally {
+                headerObserver?.takeRecords?.();
+                isApplyingNavTranslation = false;
+            }
 
             return !searchPortalPending;
         }
@@ -1462,8 +2661,20 @@
             const headerTranslated = translateReactGlobalNavHeader();
             const portalsTranslated = translateReactGlobalNavPortals();
 
+            if (headerTranslated && portalsTranslated) {
+                headerRetryCount = 0;
+                return;
+            }
+
+            if (isReactGlobalNavSearchActive()) {
+                return;
+            }
+
             if ((options.requireSettledHeader && !headerTranslated) || !portalsTranslated) {
-                scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, options);
+                if (headerRetryCount < maxHeaderRetryCount) {
+                    headerRetryCount += 1;
+                    scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, options);
+                }
             }
         }
 
@@ -1475,20 +2686,28 @@
         function translateReactGlobalNavPortalsSoon() {
             if (!FeatureSet.enable_extension) return;
 
+            if (portalRafId && typeof window.cancelAnimationFrame === 'function') {
+                window.cancelAnimationFrame(portalRafId);
+                portalRafId = 0;
+            }
+            portalTimers.forEach(id => window.clearTimeout(id));
+            portalTimers = [];
+
             const translatePortals = () => {
                 observeReactGlobalNav();
                 translateReactGlobalNavPortals();
             };
 
-            window.requestAnimationFrame(translatePortals);
+            portalRafId = window.requestAnimationFrame(translatePortals);
             [80, 200].forEach(delay => {
-                window.setTimeout(translatePortals, delay);
+                portalTimers.push(window.setTimeout(translatePortals, delay));
             });
         }
 
         function scheduleReactGlobalNavSeries() {
+            headerRetryCount = 0;
             [800, 1600, 3000].forEach(delay => {
-                window.setTimeout(translateReactGlobalNavLabels, delay);
+                window.setTimeout(() => translateReactGlobalNavLabels({ requireSettledHeader: true }), delay);
             });
         }
 
@@ -1506,8 +2725,10 @@
         function observeReactGlobalNav() {
             if (!headerObserver) {
                 headerObserver = new MutationObserver(mutations => {
+                    if (isApplyingNavTranslation) return;
                     mutations.forEach(mutation => recordReactGlobalNavMutation(mutation.target));
-                    translateReactGlobalNavPortals();
+                    headerRetryCount = 0;
+                    translateReactGlobalNavPortalsSoon();
                     scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
                 });
             }
@@ -1545,7 +2766,12 @@
         window.addEventListener('turbo:load', scheduleReactGlobalNavSeries);
         window.addEventListener('urlchange', scheduleReactGlobalNavSeries);
         ['click', 'focusin', 'focusout', 'pointerover'].forEach(eventName => {
-            document.addEventListener(eventName, () => {
+            document.addEventListener(eventName, event => {
+                if (eventName === 'pointerover'
+                    && !event.target?.closest?.('header.GlobalNav, #__primerPortalRoot__')) {
+                    return;
+                }
+                headerRetryCount = 0;
                 translateReactGlobalNavPortalsSoon();
                 scheduleReactGlobalNavTranslation(reactGlobalNavRetryMs, { requireSettledHeader: true });
             }, true);
@@ -1666,12 +2892,30 @@
     }
 
     /**
-     * transTitle 函数：翻译页面标题
+     * 仅翻译当前页面明确列出的属性原文，并可进一步限定路径。
      */
+    function transPageAttributes(node, rules) {
+        for (const [selector, name, translations, pathname] of rules) {
+            const text = node.getAttribute(name);
+            if (!text) continue;
+            if (maintenanceData.entries.length && hasCustomWrite(node, name, text)) continue;
+            const normalized = GhcnMaintenance.normalize ? GhcnMaintenance.normalize(text) : text.trim().replace(/[\xa0\s]+/g, ' ');
+            const custom = GhcnMaintenance.lookup(maintenanceData.entries, normalized, window.location);
+            const translated = custom || translations[text];
+            // 使用当前路径，避免 SPA 从议题视图返回列表后继续沿用视图排序规则。
+            if (typeof translated === 'string' && translated !== text
+                && (!pathname || pathname.test(window.location.pathname)) && node.matches(selector)) {
+                if (custom) rememberCustomWrite(node, name, translated);
+                node.setAttribute(name, translated);
+            }
+        }
+    }
+
+    /** 翻译页面标题。 */
     function transTitle() {
         if (!FeatureSet.enable_extension) return;
         const text = document.title; // 获取标题文本内容
-        let translatedText = pageConfig.titleStaticDict[text] || '';
+        let translatedText = Object.hasOwn(pageConfig.titleStaticDict, text) ? pageConfig.titleStaticDict[text] : '';
         if (!translatedText) {
             for (const [pattern, replacement] of pageConfig.titleRegexpRules) {
                 translatedText = text.replace(pattern, replacement);
@@ -1712,10 +2956,16 @@
         if (!FeatureSet.enable_extension) return false;
         const text = el[field]; // 获取需要翻译的文本
         if (!text) return false; // 当 text 为空时，退出函数
+        if (maintenanceData.entries.length && hasCustomWrite(el, field, text)) return false;
 
         const translatedText = transText(text); // 翻译后的文本
         if (translatedText) {
+            if (GhcnMaintenance.lookup(maintenanceData.entries, text.trim().replace(/[\xa0\s]+/g, ' '), window.location)) rememberCustomWrite(el, field, translatedText);
             el[field] = translatedText; // 替换翻译后的内容
+        } else {
+            const element = el.nodeType === Node.TEXT_NODE ? el.parentElement : el;
+            if (element?.closest?.('button, [role="button"], [role="menuitem"], [role="tab"], label')
+                && !element.closest('article, .markdown-body, .comment-body, input, textarea, [contenteditable], [data-hovercard-type], .AppHeader-context, [role="listbox"], [role="option"]')) recordUiMiss(text);
         }
     }
 
@@ -1725,6 +2975,17 @@
      * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
      */
     function transText(text) {
+        const trimmedText = text.trim(); // 去除首尾空格
+        if (!trimmedText) return false;
+        const cleanedText = trimmedText.replace(/\xa0|[\s]+/g, ' '); // 去除多余空白字符（包括 &nbsp; 空格 换行符）
+
+        if (typeof GhcnMaintenance !== 'undefined' && typeof maintenanceData !== 'undefined') {
+            const customTranslation = GhcnMaintenance.lookup(maintenanceData.entries, cleanedText, window.location);
+            if (customTranslation && customTranslation !== cleanedText) {
+                return text.replace(trimmedText, () => customTranslation);
+            }
+        }
+
         // 判断是否需要跳过翻译
         //  1. 检查内容是否为空或者仅包含空白字符或数字。
         //  2. 检查内容是否仅包含中文字符。
@@ -1732,16 +2993,12 @@
         const shouldSkip = text => /^[\s0-9]*$/.test(text) || /^[\u4e00-\u9fa5]+$/.test(text) || !/[a-zA-Z,.]/.test(text);
         if (shouldSkip(text)) return false;
 
-        // 清理文本内容
-        const trimmedText = text.trim(); // 去除首尾空格
-        const cleanedText = trimmedText.replace(/\xa0|[\s]+/g, ' '); // 去除多余空白字符（包括 &nbsp; 空格 换行符）
-
         // 尝试获取翻译结果
         const translatedText = fetchTranslatedText(cleanedText);
 
         // 如果找到翻译并且不与清理后的文本相同，则返回替换后的结果
         if (translatedText && translatedText !== cleanedText) {
-            return text.replace(trimmedText, translatedText); // 替换原字符，保留首尾空白部分
+            return text.replace(trimmedText, () => translatedText); // 替换原字符，保留首尾空白部分
         }
 
         return false;
@@ -1753,14 +3010,23 @@
      * @returns {string|boolean} 翻译后的文本内容，如果没有找到对应的翻译，那么返回 false。
      */
     function fetchTranslatedText(text) {
+        const custom = GhcnMaintenance.lookup(maintenanceData.entries, text, window.location);
+        if (custom) return custom;
         const cachedText = pageConfig.textCache.get(text);
         if (cachedText !== undefined) return cachedText;
 
+        const cacheSet = (key, value) => {
+            if (!pageConfig.textCache.has(key) && pageConfig.textCache.size >= 5000) {
+                pageConfig.textCache.delete(pageConfig.textCache.keys().next().value);
+            }
+            pageConfig.textCache.set(key, value);
+        };
+
         // 静态翻译
-        let translatedText = pageConfig.staticDict[text]; // 默认翻译 公共部分
+        let translatedText = Object.hasOwn(pageConfig.staticDict, text) ? pageConfig.staticDict[text] : undefined; // 默认翻译 公共部分
 
         if (typeof translatedText === 'string') {
-            pageConfig.textCache.set(text, translatedText);
+            cacheSet(text, translatedText);
             return translatedText;
         }
 
@@ -1768,12 +3034,12 @@
         for (const [pattern, replacement] of pageConfig.regexpRules) {
             translatedText = text.replace(pattern, replacement);
             if (translatedText !== text) {
-                pageConfig.textCache.set(text, translatedText);
+                cacheSet(text, translatedText);
                 return translatedText;
             }
         }
 
-        pageConfig.textCache.set(text, false);
+        cacheSet(text, false);
         return false; // 没有翻译条目
     }
 
@@ -1914,6 +3180,26 @@
                 };
             }
 
+            case 'index_translate': {
+                const rawUrl = normalizeUrl(FeatureSet.readme_index_translate_api_url);
+                const url = normalizeOpenAiEndpoint(rawUrl);
+                const key = (FeatureSet.readme_index_translate_api_key || '').trim();
+                const model = (FeatureSet.readme_index_translate_model || '').trim();
+                if (!url || !model) {
+                    return { ok: false, message: '哔哩哔哩翻译需要 API 地址与模型名（API Key 可留空）。' };
+                }
+
+                return {
+                    ok: true,
+                    provider,
+                    targetLang,
+                    url,
+                    key,
+                    model,
+                    signature: `${provider}|${targetLang}|${url}|${model}|${createHash(key)}`,
+                };
+            }
+
             case 'openai':
             case 'openai_compatible':
             case 'deepseek':
@@ -1963,15 +3249,16 @@
 
         const hostname = parsedUrl.hostname.toLowerCase();
         const path = parsedUrl.pathname.replace(/\/+$/, '');
+        const search = parsedUrl.search || '';
         if (/\/chat\/completions$/i.test(path)) {
-            return `${parsedUrl.origin}${path}`;
+            return `${parsedUrl.origin}${path}${search}`;
         }
 
         if (!path) {
-            return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions`;
+            return `${parsedUrl.origin}${getProviderDefaultBasePath(hostname)}/chat/completions${search}`;
         }
 
-        return `${parsedUrl.origin}${path}/chat/completions`;
+        return `${parsedUrl.origin}${path}/chat/completions${search}`;
     }
 
     function parseApiUrl(url) {
@@ -2051,7 +3338,7 @@
         });
 
         return {
-            translations: (data?.data?.translations || []).map(item => decodeHtmlEntities(normalizeTranslationText(item?.translatedText ?? item))),
+            translations: (data?.data?.translations || []).map(item => normalizeTranslationText(item?.translatedText ?? item)),
             tokens: 0,
         };
     }
@@ -2137,23 +3424,35 @@
         };
         applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (providerConfig.key) {
+            headers.Authorization = `Bearer ${providerConfig.key}`;
+        }
+
         const data = await proxyFetchJson({
             url: providerConfig.url,
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${providerConfig.key}`,
-            },
+            headers,
             body: JSON.stringify(payload),
         });
 
         const firstChoice = data?.choices?.[0] || {};
         const raw = extractChatMessageContent(firstChoice);
+        const tokens = getReadmeUsageTokens(data);
 
-        return {
-            translations: parseOpenAiArray(raw, texts.length),
-            tokens: getReadmeUsageTokens(data),
-        };
+        try {
+            return {
+                translations: parseOpenAiArray(raw, texts.length),
+                tokens,
+            };
+        } catch (error) {
+            if (error && typeof error === 'object') {
+                error.tokens = tokens;
+            }
+            throw error;
+        }
     }
 
     function extractChatMessageContent(messageOrChoice) {
@@ -2171,17 +3470,21 @@
             throw createRecoverableTranslationError('OpenAI 兼容接口返回内容无效。');
         }
 
-        const start = text.indexOf('[');
-        const end = text.lastIndexOf(']');
-        if (start !== -1 && end !== -1 && end > start) {
-            text = text.slice(start, end + 1);
-        }
-
         let parsed;
         try {
             parsed = JSON.parse(text);
         } catch {
-            throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+            const start = text.indexOf('[');
+            const end = text.lastIndexOf(']');
+            if (start !== -1 && end !== -1 && end > start) {
+                try {
+                    parsed = JSON.parse(text.slice(start, end + 1));
+                } catch {
+                    throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+                }
+            } else {
+                throw createRecoverableTranslationError('OpenAI 兼容接口返回内容不是合法 JSON 数组。');
+            }
         }
 
         if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
@@ -2212,7 +3515,7 @@
     }
 
     function stripOpenAiReasoningBlocks(text) {
-        return String(text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        return String(text || '').replace(/^(?:\s*<think>[\s\S]*?<\/think>)+/i, '').trim();
     }
 
     function sendProxyMessageOnce(request) {
@@ -2245,13 +3548,14 @@
         // “Could not establish connection / message channel closed”，短暂退避后重试。
         // 注意：仅对“消息未送达后台”的瞬时失败重试；上下文失效需刷新页面，不重试。
         const maxAttempts = 3;
+        const isConnectError = (error) => /Could not establish connection|Receiving end does not exist/i.test(error?.message || '');
         let response;
         for (let attempt = 1; ; attempt += 1) {
             try {
                 response = await sendProxyMessageOnce(request);
                 break;
             } catch (error) {
-                if (isExtensionContextInvalidatedError(error) || attempt >= maxAttempts) {
+                if (isExtensionContextInvalidatedError(error) || !isConnectError(error) || attempt >= maxAttempts) {
                     throw error;
                 }
                 await new Promise((resolve) => window.setTimeout(resolve, 150 * attempt));
@@ -2262,7 +3566,8 @@
             throw new Error('翻译请求失败：后台未返回响应。');
         }
 
-        const { ok, status, statusText, body, error } = response;
+        const { ok, status, statusText, body, error, userMessage } = response;
+        if (userMessage) throw new Error(userMessage);
         if (!ok) {
             const details = body ? truncateText(body, 200) : (error || 'unknown error');
             throw new Error(`翻译请求失败 (${status} ${statusText}): ${details}`);
@@ -2293,7 +3598,14 @@
     function applyOpenAiCompatibleRequestOptions(payload, providerConfig) {
         if (!payload) return payload;
 
-        if (isDeepSeekEndpoint(providerConfig?.url) || isKimiEndpoint(providerConfig?.url)) {
+        // 兼容官方端点、本地桥接及使用原模型名的中转接口。
+        const isIndexTranslate = providerConfig?.provider === 'index_translate'
+            || getProviderHost(providerConfig?.url) === 'index-translate.bilibili.com'
+            || /(?:^|\/)Index-Translate(?:-|$)/i.test(String(providerConfig?.model || '').trim());
+        if (isIndexTranslate) {
+            payload.stream = false;
+            payload.chat_template_kwargs = { ...payload.chat_template_kwargs, enable_thinking: false };
+        } else if (isDeepSeekEndpoint(providerConfig?.url) || isKimiEndpoint(providerConfig?.url)) {
             payload.stream = false;
             payload.thinking = { type: 'disabled' };
         } else if (isQwenEndpoint(providerConfig?.url)) {
@@ -2314,6 +3626,76 @@
     // [Module] providers/dispatcher.js
     // ==========================================================================
 
+    function setBoundedTranslationCache(key, value) {
+        if (!readmeRuntime.translationCache) return;
+        if (!readmeRuntime.translationCache.has(key) && readmeRuntime.translationCache.size >= 2000) {
+            readmeRuntime.translationCache.delete(readmeRuntime.translationCache.keys().next().value);
+        }
+        readmeRuntime.translationCache.set(key, value);
+    }
+
+    function addBoundedPreservedCache(key) {
+        if (!readmeRuntime.preservedCache) return;
+        if (!readmeRuntime.preservedCache.has(key) && readmeRuntime.preservedCache.size >= 1000) {
+            readmeRuntime.preservedCache.delete(readmeRuntime.preservedCache.keys().next().value);
+        }
+        readmeRuntime.preservedCache.add(key);
+    }
+
+    function isPlausiblePreservedText(text) {
+        const input = String(text || '').trim();
+        if (!input) return false;
+        if (typeof isLikelyOpaqueReadmeLabel === 'function' && isLikelyOpaqueReadmeLabel(input)) return true;
+        const normalizedVs = input.replace(/\bvs\.\s+(?=[A-Z])/gi, 'vs ');
+        if (normalizedVs.length > 80 || /[.!?]$/.test(normalizedVs) || /[.!?]\s+[A-Z]/.test(normalizedVs)) return false;
+
+        const tokens = normalizedVs.split(/\s+/).filter(Boolean);
+        if (!tokens.length || tokens.length > 12) return false;
+
+        const isConnector = (token) => /^(?:[+&/|·•–—×-]|vs\.?)$/i.test(token);
+        if (isConnector(tokens[0]) || isConnector(tokens[tokens.length - 1])) return false;
+
+        let hasConnector = false;
+        let prevWasConnector = false;
+        const words = [];
+        for (const token of tokens) {
+            if (isConnector(token)) {
+                if (prevWasConnector) return false;
+                hasConnector = true;
+                prevWasConnector = true;
+            } else {
+                prevWasConnector = false;
+                words.push(token);
+            }
+        }
+        if (!words.length || words.length > (hasConnector ? 8 : 5)) return false;
+
+        const proseIndicators = new Set([
+            'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'will', 'would', 'should',
+            'could', 'can', 'may', 'might', 'must', 'have', 'has', 'had', 'do', 'does', 'did',
+            'to', 'of', 'in', 'on', 'at', 'by', 'with', 'from', 'as', 'if', 'when', 'where',
+            'why', 'how', 'that', 'this', 'these', 'those', 'it', 'its', 'you', 'your', 'we',
+            'our', 'please', 'click', 'run', 'install', 'see', 'read', 'use', 'using', 'support',
+            'supports', 'allow', 'allows', 'require', 'requires', 'provide', 'provides', 'return',
+            'returns', 'fail', 'fails', 'pending', 'sentence', 'properly', 'following', 'command',
+            'more', 'less', 'about', 'only', 'also', 'here', 'there', 'now', 'then',
+            'fast', 'simple', 'easy', 'reliable', 'flexible', 'powerful', 'lightweight',
+            'getting', 'started', 'quick', 'overview', 'features', 'license', 'roadmap',
+            'changelog', 'contributing', 'documentation', 'download', 'downloads', 'troubleshooting',
+        ]);
+        if (words.some((w) => proseIndicators.has(w.toLowerCase().replace(/[^a-z]/g, '')))) {
+            return false;
+        }
+        return words.every((w) => {
+            const clean = w.replace(/^[(\[]+|[)\]:,]+$/g, '');
+            return /^[A-Z0-9][A-Za-z0-9.+_-]*$/.test(clean)
+                || /^[a-z]{1,4}[A-Z][A-Za-z0-9.+_-]*$/.test(clean)
+                || /^[b-df-hj-np-tv-xz]{2,10}$/.test(clean)
+                || /^[a-z][a-z0-9]*\d[a-z0-9]*$/.test(clean)
+                || /^(?:v\d[\w.-]*|cli|api|sdk|ui|ai|ml|db|os|io|js|ts|py|go|rs|x64|x86(?:_64)?|amd64|arm64|aarch64|armhf|armv7|i386|i686|ppc64le|s390x|riscv64|mips64|wasm(?:32|64)?)$/i.test(clean);
+        });
+    }
+
     async function translateTextsWithProvider(texts, providerConfig, options = {}) {
         const translatedMap = new Map();
         const uncached = [];
@@ -2328,6 +3710,8 @@
 
             if (!preferSingleItem && isUsableTranslation(text, cached)) {
                 translatedMap.set(text, cached);
+            } else if (!preferSingleItem && readmeRuntime.preservedCache?.has(cacheKey)) {
+                translatedMap.set(text, text);
             } else {
                 if (cached && isObjectObjectArtifact(cached)) {
                     readmeRuntime.translationCache.delete(cacheKey);
@@ -2343,18 +3727,22 @@
         const maxBatchChars = preferSingleItem
             ? Number.MAX_SAFE_INTEGER
             : (usesAiBatchLimits ? README_CONFIG.OPENAI_MAX_BATCH_CHARS : README_CONFIG.MAX_BATCH_CHARS);
+        const requestedConcurrency = Number(options.concurrency);
+        const batchConcurrency = Number.isFinite(requestedConcurrency) && requestedConcurrency >= 1
+            ? Math.floor(requestedConcurrency)
+            : (preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY);
         const batches = buildBatches(uncached, maxBatchItems, maxBatchChars);
         addReadmeDebugEvent(debugContext, 'batches_created', {
             batchPhase: debugPhase,
             inputCount: texts.length,
             uncachedCount: uncached.length,
             batchCount: batches.length,
-            concurrency: preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY,
+            concurrency: batchConcurrency,
             batchSizes: batches.map((batch) => batch.length),
         });
         const batchResults = await mapWithConcurrency(
             batches,
-            preferSingleItem ? 2 : README_CONFIG.TRANSLATION_CONCURRENCY,
+            batchConcurrency,
             async (batch, batchIndex) => {
                 const startedAt = Date.now();
                 addReadmeDebugEvent(debugContext, 'batch_start', {
@@ -2370,18 +3758,28 @@
                 try {
                     const batchResult = await translateBatchWithFallback(batch, providerConfig);
                     const batchTranslations = batchResult.translations;
+                    const degradedFlags = batchResult.degradedFlags || batch.map(() => false);
                     let translatedItems = 0;
+                    let extraTokens = 0;
                     const missedItems = [];
+                    const preservedItems = [];
 
                     for (let index = 0; index < batch.length; index += 1) {
                         const text = batch[index];
+                        const degraded = Boolean(degradedFlags[index]);
                         let translated = normalizeTranslationText(batchTranslations[index]);
+                        let retryDegraded = false;
+                        let retryRan = false;
 
-                        if (!isUsableTranslation(text, translated)) {
+                        if (!degraded && !isUsableTranslation(text, translated) && batch.length > 1) {
+                            retryRan = true;
                             try {
                                 const retry = await translateBatchWithFallback([text], providerConfig);
+                                extraTokens += retry.tokens;
+                                retryDegraded = Boolean(retry.degradedFlags?.[0]);
                                 translated = normalizeTranslationText(retry.translations[0]);
                             } catch (error) {
+                                retryDegraded = true;
                                 if (isExtensionContextInvalidatedError(error)) {
                                     throw error;
                                 }
@@ -2391,9 +3789,20 @@
 
                         const cacheKey = `${providerConfig.signature}|${text}`;
                         if (isUsableTranslation(text, translated)) {
-                            readmeRuntime.translationCache.set(cacheKey, translated);
+                            readmeRuntime.preservedCache?.delete(cacheKey);
+                            setBoundedTranslationCache(cacheKey, translated);
                             translatedMap.set(text, translated);
                             translatedItems += 1;
+                        } else if (!degraded
+                            && (!retryRan || !retryDegraded)
+                            && translated === text
+                            && isPlausiblePreservedText(text)) {
+                            addBoundedPreservedCache(cacheKey);
+                            translatedMap.set(text, text);
+                            preservedItems.push({
+                                textHash: createHash(text),
+                                textPreview: sanitizeReadmeDebugText(text),
+                            });
                         } else {
                             translatedMap.set(text, text);
                             missedItems.push({
@@ -2403,16 +3812,18 @@
                         }
                     }
 
+                    const batchTotalTokens = batchResult.tokens + extraTokens;
                     addReadmeDebugEvent(debugContext, 'batch_end', {
                         batchPhase: debugPhase,
                         batch: batchIndex,
                         itemCount: batch.length,
                         translatedItems,
+                        preservedItems,
                         missedItems,
-                        tokens: batchResult.tokens,
+                        tokens: batchTotalTokens,
                         durationMs: Math.max(0, Date.now() - startedAt),
                     });
-                    return batchResult.tokens;
+                    return batchTotalTokens;
                 } catch (error) {
                     addReadmeDebugEvent(debugContext, 'batch_failed', {
                         batchPhase: debugPhase,
@@ -2439,14 +3850,20 @@
 
         const results = new Array(values.length);
         let nextIndex = 0;
+        let aborted = false;
         const workerCount = Math.min(values.length, Math.max(1, Number(concurrency) || 1));
 
         const runWorker = async () => {
-            while (true) {
+            while (!aborted) {
                 const index = nextIndex;
                 nextIndex += 1;
                 if (index >= values.length) return;
-                results[index] = await worker(values[index], index);
+                try {
+                    results[index] = await worker(values[index], index);
+                } catch (error) {
+                    aborted = true;
+                    throw error;
+                }
             }
         };
 
@@ -2462,20 +3879,45 @@
         return error;
     }
 
-    async function translateBatchWithFallback(batch, providerConfig) {
+    function isTransientGatewayError(error) {
+        if (!error || (typeof isExtensionContextInvalidatedError === 'function' && isExtensionContextInvalidatedError(error))) {
+            return false;
+        }
+        const message = String(error?.message || error || '');
+        if (/HTML 页面/.test(message)) return false;
+        return /\(\s*(?:502|503|504)\b/.test(message)
+            || /UNEXPECTED_EOF_WHILE_READING|ECONNRESET/i.test(message);
+    }
+
+    async function translateBatchWithFallback(batch, providerConfig, options = {}) {
+        const gatewayRetriesLeft = Number.isInteger(options.gatewayRetriesLeft) ? options.gatewayRetriesLeft : 1;
         try {
             const result = await translateBatch(batch, providerConfig);
             const translations = result?.translations;
             const tokens = Math.max(0, Number(result?.tokens) || 0);
 
             if (!Array.isArray(translations) || translations.length !== batch.length) {
-                throw createRecoverableTranslationError('翻译结果数量与请求数量不一致，请检查接口配置。');
+                const err = createRecoverableTranslationError('翻译结果数量与请求数量不一致，请检查接口配置。');
+                err.tokens = tokens;
+                throw err;
             }
             return {
                 translations,
+                degradedFlags: batch.map(() => false),
                 tokens,
             };
         } catch (error) {
+            if (gatewayRetriesLeft > 0 && isTransientGatewayError(error)) {
+                const waitMs = 350;
+                const delayFn = (typeof window !== 'undefined' && typeof window.setTimeout === 'function')
+                    ? window.setTimeout.bind(window)
+                    : setTimeout;
+                await new Promise((resolve) => delayFn(resolve, waitMs));
+                return translateBatchWithFallback(batch, providerConfig, {
+                    gatewayRetriesLeft: gatewayRetriesLeft - 1,
+                });
+            }
+
             const isAiProvider = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
 
             // 仅对 AI 接口的“内容/解析类”错误做降级；网络/鉴权/配置等错误继续上抛，
@@ -2487,16 +3929,22 @@
             // 单条仍失败：降级为原文占位（交由上层单条重试与补翻译 pass 处理），
             // 关键是让二分中已翻好的兄弟条目不再被一条坏内容连坐丢失。
             if (batch.length <= 1) {
-                return { translations: batch.slice(), tokens: 0 };
+                return {
+                    translations: batch.slice(),
+                    degradedFlags: batch.map(() => true),
+                    tokens: Math.max(0, Number(error?.tokens) || 0),
+                };
             }
 
             // OpenAI 兼容接口在部分平台上会因 JSON 输出不稳定导致整批失败，二分缩小坏条目的影响范围。
+            const parentTokens = Math.max(0, Number(error?.tokens) || 0);
             const midpoint = Math.ceil(batch.length / 2);
             const left = await translateBatchWithFallback(batch.slice(0, midpoint), providerConfig);
             const right = await translateBatchWithFallback(batch.slice(midpoint), providerConfig);
             return {
                 translations: [...left.translations, ...right.translations],
-                tokens: left.tokens + right.tokens,
+                degradedFlags: [...left.degradedFlags, ...right.degradedFlags],
+                tokens: parentTokens + left.tokens + right.tokens,
             };
         }
     }
@@ -2540,6 +3988,7 @@
                 return translateWithAzure(texts, providerConfig);
             case 'qwen_mt':
                 return translateWithQwenMt(texts, providerConfig);
+            case 'index_translate':
             case 'openai':
             case 'openai_compatible':
             case 'deepseek':
@@ -2588,14 +4037,19 @@
 
     function getReadmeRootElement() {
         for (const selector of README_CONFIG.ROOT_SELECTORS) {
-            const element = document.querySelector(selector);
-            if (!element) continue;
-            // 避免在议题/PR 等页面误选普通 markdown 正文
-            if (element.closest('.js-comment-body, [data-testid="markdown-body"], .comment-body')) {
-                continue;
-            }
+            const elements = typeof document.querySelectorAll === 'function'
+                ? document.querySelectorAll(selector)
+                : [document.querySelector(selector)].filter(Boolean);
+            for (const element of elements) {
+                if (!element) continue;
+                if (element.closest?.('[data-ghcn-chinese-readme]')) continue;
+                // 避免在议题/PR 等页面误选普通 markdown 正文
+                if (element.closest?.('.js-comment-body, [data-testid="markdown-body"], .comment-body')) {
+                    continue;
+                }
 
-            return element;
+                return element;
+            }
         }
 
         return null;
@@ -2631,11 +4085,22 @@
         }
 
         const startAt = performance.now();
+        const expectedHref = window.location.href;
+        const runEpoch = readmeRuntime.runEpoch || 0;
+        const initialAboutEnabled = Boolean(FeatureSet.enable_readme_translation);
+        const isAboutRunValid = () => (readmeRuntime.runEpoch || 0) === runEpoch
+            && FeatureSet.enable_extension
+            && (!initialAboutEnabled || FeatureSet.enable_readme_translation)
+            && window.location.href === expectedHref
+            && aboutElements.some((el) => el.isConnected);
+
         const repoInfo = getCurrentRepoInfo();
         const elementsWithTasks = [];
 
         for (const aboutEl of aboutElements) {
-            const tasks = collectReadmeTextTasks(aboutEl);
+            const tasks = collectReadmeTextTasks(aboutEl)
+                .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node))
+                .filter((task) => !isLikelyTechnicalReadmeText(task.normalizedText, task.node));
             if (tasks.length) {
                 elementsWithTasks.push({ aboutEl, tasks });
             }
@@ -2658,13 +4123,19 @@
         let totalTokens = 0;
 
         if (cacheKey) {
-            const cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true }).catch(() => null);
+            const cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true }).catch((error) => {
+                if (isExtensionContextInvalidatedError(error)) throw error;
+                return null;
+            });
+            if (!isAboutRunValid()) return 0;
             if (cached?.translatedHtml) {
                 try {
                     const cachedData = JSON.parse(cached.translatedHtml);
                     if (cachedData?.translations && typeof cachedData.translations === 'object') {
+                        hydrateReadmePreservedCache(signature, cached.preservedTexts);
                         const translatedMap = new Map(Object.entries(cachedData.translations));
                         for (const { aboutEl, tasks } of elementsWithTasks) {
+                            if (!aboutEl.isConnected) continue;
                             const tasksByText = new Map();
                             tasks.forEach((task) => {
                                 if (!tasksByText.has(task.normalizedText)) {
@@ -2686,7 +4157,9 @@
                             sourceHash,
                             detail: 'about_cache_hit',
                         }).catch((error) => {
-                            console.warn('[About翻译] 写入缓存记录失败:', error);
+                            if (!isExtensionContextInvalidatedError(error)) {
+                                console.warn('[About翻译] 写入缓存记录失败:', error);
+                            }
                         });
 
                         return translatedCount;
@@ -2697,13 +4170,16 @@
             }
         }
 
+        if (!isAboutRunValid()) return 0;
         const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig, {
             debugContext,
             debugPhase: 'about',
         });
         totalTokens = tokens;
+        if (!isAboutRunValid()) return 0;
 
         for (const { aboutEl, tasks } of elementsWithTasks) {
+            if (!aboutEl.isConnected) continue;
             const tasksByText = new Map();
             tasks.forEach((task) => {
                 if (!tasksByText.has(task.normalizedText)) {
@@ -2716,10 +4192,26 @@
             aboutEl.setAttribute('data-ghcn-about-translated', 'true');
         }
 
+        const preservedAboutTexts = [];
+        let unresolvedAboutCount = 0;
+        allTasks.forEach((task) => {
+            if (!task.node?.isConnected) return;
+            const liveText = normalizeText(task.node.data || '');
+            if (liveText !== task.normalizedText) return;
+            if (readmeRuntime.preservedCache?.has(`${signature}|${task.normalizedText}`)) {
+                if (!preservedAboutTexts.includes(task.normalizedText)) {
+                    preservedAboutTexts.push(task.normalizedText);
+                }
+                return;
+            }
+            unresolvedAboutCount += 1;
+        });
+        const isAboutComplete = unresolvedAboutCount === 0;
+
         addReadmeDebugEvent(debugContext, 'about_end', { translatedCount });
 
-        if (translatedCount > 0) {
-            if (cacheKey) {
+        if (translatedCount > 0 || totalTokens > 0) {
+            if (cacheKey && isAboutComplete) {
                 const cachePayload = {
                     translations: Object.fromEntries(translatedMap),
                 };
@@ -2727,21 +4219,26 @@
                     repo: repoInfo?.fullName || '',
                     sourceHash,
                     translatedHtml: JSON.stringify(cachePayload),
-                    complete: translatedCount >= allTasks.length,
+                    complete: true,
+                    preservedTexts: preservedAboutTexts,
                 }).catch((error) => {
-                    console.warn('[About翻译] 写入缓存失败:', error);
+                    if (!isExtensionContextInvalidatedError(error)) {
+                        console.warn('[About翻译] 写入缓存失败:', error);
+                    }
                 });
             }
 
             await appendReadmeTranslationRecord({
                 sourceType: 'about',
-                status: 'success',
+                status: isAboutComplete ? 'success' : 'partial',
                 tokens: totalTokens,
                 durationMs: performance.now() - startAt,
                 sourceHash,
                 detail: `about_translated_nodes=${translatedCount}`,
             }).catch((error) => {
-                console.warn('[About翻译] 写入翻译记录失败:', error);
+                if (!isExtensionContextInvalidatedError(error)) {
+                    console.warn('[About翻译] 写入翻译记录失败:', error);
+                }
             });
         }
 
@@ -2897,15 +4394,39 @@
         };
 
         try {
-            const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, []);
-            const logs = Array.isArray(existing) ? existing : [];
-            logs.push(entry);
-            await setLocalValue(
-                README_LOCAL_STORAGE_KEYS.DEBUG_LOGS,
-                logs.slice(-README_CONFIG.DEBUG_LOG_MAX_ENTRIES),
-            );
+            const writeLogs = async () => {
+                const existing = await getLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, []);
+                const logs = Array.isArray(existing) ? [...existing] : [];
+                logs.push(entry);
+                const sliced = logs.slice(-README_CONFIG.DEBUG_LOG_MAX_ENTRIES);
+                const budgeted = typeof trimEntriesToByteBudget === 'function'
+                    ? (() => {
+                        const copy = [...sliced];
+                        while (copy.length > 1 && estimateJsonUtf8Bytes(copy) > DEBUG_LOGS_MAX_BYTES) {
+                            copy.shift();
+                        }
+                        return copy;
+                    })()
+                    : sliced;
+                if (typeof setLocalValueWithQuotaRetry === 'function') {
+                    await setLocalValueWithQuotaRetry(
+                        README_LOCAL_STORAGE_KEYS.DEBUG_LOGS,
+                        budgeted,
+                        (list) => list.slice(-Math.max(1, Math.floor(list.length / 2))),
+                    );
+                } else {
+                    await setLocalValue(README_LOCAL_STORAGE_KEYS.DEBUG_LOGS, budgeted);
+                }
+            };
+            if (typeof enqueueLocalStorageWrite === 'function') {
+                await enqueueLocalStorageWrite(writeLogs);
+            } else {
+                await writeLogs();
+            }
         } catch (error) {
-            console.warn('[README翻译调试] 保存调试日志失败:', error);
+            if (!isExtensionContextInvalidatedError(error)) {
+                console.warn('[README翻译调试] 保存调试日志失败:', error);
+            }
         }
     }
 
@@ -2937,23 +4458,42 @@
     function refreshReadmeTextTaskNodes(rootEl, tasks) {
         if (!rootEl || !tasks.length) return tasks;
 
-        const liveTasks = collectReadmeTextTasks(rootEl);
-        const liveByText = new Map();
-        liveTasks.forEach((task) => {
-            if (!liveByText.has(task.normalizedText)) {
-                liveByText.set(task.normalizedText, []);
+        const usedNodes = new Set();
+        const resolved = tasks.map((task) => {
+            const node = task?.node;
+            const inRoot = typeof rootEl.contains !== 'function' || rootEl.contains(node);
+            const matchesText = node && normalizeText(node.data || '') === task.normalizedText;
+            if (node?.isConnected && inRoot && matchesText && !usedNodes.has(node)) {
+                usedNodes.add(node);
+                return task;
             }
-            liveByText.get(task.normalizedText).push(task);
+            return null;
         });
 
-        const usedNodes = new Set();
+        if (resolved.every(Boolean)) {
+            return resolved;
+        }
+
+        const liveByText = new Map();
+        collectReadmeTextTasks(rootEl)
+            .filter((liveTask) => !isLikelyTechnicalReadmeText(liveTask.normalizedText, liveTask.node))
+            .forEach((liveTask) => {
+                if (!liveByText.has(liveTask.normalizedText)) {
+                    liveByText.set(liveTask.normalizedText, []);
+                }
+                liveByText.get(liveTask.normalizedText).push(liveTask);
+            });
+
         const refreshed = [];
+        tasks.forEach((task, index) => {
+            const existing = resolved[index];
+            if (existing) {
+                refreshed.push(existing);
+                return;
+            }
 
-        tasks.forEach((task) => {
             const candidates = liveByText.get(task.normalizedText) || [];
-            const replacement = candidates.find((candidate) => !usedNodes.has(candidate.node))
-                || (task.node?.isConnected ? task : null);
-
+            const replacement = candidates.find((candidate) => !usedNodes.has(candidate.node));
             if (replacement?.node) {
                 usedNodes.add(replacement.node);
                 refreshed.push(replacement);
@@ -2977,24 +4517,108 @@
 
     function applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
         let translatedCount = 0;
+        const translatableTasks = [];
 
         texts.forEach((text) => {
             const translated = normalizeTranslationText(translatedMap.get(text));
             if (!isUsableTranslation(text, translated)) return;
+            (tasksByText.get(text) || []).forEach((task) => translatableTasks.push(task));
+        });
+        if (!translatableTasks.length) return 0;
 
-            const tasks = refreshReadmeTextTaskNodes(rootEl, tasksByText.get(text) || []);
-            tasks.forEach((task) => {
-                if (!task.node?.isConnected) return;
-                task.node.data = task.rawText.replace(task.trimmedText, translated);
-                translatedCount += 1;
-            });
+        refreshReadmeTextTaskNodes(rootEl, translatableTasks).forEach((task) => {
+            const translated = normalizeTranslationText(translatedMap.get(task.normalizedText));
+            if (!isUsableTranslation(task.normalizedText, translated)) return;
+            if (!task.node?.isConnected) return;
+            task.node.data = task.rawText.replace(task.trimmedText, () => translated);
+            translatedCount += 1;
         });
 
         return translatedCount;
     }
 
+    function sanitizeCachedHtmlTree(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') return;
+
+        root.querySelectorAll('script, style, iframe, object, embed, form, base, meta, link, template, turbo-frame, turbo-stream')
+            .forEach((node) => node.remove());
+
+        const baseHref = typeof window !== 'undefined' && window.location?.href
+            ? window.location.href
+            : 'https://github.com/';
+        const elements = root.nodeType === 1 ? [root, ...root.querySelectorAll('*')] : [...root.querySelectorAll('*')];
+        for (const el of elements) {
+            if (el.attributes && typeof el.attributes[Symbol.iterator] === 'function') {
+                for (const attr of [...el.attributes]) {
+                    const attrName = String(attr.name || '').toLowerCase();
+                    if (/^on/i.test(attrName)
+                        || attrName === 'srcdoc'
+                        || attrName === 'formaction'
+                        || attrName.startsWith('data-turbo-')
+                        || attrName === 'data-action'
+                        || attrName === 'data-remote'
+                        || attrName === 'data-method') {
+                        el.removeAttribute(attr.name);
+                    }
+                }
+            }
+
+            for (const urlAttr of ['href', 'src', 'xlink:href', 'poster']) {
+                if (!el.hasAttribute?.(urlAttr)) continue;
+                const raw = String(el.getAttribute(urlAttr) || '').trim();
+                if (!raw) {
+                    el.removeAttribute(urlAttr);
+                    continue;
+                }
+                if (raw.startsWith('#') && urlAttr === 'href') continue;
+                try {
+                    const resolved = new URL(raw, baseHref);
+                    const allowedProtocols = urlAttr === 'href'
+                        ? ['https:', 'http:', 'mailto:']
+                        : ['https:', 'http:'];
+                    if (!allowedProtocols.includes(resolved.protocol.toLowerCase())) {
+                        el.removeAttribute(urlAttr);
+                    }
+                } catch {
+                    el.removeAttribute(urlAttr);
+                }
+            }
+
+            if (el.hasAttribute?.('srcset')) {
+                const rawSrcset = String(el.getAttribute('srcset') || '');
+                const parts = rawSrcset.split(',').map((part) => part.trim()).filter(Boolean);
+                let validAll = parts.length > 0;
+                for (const part of parts) {
+                    const tokens = part.split(/\s+/);
+                    if (tokens.length > 2 || !tokens[0]) {
+                        validAll = false;
+                        break;
+                    }
+                    try {
+                        const resolved = new URL(tokens[0], baseHref);
+                        if (!['https:', 'http:'].includes(resolved.protocol.toLowerCase())) {
+                            validAll = false;
+                            break;
+                        }
+                        if (tokens[1] && !/^(?:\d+w|\d+(?:\.\d+)?x)$/i.test(tokens[1])) {
+                            validAll = false;
+                            break;
+                        }
+                    } catch {
+                        validAll = false;
+                        break;
+                    }
+                }
+                if (!validAll) {
+                    el.removeAttribute('srcset');
+                }
+            }
+        }
+    }
+
     function replaceElementChildrenFromHtml(element, html) {
         const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+        sanitizeCachedHtmlTree(parsed.body);
         const nodes = Array.from(parsed.body.childNodes, node => document.importNode(node, true));
         element.replaceChildren(...nodes);
     }
@@ -3006,7 +4630,7 @@
     }
 
     function applyReadmeTextGroupTranslations(rootEl, tasksByText, texts, translatedMap) {
-        return applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap);
+        return withReadmeDomMutationGuard(() => applyTextGroupTranslations(rootEl, tasksByText, texts, translatedMap));
     }
 
     function applyTaskTranslations(rootEl, tasks, translatedMap) {
@@ -3017,7 +4641,7 @@
             if (!isUsableTranslation(task.normalizedText, translated)) return;
             if (!task.node?.isConnected) return;
 
-            task.node.data = task.rawText.replace(task.trimmedText, translated);
+            task.node.data = task.rawText.replace(task.trimmedText, () => translated);
             translatedCount += 1;
         });
 
@@ -3025,7 +4649,7 @@
     }
 
     function applyReadmeTaskTranslations(rootEl, tasks, translatedMap) {
-        return applyTaskTranslations(rootEl, tasks, translatedMap);
+        return withReadmeDomMutationGuard(() => applyTaskTranslations(rootEl, tasks, translatedMap));
     }
 
     async function waitForNextPaint() {
@@ -3035,6 +4659,7 @@
     }
 
     function restoreReadmeTranslation() {
+        readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
         const readmeEl = getReadmeRootElement();
         if (!readmeEl) return;
 
@@ -3069,8 +4694,10 @@
 
     async function runReadmeTranslation(reason) {
         const shouldTranslateReadme = isReadmeTranslationEnabled();
+        const shouldPreferChinese = FeatureSet.enable_extension && FeatureSet.prefer_chinese_readme && isReadmePage();
         const shouldTranslateAbout = isRepoAboutTranslationEnabled();
-        if (!shouldTranslateReadme && !shouldTranslateAbout) {
+        if (!shouldTranslateReadme && !shouldTranslateAbout && !shouldPreferChinese) {
+            restoreChineseReadme();
             restoreReadmeTranslation();
             return;
         }
@@ -3081,6 +4708,7 @@
         }
 
         const readmeEl = getReadmeRootElement();
+        if (!readmeEl) restoreChineseReadme();
         if (!readmeEl && !getRepoAboutElement()) return;
 
         readmeRuntime.inFlight = true;
@@ -3097,6 +4725,10 @@
             const translationTasks = [];
             if (shouldTranslateAbout) {
                 translationTasks.push(translateRepoAboutDescription(debugContext, reason).catch((error) => {
+                    if (isExtensionContextInvalidatedError(error)) {
+                        readmeRuntime.rerunRequested = false;
+                        return;
+                    }
                     addReadmeDebugEvent(debugContext, 'about_failed', {
                         message: normalizeRuntimeErrorMessage(error),
                     });
@@ -3104,8 +4736,19 @@
                 }));
             }
 
-            if (shouldTranslateReadme && readmeEl) {
-                translationTasks.push(translateReadmeElement(readmeEl, reason, debugContext));
+            if ((shouldTranslateReadme || shouldPreferChinese) && readmeEl) {
+                translationTasks.push((async () => {
+                    if (await preferChineseReadme()) {
+                        addReadmeDebugEvent(debugContext, 'readme_skipped', {
+                            reason: (typeof chineseReadme !== 'undefined' && chineseReadme?.state?.root === readmeEl)
+                                ? 'native_chinese_readme'
+                                : 'waiting_react_hydration',
+                        });
+                        return;
+                    }
+                    if (shouldTranslateReadme && FeatureSet.enable_extension && readmeEl.isConnected
+                        && readmeEl === getReadmeRootElement() && isReadmePage()) await translateReadmeElement(readmeEl, reason, debugContext);
+                })());
             }
 
             await Promise.all(translationTasks);
@@ -3129,7 +4772,9 @@
                 sourceHash,
                 detail: normalizeRuntimeErrorMessage(error),
             }).catch((recordError) => {
-                console.warn('[README翻译] 记录失败日志时出错:', recordError);
+                if (!isExtensionContextInvalidatedError(recordError)) {
+                    console.warn('[README翻译] 记录失败日志时出错:', recordError);
+                }
             });
             throw error;
         } finally {
@@ -3150,6 +4795,13 @@
     async function translateReadmeElement(readmeEl, reason, debugContext = null) {
         const startAt = performance.now();
         const expectedHref = window.location.href;
+        const initialReadmeEnabled = Boolean(FeatureSet.enable_readme_translation);
+        const runEpoch = readmeRuntime.runEpoch || 0;
+        const isRunValid = () => (readmeRuntime.runEpoch || 0) === runEpoch
+            && (typeof isPageExcluded !== 'function' || FeatureSet.enable_extension)
+            && (!initialReadmeEnabled || FeatureSet.enable_readme_translation)
+            && readmeEl.isConnected
+            && window.location.href === expectedHref;
         const state = getReadmeElementState(readmeEl);
         const currentHash = createHash(readmeEl.innerHTML);
         const currentTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
@@ -3192,7 +4844,10 @@
             return;
         }
 
-        const sourceText = normalizeText(readmeEl.textContent || '');
+        const sourceBody = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(state.originalHtml)
+            : readmeEl;
+        const sourceText = normalizeText(sourceBody.textContent || '');
         if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
             if (readmeEl.innerHTML !== state.originalHtml) {
                 applyReadmeHtml(readmeEl, state.originalHtml);
@@ -3213,14 +4868,18 @@
         );
         let cacheKeyUsed = repoCacheKey;
         let cacheHit = await getRepoCachedTranslation(repoCacheKey).catch((error) => {
+            if (isExtensionContextInvalidatedError(error)) throw error;
             console.warn('[README翻译] 读取仓库缓存失败:', error);
             return null;
         });
+        if (!isRunValid()) return;
         if (!cacheHit && legacyRepoCacheKey && legacyRepoCacheKey !== repoCacheKey) {
             cacheHit = await getRepoCachedTranslation(legacyRepoCacheKey).catch((error) => {
+                if (isExtensionContextInvalidatedError(error)) throw error;
                 console.warn('[README翻译] 读取旧版仓库缓存失败:', error);
                 return null;
             });
+            if (!isRunValid()) return;
             if (cacheHit) cacheKeyUsed = legacyRepoCacheKey;
         }
 
@@ -3230,8 +4889,11 @@
                 console.warn('[README翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
                 applyReadmeHtml(readmeEl, cacheHit.translatedHtml);
-                const cachedRemaining = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
-                    .filter((task) => task.node?.isConnected);
+                hydrateReadmePreservedCache(providerConfig.signature, cacheHit.preservedTexts);
+                const cachedRemaining = cacheHit.complete === true
+                    ? []
+                    : collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                        .filter((task) => task.node?.isConnected);
                 if (!cachedRemaining.length) {
                     state.translatedSignature = signature;
                     state.translatedHash = createHash(readmeEl.innerHTML);
@@ -3245,7 +4907,9 @@
                         sourceHash,
                         detail: `cache_reason=${reason || 'unknown'}`,
                     }).catch((error) => {
-                        console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                        if (!isExtensionContextInvalidatedError(error)) {
+                            console.warn('[README翻译] 写入缓存命中记录失败:', error);
+                        }
                     });
                     addReadmeDebugEvent(debugContext, 'cache_hit', {
                         cacheKey: cacheKeyUsed,
@@ -3255,13 +4919,17 @@
                         complete: true,
                     });
                     if (cacheKeyUsed !== repoCacheKey || cacheHit.complete !== true) {
+                        const preservedTexts = collectReadmePreservedTexts(readmeEl, providerConfig.signature);
                         await upsertRepoCachedTranslation(repoCacheKey, {
                             repo: repoInfo?.fullName || '',
                             sourceHash,
                             translatedHtml: cacheHit.translatedHtml,
                             complete: true,
+                            preservedTexts: preservedTexts.length ? preservedTexts : cacheHit.preservedTexts,
                         }).catch((error) => {
-                            console.warn('[README翻译] 迁移/补全仓库缓存失败:', error);
+                            if (!isExtensionContextInvalidatedError(error)) {
+                                console.warn('[README翻译] 迁移/补全仓库缓存失败:', error);
+                            }
                         });
                     }
                     return;
@@ -3278,19 +4946,19 @@
             }
         }
 
-        // 这三个计数在 finally 之后写翻译记录时仍要用，必须声明在 try 块外的函数作用域。
         let translatedCount = 0;
         let totalTokens = 0;
         let retryMissedCount = 0;
 
-        pushReadmeDomMutationGuard();
-        try {
         if (!partialCacheApplied && readmeEl.innerHTML !== state.originalHtml) {
             applyReadmeHtml(readmeEl, state.originalHtml);
         }
 
         const runTranslationPass = async (passName) => {
-            const tasks = collectReadmeTextTasks(readmeEl)
+            if (!isRunValid()) return { translatedCount: 0, totalTokens: 0 };
+            const tasks = (partialCacheApplied
+                ? collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                : collectReadmeTextTasks(readmeEl))
                 .filter((task) => !isLikelyOpaqueReadmeLabel(task.normalizedText, task.node))
                 .filter((task) => !isLikelyTechnicalReadmeText(task.normalizedText, task.node));
             addReadmeDebugEvent(debugContext, 'pass_start', {
@@ -3325,15 +4993,18 @@
                     groups,
                     README_CONFIG.TRANSLATION_CONCURRENCY,
                     async (group, index) => {
+                        if (!isRunValid()) {
+                            return { applied: 0, tokens: 0 };
+                        }
                         const groupTexts = [...new Set(group.map(task => task.normalizedText))];
                         const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(
                             groupTexts,
                             providerConfig,
-                            { debugContext, debugPhase: passName, debugBatchIndex: index },
+                            { debugContext, debugPhase: passName, debugBatchIndex: index, concurrency: 1 },
                         );
 
-                        // 软导航防重入校验：若网络请求期间用户已跳转或节点已卸载，安全放弃本次 DOM 回填
-                        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+                        // 软导航与开关防重入校验：若网络请求期间用户已跳转、关闭开关或节点已卸载，安全放弃本次 DOM 回填
+                        if (!readmeEl.isConnected || window.location.href !== expectedHref || !isRunValid()) {
                             return { applied: 0, tokens: groupTokens };
                         }
 
@@ -3345,7 +5016,7 @@
                             applied,
                             tokens: groupTokens,
                         });
-                        if (index < groups.length - 1) await waitForNextPaint();
+                        if (index < groups.length - 1 && isRunValid()) await waitForNextPaint();
                         return { applied, tokens: groupTokens };
                     },
                 );
@@ -3361,7 +5032,7 @@
                 );
                 passTokens += tokens;
 
-                if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+                if (!isRunValid()) {
                     return { translatedCount: 0, totalTokens: passTokens };
                 }
 
@@ -3380,7 +5051,7 @@
         translatedCount += firstPass.translatedCount;
         totalTokens += firstPass.totalTokens;
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+        if (!isRunValid()) {
             return;
         }
 
@@ -3388,9 +5059,9 @@
         // 逐条重试收尾。以“无进展即停止 + 最多 maxRetryPasses 轮”双重保险避免空转。
         const maxRetryPasses = 2;
         for (let attempt = 0; attempt < maxRetryPasses; attempt += 1) {
-            if (!readmeEl.isConnected || window.location.href !== expectedHref) break;
+            if (!isRunValid()) break;
 
-            const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+            const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
                 .filter((task) => task.node?.isConnected);
             addReadmeDebugEvent(debugContext, 'retry_scan', {
                 attempt,
@@ -3409,6 +5080,7 @@
                 retryTasksByText.get(task.normalizedText).push(task);
             });
 
+            if (!isRunValid()) break;
             const { translatedMap, totalTokens: retryTokens } = await translateTextsWithProvider(
                 retryTexts,
                 providerConfig,
@@ -3416,7 +5088,7 @@
             );
             totalTokens += retryTokens;
 
-            if (!readmeEl.isConnected || window.location.href !== expectedHref) break;
+            if (!isRunValid()) break;
 
             const applied = applyReadmeTextGroupTranslations(readmeEl, retryTasksByText, retryTexts, translatedMap);
             translatedCount += applied;
@@ -3429,26 +5101,20 @@
             if (!applied) break;
         }
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
+        if (!isRunValid()) {
             return;
         }
 
-        if (!translatedCount && !collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
-            .some((task) => task.node?.isConnected)) {
+        if (!translatedCount && !totalTokens && !partialCacheApplied
+            && !collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
+                .some((task) => task.node?.isConnected)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(readmeEl.innerHTML);
             state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
             return;
         }
-        } finally {
-            popReadmeDomMutationGuard();
-        }
 
-        if (!readmeEl.isConnected || window.location.href !== expectedHref) {
-            return;
-        }
-
-        const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml)
+        const remainingTasks = collectReadmeUntranslatedTasks(readmeEl, state.originalHtml, providerConfig.signature)
             .filter((task) => task.node?.isConnected);
         const stillMissed = remainingTasks.length;
         addReadmeDebugEvent(debugContext, 'readme_end', {
@@ -3459,16 +5125,9 @@
             remainingTasks: remainingTasks.slice(0, 24)
                 .map((task) => describeReadmeDebugTask(task, readmeEl)),
         });
-        if (!stillMissed) {
-            state.translatedSignature = signature;
-            state.translatedHash = createHash(readmeEl.innerHTML);
-            state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
-        } else {
-            // 部分结果也要持久化；刷新时先恢复已成功节点，再只补翻译剩余节点。
-            state.translatedSignature = '';
-            state.translatedHash = '';
-            state.translatedTextHash = '';
-        }
+        state.translatedSignature = signature;
+        state.translatedHash = createHash(readmeEl.innerHTML);
+        state.translatedTextHash = getStableReadmeTextHash(readmeEl.innerHTML);
 
         if (!stillMissed || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(repoCacheKey, {
@@ -3476,8 +5135,11 @@
                 sourceHash,
                 translatedHtml: readmeEl.innerHTML,
                 complete: !stillMissed,
+                preservedTexts: collectReadmePreservedTexts(readmeEl, providerConfig.signature),
             }).catch((error) => {
-                console.warn('[README翻译] 写入仓库缓存失败:', error);
+                if (!isExtensionContextInvalidatedError(error)) {
+                    console.warn('[README翻译] 写入仓库缓存失败:', error);
+                }
             });
         }
 
@@ -3489,7 +5151,9 @@
             sourceHash,
             detail: `translated_nodes=${translatedCount};retry_missed=${retryMissedCount};remaining=${stillMissed}`,
         }).catch((error) => {
-            console.warn('[README翻译] 写入翻译记录失败:', error);
+            if (!isExtensionContextInvalidatedError(error)) {
+                console.warn('[README翻译] 写入翻译记录失败:', error);
+            }
         });
     }
 
@@ -3503,13 +5167,24 @@
 
     function collectReadmeTextTasks(readmeEl) {
         const tasks = [];
-        const walker = document.createTreeWalker(readmeEl, NodeFilter.SHOW_TEXT);
+        const showMask = (NodeFilter.SHOW_ELEMENT || 1) | NodeFilter.SHOW_TEXT;
+        const walker = document.createTreeWalker(readmeEl, showMask, {
+            acceptNode(node) {
+                if (node.nodeType === 1) {
+                    return node.matches?.(README_CONFIG.SKIP_PARENT_SELECTOR)
+                        ? (NodeFilter.FILTER_REJECT || 2)
+                        : (NodeFilter.FILTER_ACCEPT || 1);
+                }
+                return (NodeFilter.FILTER_ACCEPT || 1);
+            },
+        });
 
         let node;
         while ((node = walker.nextNode())) {
+            if (node.nodeType !== 3) continue;
             const parent = node.parentElement;
             if (!parent) continue;
-            if (parent.closest(README_CONFIG.SKIP_PARENT_SELECTOR)) continue;
+            if (parent.closest?.(README_CONFIG.SKIP_PARENT_SELECTOR)) continue;
 
             const rawText = node.data;
             const trimmedText = rawText.trim();
@@ -3525,8 +5200,13 @@
 
 
     function collectReadmeOriginalTextCounts(originalHtml) {
-        const container = document.createElement('div');
-        container.innerHTML = String(originalHtml || '');
+        const container = typeof parseInertHtmlBody === 'function'
+            ? parseInertHtmlBody(originalHtml)
+            : (() => {
+                const div = document.createElement('div');
+                div.innerHTML = String(originalHtml || '');
+                return div;
+            })();
         const counts = new Map();
 
         collectReadmeTextTasks(container).forEach((task) => {
@@ -3536,16 +5216,44 @@
         return counts;
     }
 
-    function collectReadmeUntranslatedTasks(readmeEl, originalHtml) {
+    function hydrateReadmePreservedCache(providerSignature, preservedTexts) {
+        if (!providerSignature || !Array.isArray(preservedTexts) || !readmeRuntime.preservedCache) return;
+
+        preservedTexts.forEach((item) => {
+            if (typeof item !== 'string') return;
+            const normalized = normalizeText(item);
+            if (!normalized) return;
+            readmeRuntime.preservedCache.add(`${providerSignature}|${normalized}`);
+        });
+    }
+
+    function collectReadmePreservedTexts(readmeEl, providerSignature) {
+        if (!readmeEl || !providerSignature || !readmeRuntime.preservedCache?.size) return [];
+
+        const seen = new Set();
+        const preservedTexts = [];
+        collectReadmeTextTasks(readmeEl).forEach((task) => {
+            if (!readmeRuntime.preservedCache.has(`${providerSignature}|${task.normalizedText}`)) return;
+            if (seen.has(task.normalizedText)) return;
+            seen.add(task.normalizedText);
+            preservedTexts.push(task.normalizedText);
+        });
+        return preservedTexts;
+    }
+
+    function collectReadmeUntranslatedTasks(readmeEl, originalHtml, providerSignature = '') {
         const originalCounts = collectReadmeOriginalTextCounts(originalHtml);
         return collectReadmeTextTasks(readmeEl)
             .filter((task) => {
                 if (isLikelyTechnicalReadmeText(task.normalizedText, task.node)) return false;
+                if (providerSignature && readmeRuntime.preservedCache?.has(`${providerSignature}|${task.normalizedText}`)) {
+                    return false;
+                }
                 const remaining = originalCounts.get(task.normalizedText) || 0;
                 if (!remaining) return false;
 
                 originalCounts.set(task.normalizedText, remaining - 1);
-                return !isLikelyTechnicalReadmeText(task.normalizedText, task.node);
+                return true;
             });
     }
 
@@ -3588,6 +5296,21 @@
         return item?.sourceType || getIssuePrRecordSourceType();
     }
 
+    function getDiscussionDocUrl() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        try {
+            const parsed = new URL(href);
+            parsed.hash = '';
+            return parsed.href;
+        } catch {
+            return href.split('#')[0];
+        }
+    }
+
     function getIssuePrDiscussionState(item) {
         const keyEl = item?.markdownEl || item;
         if (!issuePrRuntime.stateByElement.has(keyEl)) {
@@ -3596,6 +5319,7 @@
                 translatedHash: '',
                 translatedSignature: '',
                 isBusy: false,
+                runSeq: 0,
                 translatedEl: null,
                 toolbarEl: null,
                 mode: 'original',
@@ -3618,6 +5342,7 @@
                 if (!markdownEl || seen.has(markdownEl)) return null;
                 seen.add(markdownEl);
                 if (markdownEl.closest('.ghcn-discussion-translation-panel')) return null;
+                if (markdownEl.closest('.js-preview-body, form, [data-testid="markdown-editor"]')) return null;
 
                 if (!isReleaseNotes && markdownEl.parentElement?.closest('[data-testid="markdown-body"]')) {
                     return null;
@@ -3693,6 +5418,8 @@
                 'svg.octicon-kebab-horizontal',
                 'button[aria-label*="More" i]',
                 'button[aria-label*="Actions" i]',
+                'button[aria-label*="更多"]',
+                'button[aria-label*="操作"]',
             ];
             for (const selector of menuSelectors) {
                 const menuNode = scope.querySelector(selector);
@@ -3702,51 +5429,69 @@
             return null;
         };
 
+        const belongsToItem = (candidate) => {
+            if (!candidate) return false;
+            const nestedBodies = candidate.querySelectorAll?.('.markdown-body:not(.ghcn-discussion-translation-panel), [data-testid="markdown-body"]:not(.ghcn-discussion-translation-panel)');
+            if (nestedBodies && nestedBodies.length > 1) return false;
+            const ownerComment = candidate.closest?.('[data-testid="issue-body"], [data-testid="comment-body"], [data-testid^="comment-viewer-outer-box"], .react-issue-comment, .timeline-comment, .js-comment');
+            if (ownerComment && !ownerComment.contains(item.markdownEl)) return false;
+            return true;
+        };
+
         // 回复评论可能嵌套在同一个 timeline-comment-group 中；从正文向上查找，
         // 优先使用当前评论自己的操作菜单，避免误用父评论或标题区域的 flex 容器。
         let menuButton = null;
         let scope = item.markdownEl?.parentElement;
         while (scope && rootEl.contains(scope)) {
             menuButton = findMenuButton(scope);
-            if (menuButton) break;
+            if (menuButton && belongsToItem(menuButton)) break;
+            menuButton = null;
             if (scope === rootEl) break;
             scope = scope.parentElement;
         }
         menuButton ||= findMenuButton(rootEl);
+        if (menuButton && !belongsToItem(menuButton)) menuButton = null;
 
         // 新版 GitHub 把三个点放在 .timeline-comment-actions 内层的 flex 行中；
         // 优先使用该行，避免插入块级外层后被换到上一行。
         const actionRow = menuButton?.closest('comment-actions-container')?.parentElement;
-        if (actionRow) return actionRow;
+        if (belongsToItem(actionRow)) return actionRow;
 
         // 兼容旧版直接把菜单放在 .timeline-comment-actions 下的结构。
         const actionGroup = menuButton?.closest('.timeline-comment-actions');
-        if (actionGroup) return actionGroup;
+        if (belongsToItem(actionGroup)) return actionGroup;
 
         // 当前 React 评论头部会把三点按钮包在 ActionsButtonsContainer 中；
         // 直接挂到该容器，才能让翻译按钮紧挨三点左侧，而不是排在贡献者标签之前。
         const menuButtonsContainer = menuButton?.closest('[class*="ActionsButtonsContainer"]');
-        if (menuButtonsContainer) return menuButtonsContainer;
+        if (belongsToItem(menuButtonsContainer)) return menuButtonsContainer;
 
         const menuRow = menuButton?.closest('[data-testid="comment-header-right-side-items"], .timeline-comment-actions > .d-flex');
-        if (menuRow) return menuRow;
+        if (belongsToItem(menuRow)) return menuRow;
 
         const commentActionsRow = rootEl.querySelector('comment-actions-container')?.parentElement;
-        if (commentActionsRow) return commentActionsRow;
+        if (belongsToItem(commentActionsRow)) return commentActionsRow;
 
-        return rootEl.querySelector('[data-testid="comment-header-right-side-items"] [class*="ActionsButtonsContainer"]')
-            || rootEl.querySelector('[data-testid="comment-header-right-side-items"] [data-testid="comment-header-hamburger"]')?.parentElement
-            || rootEl.querySelector('[data-testid="comment-header-right-side-items"]')
-            || rootEl.querySelector('.timeline-comment-actions')
-            || rootEl.querySelector('.timeline-comment-header .timeline-comment-actions')
-            || rootEl.querySelector('[class*="actionsSection"]')
-            || rootEl.querySelector('[class*="actionsWrapper"]')
-            || rootEl.querySelector('[aria-label="Discussion actions"]')?.parentElement
-            || rootEl.querySelector('[aria-label="Discussion comment actions"]')?.parentElement
-            || rootEl.querySelector('[data-testid="discussion-comment-actions"]')
-            || rootEl.querySelector('[aria-label="Issue body actions"]')?.parentElement
-            || rootEl.querySelector('[aria-label="Comment actions"]')?.parentElement
-            || rootEl.querySelector('[data-testid="issue-body-header-author"]')?.closest('[class*="activityHeader"]');
+        const slotCandidates = [
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"] [class*="ActionsButtonsContainer"]'),
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"] [data-testid="comment-header-hamburger"]')?.parentElement,
+            rootEl.querySelector('[data-testid="comment-header-right-side-items"]'),
+            rootEl.querySelector('.timeline-comment-actions'),
+            rootEl.querySelector('.timeline-comment-header .timeline-comment-actions'),
+            rootEl.querySelector('[class*="actionsSection"]'),
+            rootEl.querySelector('[class*="actionsWrapper"]'),
+            rootEl.querySelector('[aria-label="Discussion actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="Discussion comment actions"]')?.parentElement,
+            rootEl.querySelector('[data-testid="discussion-comment-actions"]'),
+            rootEl.querySelector('[aria-label="Issue body actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="Comment actions"]')?.parentElement,
+            rootEl.querySelector('[aria-label="讨论操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="讨论评论操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="议题正文操作"]')?.parentElement,
+            rootEl.querySelector('[aria-label="评论操作"]')?.parentElement,
+            rootEl.querySelector('[data-testid="issue-body-header-author"]')?.closest('[class*="activityHeader"]'),
+        ];
+        return slotCandidates.find(belongsToItem) || null;
     }
 
     function buildDiscussionCacheKey(item, sourceHash, signature) {
@@ -3911,7 +5656,9 @@
         const slotEl = findDiscussionActionsSlot(item);
         const existingToolbars = slotEl
             ? [...slotEl.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]')]
-            : [];
+            : (item.sourceType === 'release' && item.viewerEl
+                ? [...item.viewerEl.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]')]
+                : []);
         const toolbar = state.toolbarEl?.isConnected
             ? state.toolbarEl
             : existingToolbars[0] || null;
@@ -3922,7 +5669,15 @@
             existingToolbars.forEach((existingToolbar) => {
                 if (existingToolbar !== toolbar) existingToolbar.remove();
             });
-            const needsRender = state.toolbarEl !== toolbar;
+            let contentChanged = false;
+            if (!state.isBusy && state.translatedEl && state.translatedHash) {
+                const liveHash = createHash(item.markdownEl.innerHTML);
+                if (liveHash !== state.translatedHash) {
+                    contentChanged = true;
+                    restoreIssuePrBody(item);
+                }
+            }
+            const needsRender = contentChanged || state.toolbarEl !== toolbar;
             state.toolbarEl = toolbar;
             // GitHub 的 Turbo/React 重绘可能保留旧工具条节点；每次扫描都把它
             // 重新归位到三个点所在的操作行，避免遗留在 header 顶部。
@@ -3970,7 +5725,10 @@
             button.disabled = state.isBusy;
             button.addEventListener('click', () => {
                 handleIssuePrTranslateButton(item).catch((error) => {
-                    console.error('[Issue/PR翻译] 执行失败:', error);
+                    if (error?.__ghcnStaleRun) return;
+                    if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                        console.error('[Issue/PR翻译] 执行失败:', error);
+                    }
                     state.errorMessage = normalizeRuntimeErrorMessage(error);
                     state.isBusy = false;
                     renderDiscussionToolbar(item);
@@ -4017,6 +5775,11 @@
         const state = getIssuePrDiscussionState(item);
         if (state.isBusy) return;
 
+        const runEpoch = issuePrRuntime.runEpoch || 0;
+        const runId = (state.runSeq || 0) + 1;
+        state.runSeq = runId;
+        const isCurrentRun = () => state.runSeq === runId && (issuePrRuntime.runEpoch || 0) === runEpoch;
+
         clearIssuePrError(state.toolbarEl);
         state.errorMessage = '';
 
@@ -4024,14 +5787,24 @@
         renderDiscussionToolbar(item);
 
         try {
-            await translateIssuePrBody(item);
-            setDiscussionViewMode(item, 'translated');
+            const completed = await translateIssuePrBody(item, { runEpoch, runId });
+            if (completed && isCurrentRun() && state.translatedEl) {
+                setDiscussionViewMode(item, 'translated');
+            }
         } catch (error) {
+            if (!isCurrentRun()) {
+                if (error && typeof error === 'object') {
+                    error.__ghcnStaleRun = true;
+                }
+                throw error;
+            }
             state.errorMessage = normalizeRuntimeErrorMessage(error);
             throw error;
         } finally {
-            state.isBusy = false;
-            renderDiscussionToolbar(item);
+            if (isCurrentRun()) {
+                state.isBusy = false;
+                renderDiscussionToolbar(item);
+            }
         }
     }
 
@@ -4052,27 +5825,50 @@
     function restoreIssuePrBody(itemOrBodyEl) {
         const item = itemOrBodyEl?.markdownEl ? itemOrBodyEl : { markdownEl: itemOrBodyEl };
         const state = getIssuePrDiscussionState(item);
+        state.runSeq = (state.runSeq || 0) + 1;
+        state.isBusy = false;
         state.translatedEl?.remove();
         state.translatedEl = null;
+        if (state.toolbarEl && !state.toolbarEl.isConnected) {
+            state.toolbarEl = null;
+        }
         state.mode = 'original';
+        state.originalHtml = '';
         state.translatedHash = '';
+        state.translatedSignature = '';
         item.markdownEl?.removeAttribute('data-ghcn-discussion-hidden');
         item.markdownEl?.removeAttribute('data-ghcn-discussion-view-mode');
         renderDiscussionToolbar(item);
     }
 
     function restoreIssuePrTranslations() {
+        issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
         document.querySelectorAll('[data-ghcn-discussion-translate="toolbar"]').forEach((toolbar) => toolbar.remove());
+        document.querySelectorAll('.ghcn-discussion-translation-panel').forEach((panel) => panel.remove());
+        document.querySelectorAll('[data-ghcn-discussion-hidden]').forEach((el) => {
+            el.removeAttribute('data-ghcn-discussion-hidden');
+            el.removeAttribute('data-ghcn-discussion-view-mode');
+            delete el.dataset.ghcnDiscussionTranslate;
+        });
         findDiscussionItems().forEach((item) => {
             restoreIssuePrBody(item);
             delete item.markdownEl.dataset.ghcnDiscussionTranslate;
         });
     }
 
-    async function translateIssuePrBody(item) {
+    async function translateIssuePrBody(item, options = {}) {
         const startAt = performance.now();
+        const expectedDocUrl = getDiscussionDocUrl();
         const state = getIssuePrDiscussionState(item);
         const markdownEl = item.markdownEl;
+        const runEpoch = options.runEpoch ?? (issuePrRuntime.runEpoch || 0);
+        const runId = options.runId ?? (state.runSeq || 0);
+        const isCurrentRun = () => (issuePrRuntime.runEpoch || 0) === runEpoch && (state.runSeq || 0) === runId;
+        const isRunValid = () => isCurrentRun()
+            && getDiscussionDocUrl() === expectedDocUrl
+            && markdownEl.isConnected
+            && FeatureSet.enable_extension
+            && FeatureSet.enable_issue_pr_translation;
 
         if (!state.originalHtml || (state.translatedHash && createHash(markdownEl.innerHTML) !== state.translatedHash)) {
             state.originalHtml = markdownEl.innerHTML;
@@ -4092,21 +5888,25 @@
         const sourceHash = createHash(state.originalHtml);
         const signature = createHash(`${providerConfig.signature}\n${state.originalHtml}`);
         if (state.translatedSignature === signature && state.translatedEl?.isConnected) {
-            return;
+            return true;
         }
 
         const sourceText = normalizeText(markdownEl.textContent || '');
         if (shouldSkipReadmeByLanguage(sourceText, providerConfig.targetLang)) {
             state.translatedSignature = signature;
             state.translatedHash = createHash(markdownEl.innerHTML);
-            return;
+            return false;
         }
 
         const cacheKey = buildDiscussionCacheKey(item, sourceHash, providerConfig.signature);
         const cacheHit = await getRepoCachedTranslation(cacheKey).catch((error) => {
+            if (typeof isExtensionContextInvalidatedError === 'function' && isExtensionContextInvalidatedError(error)) {
+                throw error;
+            }
             console.warn('[Issue/PR翻译] 读取讨论缓存失败:', error);
             return null;
         });
+        if (!isRunValid()) return false;
 
         let translatedEl = createTranslatedClone(markdownEl);
         let partialCacheApplied = false;
@@ -4115,7 +5915,13 @@
                 console.warn('[Issue/PR翻译] 忽略含有 [object Object] 的损坏仓库缓存');
             } else {
                 replaceElementChildrenFromHtml(translatedEl, cacheHit.translatedHtml);
-                const cachedRemaining = collectIssuePrTextTasks(translatedEl);
+                if (cacheHit.preservedTexts && typeof hydrateReadmePreservedCache === 'function') {
+                    hydrateReadmePreservedCache(providerConfig.signature, cacheHit.preservedTexts);
+                }
+                const cachedRemaining = cacheHit.complete === true
+                    ? []
+                    : collectIssuePrTextTasks(translatedEl)
+                        .filter((task) => !readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${task.normalizedText}`));
                 if (!cachedRemaining.length) {
                     state.translatedEl?.remove();
                     state.translatedEl = translatedEl;
@@ -4133,19 +5939,30 @@
                         sourceHash,
                         detail: `${getDiscussionRecordSourceType(item)}_cache_hit`,
                     }).catch((error) => {
-                        console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                        if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                            console.warn('[Issue/PR翻译] 写入缓存命中记录失败:', error);
+                        }
                     });
+                    if (!isRunValid()) return false;
                     if (cacheHit.complete !== true) {
+                        const preservedTexts = [...new Set(
+                            collectIssuePrTextTasks(translatedEl)
+                                .map((task) => task.normalizedText)
+                                .filter((text) => readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${text}`)),
+                        )];
                         await upsertRepoCachedTranslation(cacheKey, {
                             repo: getCurrentRepoInfo()?.fullName || '',
                             sourceHash,
                             translatedHtml: cacheHit.translatedHtml,
                             complete: true,
+                            preservedTexts,
                         }).catch((error) => {
-                            console.warn('[Issue/PR翻译] 补全讨论缓存状态失败:', error);
+                            if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                                console.warn('[Issue/PR翻译] 补全讨论缓存状态失败:', error);
+                            }
                         });
                     }
-                    return;
+                    return true;
                 }
 
                 partialCacheApplied = true;
@@ -4176,34 +5993,66 @@
         markdownEl.insertAdjacentElement('afterend', translatedEl);
         setDiscussionViewMode(item, 'translated');
 
-        if (FeatureSet.readme_enable_progressive) {
-            const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
-            const groupSize = usesAiBatchLimits
-                ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
-                : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
-            const groups = buildProgressiveTaskGroupsByBlock(translatedEl, tasks, groupSize, ISSUE_PR_CONFIG.BLOCK_SELECTOR);
+        try {
+            if (FeatureSet.readme_enable_progressive) {
+                const usesAiBatchLimits = AI_CHAT_PROVIDERS.includes(providerConfig.provider) || providerConfig.provider === 'qwen_mt';
+                const groupSize = usesAiBatchLimits
+                    ? README_CONFIG.OPENAI_PROGRESSIVE_GROUP_SIZE
+                    : README_CONFIG.PROGRESSIVE_GROUP_SIZE;
+                const groups = buildProgressiveTaskGroupsByBlock(translatedEl, tasks, groupSize, ISSUE_PR_CONFIG.BLOCK_SELECTOR);
 
-            for (let index = 0; index < groups.length; index += 1) {
-                const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
-                const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
-                totalTokens += groupTokens;
-                translatedCount += applyTaskTranslations(translatedEl, groups[index], translatedMap);
+                for (let index = 0; index < groups.length; index += 1) {
+                    if (!isRunValid()) {
+                        if (isCurrentRun()) restoreIssuePrBody(item);
+                        return false;
+                    }
+                    const groupTexts = [...new Set(groups[index].map(task => task.normalizedText))];
+                    const { translatedMap, totalTokens: groupTokens } = await translateTextsWithProvider(groupTexts, providerConfig);
+                    if (!isRunValid()) {
+                        if (isCurrentRun()) restoreIssuePrBody(item);
+                        return false;
+                    }
+                    totalTokens += groupTokens;
+                    translatedCount += applyTaskTranslations(translatedEl, groups[index], translatedMap);
 
-                if (index < groups.length - 1) {
-                    await waitForNextPaint();
+                    if (index < groups.length - 1) {
+                        await waitForNextPaint();
+                    }
                 }
+            } else {
+                const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
+                if (!isRunValid()) {
+                    if (isCurrentRun()) restoreIssuePrBody(item);
+                    return false;
+                }
+                totalTokens += tokens;
+                translatedCount += applyTextGroupTranslations(translatedEl, tasksByText, uniqueTexts, translatedMap);
             }
-        } else {
-            const { translatedMap, totalTokens: tokens } = await translateTextsWithProvider(uniqueTexts, providerConfig);
-            totalTokens += tokens;
-            translatedCount += applyTextGroupTranslations(translatedEl, tasksByText, uniqueTexts, translatedMap);
+        } catch (error) {
+            if (isCurrentRun()) {
+                restoreIssuePrBody(item);
+            }
+            throw error;
         }
 
-        const complete = translatedCount >= tasks.length;
+        if (!isRunValid()) {
+            if (isCurrentRun()) restoreIssuePrBody(item);
+            return false;
+        }
+
+        const remainingTasks = collectIssuePrTextTasks(translatedEl)
+            .filter((task) => !readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${task.normalizedText}`));
+        const complete = !remainingTasks.length;
         state.translatedSignature = complete ? signature : '';
         state.translatedHash = complete ? createHash(markdownEl.innerHTML) : '';
         state.sourceHash = sourceHash;
         state.errorMessage = '';
+
+        const preservedTexts = [...new Set(
+            collectIssuePrTextTasks(translatedEl)
+                .map((task) => task.normalizedText)
+                .filter((text) => readmeRuntime.preservedCache?.has(`${providerConfig.signature}|${text}`)),
+        )];
 
         if (complete || translatedCount > 0 || partialCacheApplied) {
             await upsertRepoCachedTranslation(cacheKey, {
@@ -4211,8 +6060,11 @@
                 sourceHash,
                 translatedHtml: translatedEl.innerHTML,
                 complete,
+                preservedTexts,
             }).catch((error) => {
-                console.warn('[Issue/PR翻译] 写入讨论缓存失败:', error);
+                if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                    console.warn('[Issue/PR翻译] 写入讨论缓存失败:', error);
+                }
             });
         }
 
@@ -4224,13 +6076,17 @@
             sourceHash,
             detail: `${getDiscussionRecordSourceType(item)}_translated_nodes=${translatedCount}`,
         }).catch((error) => {
-            console.warn('[Issue/PR翻译] 写入翻译记录失败:', error);
+            if (typeof isExtensionContextInvalidatedError !== 'function' || !isExtensionContextInvalidatedError(error)) {
+                console.warn('[Issue/PR翻译] 写入翻译记录失败:', error);
+            }
         });
+        return true;
     }
 
     function createTranslatedClone(markdownEl) {
         const translatedEl = markdownEl.cloneNode(true);
         translatedEl.classList.add('ghcn-discussion-translation-panel');
+        translatedEl.removeAttribute('id');
         translatedEl.removeAttribute('data-ghcn-discussion-translate');
         translatedEl.setAttribute('data-ghcn-discussion-view-mode', 'translated');
         translatedEl.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
@@ -4276,7 +6132,8 @@
             const trimmedText = rawText.trim();
             const normalizedText = normalizeText(trimmedText);
 
-            if (shouldSkipReadmeText(normalizedText)) continue;
+            if (shouldSkipReadmeText(normalizedText)
+                || (typeof isLikelyTechnicalReadmeText === 'function' && isLikelyTechnicalReadmeText(normalizedText, node))) continue;
 
             tasks.push({ node, rawText, trimmedText, normalizedText });
         }
@@ -4457,12 +6314,14 @@ Strict rules:
 
     function restoreCollaborationHelperControls() {
         document.querySelectorAll('[data-ghcn-collab-btn]').forEach((btn) => btn.remove());
+        document.querySelectorAll('.ghcn-collab-fallback-bar').forEach((bar) => bar.remove());
         closeCollaborationModal();
     }
 
     function isValidCollaborationTextarea(el) {
         if (!el || !el.isConnected) return false;
         if (el.tagName !== 'TEXTAREA') return false;
+        if (el.disabled || el.readOnly) return false;
         if (el.closest('.ghcn-collab-modal')) return false;
         if (el.type === 'hidden' || el.hasAttribute('hidden')) return false;
 
@@ -4484,7 +6343,7 @@ Strict rules:
         });
 
         // 2. 由 markdown-toolbar 的 for 属性反查绑定的 textarea (精确 1:1 关系)
-        document.querySelectorAll('markdown-toolbar[for], [data-for]').forEach((toolbar) => {
+        document.querySelectorAll('markdown-toolbar[for], markdown-toolbar[data-for], [role="toolbar"][data-for]').forEach((toolbar) => {
             const targetId = toolbar.getAttribute('for') || toolbar.getAttribute('data-for');
             if (targetId) {
                 const targetEl = document.getElementById(targetId);
@@ -4525,15 +6384,32 @@ Strict rules:
             '.tabnav',
         ];
 
+        const belongsToTextarea = (el) => {
+            if (!el) return false;
+            const targetFor = el.getAttribute?.('for') || el.getAttribute?.('data-for');
+            if (targetFor && (!textarea.id || targetFor !== textarea.id)) return false;
+            const formGroup = el.closest?.('.form-group');
+            if (formGroup && !formGroup.contains(textarea)) return false;
+            const editor = el.closest?.('[data-testid="markdown-editor"], [data-component="MarkdownEditor"], .js-previewable-comment-form');
+            if (editor && !editor.contains(textarea)) return false;
+            return true;
+        };
+
         let toolbar = null;
 
         // 1. 优先通过 textarea.id 与 markdown-toolbar[for] 进行精确 1:1 匹配
         if (textarea.id) {
+            let escapedId = textarea.id;
             try {
-                toolbar = document.querySelector(`markdown-toolbar[for="${CSS.escape(textarea.id)}"]`)
-                       || document.querySelector(`[data-for="${CSS.escape(textarea.id)}"]`);
-            } catch {
-                toolbar = document.querySelector(`markdown-toolbar[for="${textarea.id}"]`);
+                if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                    escapedId = CSS.escape(textarea.id);
+                }
+            } catch { /* 保留原始 id */ }
+            toolbar = document.querySelector(`markdown-toolbar[for="${escapedId}"]`)
+                   || document.querySelector(`markdown-toolbar[data-for="${escapedId}"]`)
+                   || document.querySelector(`[role="toolbar"][data-for="${escapedId}"]`);
+            if (toolbar && !belongsToTextarea(toolbar)) {
+                toolbar = null;
             }
         }
 
@@ -4546,7 +6422,7 @@ Strict rules:
             if (localScope) {
                 for (const selector of toolbarSelectors) {
                     const el = localScope.querySelector(selector);
-                    if (el) {
+                    if (el && belongsToTextarea(el)) {
                         toolbar = el;
                         break;
                     }
@@ -4554,15 +6430,18 @@ Strict rules:
             }
         }
 
-        // 3. 兜底在所属表单范围查找
+        // 3. 兜底在所属表单范围查找（仅限同一独立作用域内的工具栏）
         if (!toolbar) {
             const formScope = textarea.closest('form') || textarea.parentElement;
             if (formScope) {
                 for (const selector of toolbarSelectors) {
                     const el = formScope.querySelector(selector);
-                    if (el) {
-                        toolbar = el;
-                        break;
+                    if (el && belongsToTextarea(el)) {
+                        const validAreas = [...formScope.querySelectorAll('textarea')].filter(isValidCollaborationTextarea);
+                        if (validAreas.length <= 1) {
+                            toolbar = el;
+                            break;
+                        }
                     }
                 }
             }
@@ -4611,14 +6490,17 @@ Strict rules:
         ) || textarea.parentElement;
 
         if (editorContainer) {
-            const tabList = editorContainer.querySelector('[role="tablist"], [data-testid="markdown-editor-tab-bar"], [data-testid="markdown-editor-tabs"], ul.tabnav-tabs');
-            if (tabList && tabList.parentElement) {
-                const nextSibling = tabList.nextElementSibling;
-                if (nextSibling) {
-                    return {
-                        container: nextSibling,
-                        beforeEl: nextSibling.firstElementChild,
-                    };
+            const validAreas = [...editorContainer.querySelectorAll('textarea')].filter(isValidCollaborationTextarea);
+            if (validAreas.length <= 1) {
+                const tabList = editorContainer.querySelector('[role="tablist"], [data-testid="markdown-editor-tab-bar"], [data-testid="markdown-editor-tabs"], ul.tabnav-tabs');
+                if (tabList && tabList.parentElement) {
+                    const nextSibling = tabList.nextElementSibling;
+                    if (nextSibling && belongsToTextarea(nextSibling)) {
+                        return {
+                            container: nextSibling,
+                            beforeEl: nextSibling.firstElementChild,
+                        };
+                    }
                 }
             }
         }
@@ -4638,6 +6520,7 @@ Strict rules:
             const existingBtn = mountPoint.container.querySelector('[data-ghcn-collab-btn]');
             if (existingBtn) {
                 if (existingBtn === mountPoint.beforeEl?.previousElementSibling || (existingBtn === mountPoint.container.firstElementChild && !mountPoint.beforeEl)) {
+                    existingBtn.__ghcnTargetTextarea = textarea;
                     textarea.__ghcnCollabBtn = existingBtn;
                     return;
                 }
@@ -4670,10 +6553,11 @@ Strict rules:
         btn.setAttribute('data-ghcn-collab-btn', 'true');
         btn.title = '将中文草稿润色为规范、地道的英文 Markdown';
         btn.innerHTML = `<span class="ghcn-collab-btn-icon" aria-hidden="true">${COLLAB_ICONS.sparkle}</span><span class="ghcn-collab-btn-label">润色转为英文</span>`;
+        btn.__ghcnTargetTextarea = textarea;
         btn.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            openCollaborationModal(textarea);
+            openCollaborationModal(btn.__ghcnTargetTextarea || textarea);
         });
         textarea.__ghcnCollabBtn = btn;
         return btn;
@@ -4707,6 +6591,12 @@ Strict rules:
     }
 
     function closeCollaborationModal() {
+        if (typeof collabRuntime.modalCleanup === 'function') {
+            try {
+                collabRuntime.modalCleanup();
+            } catch { /* 忽略弹窗清理异常 */ }
+            collabRuntime.modalCleanup = null;
+        }
         if (collabRuntime.modalEl) {
             collabRuntime.modalEl.remove();
             collabRuntime.modalEl = null;
@@ -4892,15 +6782,17 @@ Strict rules:
             copyBtn.disabled = !hasText;
         });
 
+        let copyResetTimer = 0;
         copyBtn.addEventListener('click', async () => {
             const text = previewArea.value;
             if (!text) return;
             try {
                 await navigator.clipboard.writeText(text);
-                const originalText = copyBtn.textContent;
+                window.clearTimeout(copyResetTimer);
                 copyBtn.textContent = '已复制';
-                window.setTimeout(() => {
-                    copyBtn.textContent = originalText;
+                copyResetTimer = window.setTimeout(() => {
+                    copyResetTimer = 0;
+                    copyBtn.textContent = '复制英文';
                 }, 1500);
             } catch {
                 previewArea.select();
@@ -4911,7 +6803,12 @@ Strict rules:
         applyBtn.addEventListener('click', () => {
             const text = previewArea.value;
             if (!text) return;
-            applyPolishedTextToTextarea(textarea, text);
+            const applied = applyPolishedTextToTextarea(textarea, text);
+            if (!applied) {
+                statusEl.className = 'ghcn-collab-status is-error';
+                statusEl.textContent = '原输入框已失效或不可编辑，请点击“复制英文”手动粘贴。';
+                return;
+            }
             closeCollaborationModal();
         });
 
@@ -4925,6 +6822,10 @@ Strict rules:
         });
 
         const keyHandler = (event) => {
+            if (!overlay.isConnected) {
+                closeCollaborationModal();
+                return;
+            }
             if (event.key === 'Escape') {
                 event.preventDefault();
                 closeCollaborationModal();
@@ -4932,12 +6833,18 @@ Strict rules:
         };
         window.addEventListener('keydown', keyHandler);
 
+        const cleanupListeners = () => {
+            window.clearTimeout(copyResetTimer);
+            copyResetTimer = 0;
+            window.removeEventListener('keydown', keyHandler);
+        };
         const originalRemove = overlay.remove.bind(overlay);
         overlay.remove = () => {
-            window.removeEventListener('keydown', keyHandler);
+            cleanupListeners();
             originalRemove();
         };
 
+        collabRuntime.modalCleanup = cleanupListeners;
         collabRuntime.modalEl = overlay;
         document.body.appendChild(overlay);
 
@@ -4975,13 +6882,17 @@ Strict rules:
             };
             applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (providerConfig.key) {
+                headers.Authorization = `Bearer ${providerConfig.key}`;
+            }
+
             const data = await proxyFetchJson({
                 url: providerConfig.url,
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${providerConfig.key}`,
-                },
+                headers,
                 body: JSON.stringify(payload),
             });
 
@@ -5007,7 +6918,12 @@ Strict rules:
             durationMs,
             detail: `collab_mode=${mode}`,
         }).catch((err) => {
-            console.warn('[协作润色助手] 记录写入失败:', err);
+            const isInvalidated = typeof isExtensionContextInvalidatedError === 'function'
+                ? isExtensionContextInvalidatedError(err)
+                : /extension context invalidated|context invalidated|插件上下文已失效/i.test(String(err?.message || err || ''));
+            if (!isInvalidated) {
+                console.warn('[协作润色助手] 记录写入失败:', err);
+            }
         });
 
         return {
@@ -5018,7 +6934,7 @@ Strict rules:
     }
 
     function applyPolishedTextToTextarea(textarea, text) {
-        if (!textarea) return;
+        if (!textarea || !textarea.isConnected || textarea.disabled || textarea.readOnly) return false;
         textarea.focus();
         textarea.select();
 
@@ -5039,6 +6955,7 @@ Strict rules:
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
             textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        return true;
     }
 
     function injectCollaborationControlStyles() {
@@ -5378,6 +7295,14 @@ Strict rules:
 - **💡 选型考量**：说明同类对比或适用场景（如：“相比 XX 更轻量，适合小型集群”）。
 输出纯 Markdown 列表，严格不要包含额外前缀、礼貌客套或总结废话。`;
 
+    function isTldrContextInvalidated(error) {
+        if (typeof isExtensionContextInvalidatedError === 'function') {
+            return isExtensionContextInvalidatedError(error);
+        }
+        const message = String(error?.message || error || '');
+        return /extension context invalidated|context invalidated|插件上下文已失效/i.test(message);
+    }
+
     function isTldrCapsuleEnabled() {
         return FeatureSet.enable_extension && FeatureSet.enable_repo_tldr && isReadmePage();
     }
@@ -5415,10 +7340,44 @@ Strict rules:
         }
 
         injectTldrCapsuleStyles();
-        mountTldrCapsule(readmeRoot, repoInfo);
+        mountTldrCapsule(readmeRoot, repoInfo).catch((error) => {
+            if (!isTldrContextInvalidated(error)) {
+                console.warn('[速读胶囊] 挂载失败:', error);
+            }
+        });
+    }
+
+    function getTldrDocUrl() {
+        if (typeof getDocumentUrlWithoutHash === 'function') {
+            return getDocumentUrlWithoutHash();
+        }
+        const href = String(window?.location?.href || '');
+        if (!href) return '';
+        try {
+            const parsed = new URL(href);
+            parsed.hash = '';
+            return parsed.href;
+        } catch {
+            return href.split('#')[0];
+        }
+    }
+
+    function resetTldrRuntimeForNavigation() {
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        tldrRuntime.isBusy = false;
+        tldrRuntime.busyDocUrl = '';
+        tldrRuntime.busyCard = null;
+        document.querySelectorAll('[data-ghcn-tldr="capsule"]').forEach((el) => el.remove());
     }
 
     function restoreTldrCapsuleControls() {
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        tldrRuntime.isBusy = false;
+        tldrRuntime.busyDocUrl = '';
+        tldrRuntime.busyCard = null;
+        tldrRuntime.activeDocUrl = '';
         document.querySelectorAll('[data-ghcn-tldr]').forEach((el) => el.remove());
     }
 
@@ -5436,19 +7395,31 @@ Strict rules:
 
     function extractReadmeIntroText(readmeRoot, maxChars = 2400) {
         const state = typeof getReadmeElementState === 'function' ? getReadmeElementState(readmeRoot) : null;
-        let sourceEl = readmeRoot;
+        let clone;
         if (state?.originalHtml) {
-            sourceEl = document.createElement('div');
-            sourceEl.innerHTML = state.originalHtml;
+            clone = typeof parseInertHtmlBody === 'function'
+                ? parseInertHtmlBody(state.originalHtml)
+                : (() => {
+                    const div = document.createElement('div');
+                    div.innerHTML = state.originalHtml;
+                    return div;
+                })();
+        } else {
+            clone = readmeRoot.cloneNode(true);
         }
-        const clone = sourceEl.cloneNode(true);
-        clone.querySelectorAll('pre, code, svg, img, table, .notranslate, [translate="no"]').forEach((el) => el.remove());
+        clone.querySelectorAll?.('pre, code, svg, img, table, .notranslate, [translate="no"]').forEach((el) => el.remove());
         const text = normalizeText(clone.textContent || '');
         return text.slice(0, maxChars);
     }
 
     function findTldrMountPoint(readmeRoot) {
         if (!readmeRoot) return null;
+
+        if (typeof chineseReadme !== 'undefined'
+            && chineseReadme?.state?.root === readmeRoot
+            && chineseReadme.state.controls?.parentElement) {
+            return { parent: chineseReadme.state.controls.parentElement, before: chineseReadme.state.controls };
+        }
 
         // 如果处于 .Box-body 内部，优先挂载在 .Box-body 之前（紧贴 .Box-header 之后，贴紧上边和左右）
         const boxBody = readmeRoot.closest('.Box-body');
@@ -5517,9 +7488,13 @@ Strict rules:
         const mountPoint = findTldrMountPoint(readmeRoot);
         if (!mountPoint) return null;
 
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
         const oldCard = document.querySelector('[data-ghcn-tldr="capsule"]');
         if (oldCard) {
-            if (oldCard.dataset.sourceHash === sourceHash && oldCard.parentElement === mountPoint.parent && oldCard.nextElementSibling === mountPoint.before) {
+            if (oldCard.dataset.sourceHash === sourceHash
+                && oldCard.dataset.pathname === currentPathname
+                && oldCard.parentElement === mountPoint.parent
+                && oldCard.nextElementSibling === mountPoint.before) {
                 oldCard.style.display = '';
                 return oldCard;
             }
@@ -5530,6 +7505,7 @@ Strict rules:
         card.className = 'ghcn-tldr-card';
         card.dataset.ghcnTldr = 'capsule';
         card.dataset.sourceHash = sourceHash;
+        card.dataset.pathname = currentPathname;
 
         mountPoint.parent.insertBefore(card, mountPoint.before);
         return card;
@@ -5543,6 +7519,8 @@ Strict rules:
 
         let btn = document.querySelector('[data-ghcn-tldr="header-btn"]');
         if (btn) {
+            btn.__ghcnTldrOnToggle = onToggle;
+            btn.dataset.sourceHash = sourceHash;
             if (btn.parentElement === headerActions.container && btn.nextElementSibling === headerActions.beforeEl) {
                 return btn;
             }
@@ -5559,14 +7537,19 @@ Strict rules:
         btn.dataset.ghcnTldr = 'header-btn';
         btn.dataset.sourceHash = sourceHash;
         btn.innerHTML = `<span class="ghcn-tldr-header-icon" aria-hidden="true">${TLDR_ICONS.sparkle}</span><span class="ghcn-tldr-header-text">AI 速读</span>`;
+        btn.__ghcnTldrOnToggle = onToggle;
 
         headerActions.container.insertBefore(btn, headerActions.beforeEl);
 
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (typeof onToggle === 'function') {
-                onToggle(btn);
+            if (typeof btn.__ghcnTldrOnToggle === 'function') {
+                Promise.resolve(btn.__ghcnTldrOnToggle(btn)).catch((error) => {
+                    if (!isTldrContextInvalidated(error)) {
+                        console.warn('[速读胶囊] 交互失败:', error);
+                    }
+                });
             }
         });
 
@@ -5574,18 +7557,55 @@ Strict rules:
     }
 
     async function mountTldrCapsule(readmeRoot, repoInfo) {
+        const expectedDocUrl = getTldrDocUrl();
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+        if (tldrRuntime.activeDocUrl && tldrRuntime.activeDocUrl !== expectedDocUrl) {
+            resetTldrRuntimeForNavigation();
+        }
+        tldrRuntime.activeDocUrl = expectedDocUrl;
+        tldrRuntime.mountSeq = (tldrRuntime.mountSeq || 0) + 1;
+        const mountSeq = tldrRuntime.mountSeq;
+        const isMountValid = () => mountSeq === tldrRuntime.mountSeq
+            && getTldrDocUrl() === expectedDocUrl
+            && readmeRoot.isConnected
+            && isTldrCapsuleEnabled();
+
         const sourceHash = getTldrSourceHash(readmeRoot);
         const cacheKey = buildTldrCacheKey(repoInfo, sourceHash);
 
         // 1. 精确匹配当前 hash 缓存
-        let cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true });
+        let cached = null;
+        try {
+            cached = await getRepoCachedTranslation(cacheKey, { requireComplete: true });
+        } catch (error) {
+            if (isTldrContextInvalidated(error)) return;
+            console.warn('[速读胶囊] 读取缓存失败:', error);
+        }
+        if (!isMountValid()) {
+            return;
+        }
 
-        // 2. 兜底匹配该仓库最新生成的速读缓存（防止 README 翻译后 DOM 变动导致 hash 微小变化）
+        // 2. 兜底匹配该仓库当前路径最新生成的速读缓存（防止 README 翻译后 DOM 变动导致 hash 微小变化）
         if (!cached?.tldrContent && FeatureSet.readme_enable_repo_cache && repoInfo?.fullName) {
-            await ensureRepoCacheLoaded();
+            try {
+                await ensureRepoCacheLoaded();
+            } catch (error) {
+                if (isTldrContextInvalidated(error)) return;
+                console.warn('[速读胶囊] 加载仓库缓存失败:', error);
+            }
+            if (!isMountValid()) {
+                return;
+            }
             const prefix = `${repoInfo.fullName.toLowerCase()}|tldr|`;
+            const repoRootPathLower = `/${repoInfo.fullName.toLowerCase()}`;
+            const currentPathLower = currentPathname.toLowerCase();
             for (const [key, entry] of readmeRuntime.repoCacheMap.entries()) {
-                if (key.startsWith(prefix) && entry.tldrContent && entry.complete === true) {
+                const entryPathLower = entry?.pathname ? (String(entry.pathname).replace(/\/+$/, '') || '/').toLowerCase() : '';
+                const matchesPath = entryPathLower
+                    ? entryPathLower === currentPathLower
+                    : currentPathLower === repoRootPathLower;
+                if (key.startsWith(prefix) && matchesPath
+                    && entry.tldrContent && entry.complete === true) {
                     cached = entry;
                     break;
                 }
@@ -5593,10 +7613,19 @@ Strict rules:
         }
 
         const headerActions = findReadmeHeaderActions(readmeRoot);
+        const isMatchingCard = (targetCard) => Boolean(
+            targetCard
+            && targetCard.dataset.sourceHash === sourceHash
+            && targetCard.dataset.pathname === currentPathname,
+        );
 
         // 挂载或更新头部按钮（位于 Copilot 图标左侧）
         const headerBtn = mountTldrHeaderButton(readmeRoot, repoInfo, async (btn) => {
             let card = document.querySelector('[data-ghcn-tldr="capsule"]');
+            if (card && !isMatchingCard(card)) {
+                card.remove();
+                card = null;
+            }
 
             // 如果卡片已经存在且可见，点击则折叠/收起卡片
             if (card && card.style.display !== 'none') {
@@ -5635,17 +7664,29 @@ Strict rules:
         });
 
         // 默认不主动展示下方的总结内容卡片，保持 README 清爽，待用户点击头部「AI 速读」按钮后再展开
-        const existingCard = document.querySelector('[data-ghcn-tldr="capsule"]');
-        if (existingCard && !headerBtn?.classList.contains('is-active')) {
+        let existingCard = document.querySelector('[data-ghcn-tldr="capsule"]');
+        if (existingCard && !isMatchingCard(existingCard)) {
+            existingCard.remove();
+            existingCard = null;
+        }
+        const isExistingCardVisible = Boolean(
+            existingCard
+            && isMatchingCard(existingCard)
+            && existingCard.style.display !== 'none',
+        );
+        if (existingCard && (!isExistingCardVisible || !headerBtn?.classList.contains('is-active'))) {
             existingCard.style.display = 'none';
         }
 
         if (headerBtn) {
-            headerBtn.classList.remove('is-active');
-            headerBtn.setAttribute('aria-expanded', 'false');
+            const keepActive = Boolean(existingCard && isExistingCardVisible && headerBtn.classList.contains('is-active'));
+            headerBtn.classList.toggle('is-active', keepActive);
+            headerBtn.setAttribute('aria-expanded', keepActive ? 'true' : 'false');
             if (cached?.tldrContent) {
                 headerBtn.setAttribute('data-has-cache', 'true');
                 headerBtn.title = 'AI 项目速读 (TL;DR) - 点击展开速读卡片';
+            } else {
+                headerBtn.removeAttribute('data-has-cache');
             }
         } else if (!headerActions) {
             // 极低概率：若找不到任何头部按钮挂载点，降级在 README 顶部展示初始提炼条
@@ -5710,7 +7751,7 @@ Strict rules:
                 <div class="ghcn-tldr-title-wrap">
                     <span class="ghcn-tldr-error-icon" aria-hidden="true">${TLDR_ICONS.alert}</span>
                     <strong class="Box-title ghcn-tldr-title">生成速读失败</strong>
-                    <span class="ghcn-tldr-error-msg">${decodeHtmlEntities(message || '接口调用异常')}</span>
+                    <span class="ghcn-tldr-error-msg">${escapeHtml(message || '接口调用异常')}</span>
                 </div>
                 <div class="ghcn-tldr-actions">
                     <button type="button" class="btn btn-sm ghcn-tldr-btn" data-ghcn-tldr-action="retry">重试</button>
@@ -5907,8 +7948,19 @@ Strict rules:
     }
 
     async function executeTldrGeneration(card, repoInfo, readmeRoot, sourceHash) {
-        if (tldrRuntime.isBusy) return;
+        const expectedDocUrl = getTldrDocUrl();
+        if (tldrRuntime.isBusy && tldrRuntime.busyDocUrl === expectedDocUrl && tldrRuntime.busyCard?.isConnected) return;
         tldrRuntime.isBusy = true;
+        tldrRuntime.busyDocUrl = expectedDocUrl;
+        tldrRuntime.busyCard = card;
+        const currentPathname = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+        tldrRuntime.genSeq = (tldrRuntime.genSeq || 0) + 1;
+        const genSeq = tldrRuntime.genSeq;
+        const isGenValid = () => genSeq === tldrRuntime.genSeq
+            && getTldrDocUrl() === expectedDocUrl
+            && card.isConnected
+            && FeatureSet.enable_extension
+            && FeatureSet.enable_repo_tldr;
         renderTldrLoading(card);
 
         const headerBtn = document.querySelector('[data-ghcn-tldr="header-btn"]');
@@ -5952,15 +8004,21 @@ Strict rules:
                 };
                 applyOpenAiCompatibleRequestOptions(payload, providerConfig);
 
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                if (providerConfig.key) {
+                    headers.Authorization = `Bearer ${providerConfig.key}`;
+                }
+
                 const data = await proxyFetchJson({
                     url: providerConfig.url,
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${providerConfig.key}`,
-                    },
+                    headers,
                     body: JSON.stringify(payload),
                 });
+
+                if (!isGenValid()) return;
 
                 const firstChoice = data?.choices?.[0] || {};
                 summaryText = stripOpenAiReasoningBlocks(extractChatMessageContent(firstChoice));
@@ -5971,17 +8029,24 @@ Strict rules:
                 throw new Error('速读胶囊生成结果为空，请重试或检查接口配置。');
             }
 
+            if (!isGenValid()) return;
+
             const durationMs = performance.now() - startAt;
 
             // Save to repo cache
             await upsertRepoCachedTranslation(cacheKey, {
                 repo: repoInfo.fullName,
+                pathname: currentPathname,
                 sourceHash: activeSourceHash,
                 tldrContent: summaryText,
                 complete: true,
             }).catch((err) => {
-                console.warn('[速读胶囊] 写入缓存失败:', err);
+                if (!isTldrContextInvalidated(err)) {
+                    console.warn('[速读胶囊] 写入缓存失败:', err);
+                }
             });
+
+            if (!isGenValid()) return;
 
             // Append record
             await appendReadmeTranslationRecord({
@@ -5993,8 +8058,12 @@ Strict rules:
                 sourceHash: activeSourceHash,
                 detail: 'tldr_generated',
             }).catch((err) => {
-                console.warn('[速读胶囊] 写入翻译记录失败:', err);
+                if (!isTldrContextInvalidated(err)) {
+                    console.warn('[速读胶囊] 写入翻译记录失败:', err);
+                }
             });
+
+            if (!isGenValid()) return;
 
             renderTldrContent(card, summaryText, repoInfo, readmeRoot, activeSourceHash, false);
             if (headerBtn) {
@@ -6003,13 +8072,20 @@ Strict rules:
                 headerBtn.setAttribute('aria-expanded', 'true');
             }
         } catch (error) {
-            console.error('[速读胶囊] 生成失败:', error);
+            if (!isTldrContextInvalidated(error)) {
+                console.error('[速读胶囊] 生成失败:', error);
+            }
+            if (!isGenValid()) return;
             renderTldrError(card, normalizeRuntimeErrorMessage(error), repoInfo, readmeRoot, activeSourceHash);
             if (headerBtn) {
                 headerBtn.classList.remove('is-loading');
             }
         } finally {
-            tldrRuntime.isBusy = false;
+            if (genSeq === tldrRuntime.genSeq) {
+                tldrRuntime.isBusy = false;
+                tldrRuntime.busyDocUrl = '';
+                tldrRuntime.busyCard = null;
+            }
         }
     }
 
@@ -6455,12 +8531,39 @@ Strict rules:
 
         // 监听 Turbo 完成事件（延迟翻译）
         document.addEventListener('turbo:load', () => {
-            updatePageConfig('turbo:load');
+            const currentDocUrl = typeof getDocUrlNoHashFallback === 'function'
+                ? getDocUrlNoHashFallback()
+                : String(window?.location?.href || '').split('#')[0];
+            const docUrlChanged = Boolean(typeof lastHistoryDocUrl !== 'undefined' && lastHistoryDocUrl && currentDocUrl && currentDocUrl !== lastHistoryDocUrl);
+            if (typeof lastHistoryDocUrl !== 'undefined' && currentDocUrl) {
+                lastHistoryDocUrl = currentDocUrl;
+            }
+            if (docUrlChanged) {
+                if (typeof closeCollaborationModal === 'function') {
+                    closeCollaborationModal();
+                }
+                if (typeof resetTldrRuntimeForNavigation === 'function') {
+                    resetTldrRuntimeForNavigation();
+                }
+            }
+            if (typeof readmeRuntime === 'object') {
+                readmeRuntime.runEpoch = (readmeRuntime.runEpoch || 0) + 1;
+            }
+            if (typeof issuePrRuntime === 'object') {
+                issuePrRuntime.runEpoch = (issuePrRuntime.runEpoch || 0) + 1;
+            }
+            if (!FeatureSet.enable_extension) {
+                if (typeof restoreAllExtensionFeatures === 'function') {
+                    restoreAllExtensionFeatures();
+                }
+                return;
+            }
+            updatePageConfig('turbo:load', true);
             scheduleIssuePrTranslationControls('turbo:load');
             scheduleCollaborationHelperControls('turbo:load');
             scheduleTldrCapsuleControls('turbo:load');
             scheduleReadmeTranslation('turbo:load');
-            if (!FeatureSet.enable_extension || !pageConfig.currentPageType) return;
+            if (!pageConfig.currentPageType) return;
 
             // 软导航后必须全量扫描；仅靠 title/selector 会漏掉仓库顶栏等 React 文案
             scheduleTurboPageTranslation();

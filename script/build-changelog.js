@@ -43,7 +43,11 @@ function parseChangelog(markdown) {
 }
 
 function escapeHtml(text) {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(text) {
+  return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function inlineHtml(text) {
@@ -58,10 +62,10 @@ function renderList(entries, pad) {
   const out = [`${pad}<ol class="changelog-list">`];
 
   for (const entry of entries) {
-    out.push(`${pad}  <li class="changelog-item" id="${versionAnchor(entry.version)}">`);
+    out.push(`${pad}  <li class="changelog-item" id="${escapeAttr(versionAnchor(entry.version))}">`);
     out.push(`${pad}    <div class="changelog-meta">`);
-    out.push(`${pad}      <span class="changelog-version">v${entry.version}</span>`);
-    out.push(`${pad}      <time class="changelog-date" datetime="${entry.date}">${entry.date}</time>`);
+    out.push(`${pad}      <span class="changelog-version">v${escapeHtml(entry.version)}</span>`);
+    out.push(`${pad}      <time class="changelog-date" datetime="${escapeAttr(entry.date)}">${escapeHtml(entry.date)}</time>`);
     out.push(`${pad}    </div>`);
     out.push(`${pad}    <ul class="changelog-points">`);
     entry.points.forEach((point) => out.push(`${pad}      <li>${inlineHtml(point)}</li>`));

@@ -27,12 +27,28 @@
         return `${text.slice(0, maxLength)}...`;
     }
 
-    function createHash(input) {
-        let hash = 0;
-        for (let i = 0; i < input.length; i += 1) {
-            hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+    function parseInertHtmlBody(html) {
+        if (typeof DOMParser === 'function') {
+            const parsedBody = new DOMParser().parseFromString(String(html || ''), 'text/html')?.body;
+            if (parsedBody && typeof parsedBody.textContent === 'string') {
+                return parsedBody;
+            }
         }
-        return (hash >>> 0).toString(16);
+        const container = document.createElement('div');
+        container.innerHTML = String(html || '');
+        return container;
+    }
+
+    function createHash(input) {
+        const text = String(input || '');
+        let h1 = 0x811c9dc5 ^ text.length;
+        let h2 = 0x9e3779b1 + text.length;
+        for (let i = 0; i < text.length; i += 1) {
+            const ch = text.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 0x01000193);
+            h2 = (((h2 << 5) - h2) + ch) | 0;
+        }
+        return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
     }
 
     function isObjectObjectArtifact(value) {

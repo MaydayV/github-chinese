@@ -392,19 +392,22 @@ body {
   font-size: 16px;
 }
 
-input,
-select {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
   width: 100%;
   border: 1px solid #b4c6e5;
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 16px;
+  font-family: inherit;
   background: #fdfefe;
   color: var(--text);
 }
 
-input:focus,
-select:focus {
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: #3471f7;
   box-shadow: 0 0 0 3px rgba(52, 113, 247, 0.16);
@@ -415,6 +418,112 @@ select:focus {
   color: #64748b;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.hint code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #e9eff8;
+  color: #243652;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.hint a {
+  color: #2455cc;
+  text-decoration: none;
+}
+
+.hint a:hover {
+  text-decoration: underline;
+}
+
+.provider-guide {
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1px solid #d6e3f6;
+  border-radius: 12px;
+  background: #f4f8ff;
+}
+
+.provider-guide-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #21375c;
+}
+
+.provider-guide .hint {
+  margin-top: 6px;
+}
+
+.provider-guide-steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: #364966;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.provider-guide-steps li + li {
+  margin-top: 8px;
+}
+
+.provider-guide-steps a {
+  color: #2455cc;
+  text-decoration: none;
+}
+
+.provider-guide-steps a:hover {
+  text-decoration: underline;
+}
+
+.provider-guide-steps code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #e6eefb;
+  color: #1f3354;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.provider-guide-sub {
+  display: block;
+  margin-top: 4px;
+  color: #5b6d88;
+  font-size: 12px;
+}
+
+.provider-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+}
+
+.provider-download-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1px solid #b9cef2;
+  background: #fdfefe;
+  color: #1f4fc2 !important;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.provider-download-btn:hover {
+  background: #e9f1ff;
+  border-color: #8eb2ee;
+}
+
+.provider-download-link {
+  font-size: 12px;
+  color: #4f6078 !important;
 }
 
 .guide-list {
@@ -589,6 +698,12 @@ select:focus {
   background: #fff8df;
 }
 
+.history-source.is-discussion {
+  color: #1f4f99;
+  border-color: #a9c5f0;
+  background: #eef4ff;
+}
+
 .history-source.is-pull {
   color: #6850a0;
   border-color: #cab9f4;
@@ -739,7 +854,7 @@ select:focus {
 }
 
 .footer-meta {
-  margin-top: 2px;
+  margin-top: 16px;
   padding: 14px 16px;
   border: 1px solid var(--line-soft);
   border-radius: 14px;
@@ -803,3 +918,19 @@ select:focus {
     justify-content: flex-start;
   }
 }
+.maintenance-panel { margin-top: 16px; }
+.maintenance-check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; cursor: pointer; font-weight: 600; }
+.maintenance-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--primary); cursor: pointer; }
+.maintenance-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.maintenance-file-btn { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.maintenance-file-btn input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }
+.maintenance-file-btn:focus-within { outline: 3px solid rgba(47, 109, 255, 0.25); outline-offset: 2px; }
+.maintenance-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; max-height: 360px; overflow: auto; }
+.maintenance-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; align-items: center; }
+.maintenance-row input { flex: 1 1 160px; min-width: 0; }
+.maintenance-list .maintenance-row { margin: 0; }
+.maintenance-notice { margin-top: 10px; }
+.maintenance-notice[hidden] { display: none; }
+.maintenance-notice a { color: #2455cc; font-weight: 600; text-decoration: underline; }
+#entrySearch { margin-top: 8px; }
+#excludedPaths { width: 100%; margin-top: 8px; resize: vertical; }
